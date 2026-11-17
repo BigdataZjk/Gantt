@@ -79,6 +79,36 @@ async function openSession(page: Page, mode: "setup" | "guest" | "member") {
   };
 }
 
+test("首次设密时任一非空密码显示明文，小人持续移开视线", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openSession(page, "setup");
+  const scene = page.locator("[data-attention]");
+  const eyes = scene.locator('[class*="eyes"]').first();
+  const password = page.locator("#rsm-setup-password");
+  const confirm = page.locator("#rsm-setup-confirm");
+  await expect(scene).toHaveAttribute("data-attention", "idle");
+  await password.fill("密");
+  await expect(scene).toHaveAttribute("data-attention", "idle");
+  await page.getByRole("button", { name: "显示初始密码", exact: true }).click();
+  await expect(password).toHaveAttribute("type", "text");
+  await expect(scene).toHaveAttribute("data-attention", "privacy");
+  await expect(eyes).toHaveCSS("transform", "matrix(1, 0, 0, 1, -12, -6)");
+  await confirm.fill("密");
+  await page.getByRole("button", { name: "显示确认密码", exact: true }).click();
+  await page.getByRole("button", { name: "隐藏初始密码", exact: true }).click();
+  await expect(password).toHaveAttribute("type", "password");
+  await expect(scene).toHaveAttribute("data-attention", "privacy");
+  await confirm.fill("");
+  await expect(scene).toHaveAttribute("data-attention", "idle");
+  await confirm.fill("密");
+  await expect(scene).toHaveAttribute("data-attention", "privacy");
+  await page.getByRole("button", { name: "隐藏确认密码", exact: true }).click();
+  await expect(scene).toHaveAttribute("data-attention", "idle");
+  await page.getByRole("button", { name: "设置密码并进入", exact: true }).click();
+  await expect(page.getByRole("button", { name: "新增需求", exact: true })).toBeEnabled();
+  await expect(page.getByText(guestNotice, { exact: true })).toHaveCount(0);
+});
+
 for (const mode of ["setup", "guest"] as const) {
   test(`${mode === "setup" ? "首次设密" : "普通登录"}后，晚到的游客资料不能恢复登录提示和只读权限`, async ({ page }) => {
     const session = await openSession(page, mode);

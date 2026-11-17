@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# 自启动：macOS 用户级 launchd；Linux root 使用系统级 systemd，普通用户使用 --user。
+# 自启动：macOS 用户级 launchd；Linux 使用 systemd 或现有 Supervisor。
 # 一律以前台方式运行 scripts/lib/service-run.sh；启用自启动后 start/stop 必须走服务管理器，
 # 避免 launchd/systemd 的 KeepAlive/Restart 与手工 kill 互相冲突。
 
 SERVICE_UID=$(id -u)
 HOST_USER_HOME=$(user_home)
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/supervisor.sh"
 
 service_hash() { short_hash "$RSM_HOME"; }
 mac_label() { printf 'com.rsm.service.%s' "$(service_hash)"; }
@@ -21,11 +22,12 @@ linux_unit_dir() {
   else printf '%s/.config/systemd/user' "$HOST_USER_HOME"; fi
 }
 linux_unit_path() { printf '%s/%s' "$(linux_unit_dir)" "$(linux_unit_name)"; }
-
 autostart_enabled() {
   case "$(host_os)" in
     darwin) [ -f "$(mac_plist_path)" ] ;;
-    linux) [ -f "$(linux_unit_path)" ] ;;
+    linux)
+      if [ "$(linux_service_backend)" = supervisor ]; then [ -f "$(supervisor_marker)" ]
+      else [ -f "$(linux_unit_path)" ]; fi ;;
     *) return 1 ;;
   esac
 }
@@ -33,7 +35,9 @@ autostart_enabled() {
 service_loaded() {
   case "$(host_os)" in
     darwin) launchctl print "gui/$SERVICE_UID/$(mac_label)" >/dev/null 2>&1 ;;
-    linux) linux_systemctl is-active --quiet "$(linux_unit_name)" >/dev/null 2>&1 ;;
+    linux)
+      if [ "$(linux_service_backend)" = supervisor ]; then supervisor_loaded
+      else linux_systemctl is-active --quiet "$(linux_unit_name)" >/dev/null 2>&1; fi ;;
     *) return 1 ;;
   esac
 }
@@ -135,6 +139,7 @@ service_start() {
       fi
       ;;
     linux)
+      if [ "$(linux_service_backend)" = supervisor ]; then supervisor_start; return; fi
       write_unit || die "更新 systemd 配置失败"
       linux_systemctl daemon-reload || die "systemd 重载失败"
       linux_systemctl start "$(linux_unit_name)" || die "systemd 启动失败，请检查服务日志"
@@ -147,14 +152,19 @@ service_stop() {
   if autostart_enabled; then
     case "$(host_os)" in
       darwin) mac_bootout || die "无法停止 launchd 服务，已中止以避免残留实例" ;;
-      linux) linux_systemctl stop "$(linux_unit_name)" || die "无法停止 systemd 服务，已中止以避免残留实例" ;;
+      linux)
+        if [ "$(linux_service_backend)" = supervisor ]; then supervisor_stop
+        else linux_systemctl stop "$(linux_unit_name)" || die "无法停止 systemd 服务，已中止以避免残留实例"; fi ;;
       *) die "不支持的自启动平台: $(host_os)" ;;
     esac
   fi
 }
 
 service_install_and_start() {
-  if [ "$(host_os)" = "linux" ]; then linux_require_manager; fi
+  if [ "$(host_os)" = "linux" ]; then
+    if [ "$(linux_service_backend)" = supervisor ]; then supervisor_install_and_start; return; fi
+    linux_require_manager
+  fi
   ensure_layout
   ensure_service_wrapper
   rotate_log "$RSM_HOME/logs/service.log" 5242880
@@ -186,6 +196,7 @@ service_install_and_start() {
 
 service_remove() {
   if autostart_enabled; then
+    if [ "$(host_os)" = linux ] && [ "$(linux_service_backend)" = supervisor ]; then supervisor_remove; return; fi
     if instance_running; then stop_instance; fi
     case "$(host_os)" in
       darwin)
@@ -206,7 +217,9 @@ service_remove() {
 autostart_config_path() {
   case "$(host_os)" in
     darwin) mac_plist_path ;;
-    linux) linux_unit_path ;;
+    linux)
+      if [ "$(linux_service_backend)" = supervisor ]; then sed -n '2p' "$(supervisor_marker)"
+      else linux_unit_path; fi ;;
     *) printf '' ;;
   esac
 }
@@ -219,6 +232,11 @@ autostart_status_print() {
     case "$(host_os)" in
       darwin) printf '  服务管理器: launchd（用户级）\n' ;;
       linux)
+        if [ "$(linux_service_backend)" = supervisor ]; then
+          printf '  服务管理器: Supervisor（独立进程组 %s）\n' "$(supervisor_name)"
+          printf '  随现有 supervisord 启动；宿主机/容器的启动策略由平台控制\n'
+          return
+        fi
         if linux_system_service; then printf '  服务管理器: systemd（系统级）\n'
         else printf '  服务管理器: systemd --user\n'; fi
         if ! linux_systemctl is-enabled --quiet "$(linux_unit_name)" >/dev/null 2>&1; then

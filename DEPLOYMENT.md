@@ -108,6 +108,8 @@ rsm/
 ./rsm.sh logs -n 100
 ```
 
-Linux root 使用系统级 systemd，普通账号使用用户级 systemd；macOS 使用登录后启动的用户级 launchd。移动已注册自启动的项目目录前应先停服并取消旧注册，移动后重新注册。macOS 自启动目录应避开 Documents、Desktop、Downloads 等受系统隐私保护的位置。
+Linux 使用 systemd（root 为系统级，普通账号为用户级）；PID 1 为 `supervisord` 时复用现有 Supervisor，不安装或重启服务管理器。`./rsm.sh autostart enable` 自动核实运行中管理器的配置及 include 目录，为当前路径创建独立的 `rsm-<路径摘要>` 进程组。先校验配置，再短暂停止本实例并接管；失败时恢复原后台运行。后续启停、升级和禁用均限定到本实例，其他进程组的待更新配置也不会应用。配置无法确认时安全中止；确需指定时可设置 `RSM_SUPERVISOR_CONFIG=/path/to/supervisord.conf`。
 
-macOS arm64 已完成实际部署验证；Linux 的脚本与服务配置已做隔离检查，实机部署及重启仍需在目标服务器验证。
+Supervisor 接管后，RSM 随现有 supervisord 启动；宿主机是否自动启动容器由平台管理。macOS 使用登录后启动的用户级 launchd。移动已注册自启动的项目目录前应先停服并取消旧注册，移动后重新注册。macOS 自启动目录应避开 Documents、Desktop、Downloads 等受系统隐私保护的位置。
+
+macOS arm64 已完成实际部署验证；systemd 已做受控回归，Supervisor 已用独立管理器及另一项持续运行的服务验收。Linux 实机部署及宿主机重启仍需在目标服务器验证。

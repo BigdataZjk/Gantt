@@ -13,6 +13,7 @@ if [ "${1:-}" = "--service-case" ]; then
   RSM_HOME="$RSM_TEST_DIR/instance with space"
   RSM_ADDR=0.0.0.0:1111
   host_os() { printf linux; }
+  linux_service_backend() { printf systemd; }
   printf '%s\n' "$(linux_unit_dir)" >"$RSM_TEST_DIR/default-unit-dir"
   linux_unit_dir() { printf '%s/units' "$RSM_TEST_DIR"; }
   ensure_layout() { mkdir -p "$RSM_HOME/logs"; }

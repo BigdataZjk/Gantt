@@ -208,6 +208,8 @@ export function SetupScreen() {
   const notice = useNotice();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -236,7 +238,7 @@ export function SetupScreen() {
   };
 
   return (
-    <AuthShell fullScreen>
+    <AuthShell fullScreen attention={(passwordVisible && password) || (confirmVisible && confirm) ? "privacy" : "idle"}>
       <form className={styles.form} onSubmit={submit} noValidate>
         <div className={styles.heading}>
           <h2>首次使用 RSM</h2>
@@ -248,11 +250,11 @@ export function SetupScreen() {
         </div>
         <div className={styles.field}>
           <label htmlFor="rsm-setup-password">密码（至少 1 个任意字符）</label>
-          <PasswordInput id="rsm-setup-password" value={password} onChange={(value) => { setPassword(value); setError(""); }} autoComplete="new-password" labelText="初始密码" />
+          <PasswordInput id="rsm-setup-password" value={password} onChange={(value) => { setPassword(value); setError(""); }} onVisibilityChange={setPasswordVisible} autoComplete="new-password" labelText="初始密码" />
         </div>
         <div className={styles.field}>
           <label htmlFor="rsm-setup-confirm">确认密码</label>
-          <PasswordInput id="rsm-setup-confirm" value={confirm} onChange={(value) => { setConfirm(value); setError(""); }} autoComplete="new-password" labelText="确认密码" />
+          <PasswordInput id="rsm-setup-confirm" value={confirm} onChange={(value) => { setConfirm(value); setError(""); }} onVisibilityChange={setConfirmVisible} autoComplete="new-password" labelText="确认密码" />
         </div>
         {error ? <p className={styles.error} role="alert">{error}</p> : null}
         <Button type="submit" variant="primary" className={styles.submit} disabled={pending}>{pending ? "设置中…" : "设置密码并进入"}</Button>

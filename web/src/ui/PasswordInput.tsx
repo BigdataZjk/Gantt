@@ -6,6 +6,7 @@ export interface PasswordInputProps {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  onVisibilityChange?: (visible: boolean) => void;
   placeholder?: string;
   autoComplete?: string;
   required?: boolean;
@@ -15,7 +16,7 @@ export interface PasswordInputProps {
   labelText?: string;
 }
 
-export function PasswordInput({ id, value, onChange, placeholder, autoComplete, required, disabled, readOnly, ariaLabel, labelText = "密码" }: PasswordInputProps) {
+export function PasswordInput({ id, value, onChange, onVisibilityChange, placeholder, autoComplete, required, disabled, readOnly, ariaLabel, labelText = "密码" }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   return (
     <div className={styles.wrap}>
@@ -38,7 +39,11 @@ export function PasswordInput({ id, value, onChange, placeholder, autoComplete, 
         aria-pressed={visible}
         data-tooltip={visible ? "隐藏密码" : "显示密码"}
         disabled={disabled}
-        onClick={() => setVisible((current) => !current)}
+        onClick={() => {
+          const nextVisible = !visible;
+          setVisible(nextVisible);
+          onVisibilityChange?.(nextVisible);
+        }}
       >
         {visible ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
       </button>

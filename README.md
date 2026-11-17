@@ -96,4 +96,4 @@ rsm/
 
 支持 macOS 和 Linux，架构为 amd64 或 arm64。首次源码部署需要联网，脚本自动准备固定版本的 Go、Node、pnpm 及所需编译依赖，不维护离线依赖包。
 
-macOS arm64 已验证源码部署、升级、回退、备份、恢复及 launchd。Linux 部署与 systemd 管理已通过隔离脚本检查，尚未在 Linux 实机或重启场景验证。
+macOS arm64 已验证源码部署、升级、回退、备份、恢复及 launchd。Linux 支持 systemd 和现有 Supervisor；systemd 通过受控回归，Supervisor 通过独立管理器及另一项持续运行服务的隔离验收。Linux 实机及宿主机重启仍需在目标服务器验证。Supervisor 回归可在装有该工具的独立 Python 环境中运行 `python scripts/tests/supervisor-integration.py`，需要已有 `build/rsm`。
