@@ -78,6 +78,7 @@ printf '日志: %s\n' "$LOG"
 run_step "构建工具链与 C 编译器" "$SCRIPT_DIR/bootstrap.sh" --ensure-build
 ensure_toolchain build >/dev/null 2>&1 || die "工具链准备失败（可单独运行 scripts/bootstrap.sh 查看原因）"
 run_step "部署脚本回归（隔离服务管理器）" bash "$SCRIPT_DIR/tests/deploy.sh"
+run_step "源码 ZIP 自动升级回归" bash "$SCRIPT_DIR/tests/source-upgrade.sh"
 run_step "接口类型复用回归（隔离生成器）" bash "$SCRIPT_DIR/tests/codegen.sh"
 
 # 2. 接口契约生成核对

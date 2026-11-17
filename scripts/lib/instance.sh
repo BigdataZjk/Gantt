@@ -56,10 +56,10 @@ ensure_layout() {
     mkdir -p "$RSM_HOME" || die "无法创建安装目录: $RSM_HOME"
     chmod 700 "$RSM_HOME" 2>/dev/null || true
   fi
-  for _el_d in data secrets logs backups releases run scripts scripts/lib; do
+  for _el_d in data secrets logs backups releases run scripts scripts/lib upgrade; do
     mkdir -p "$RSM_HOME/$_el_d" || die "无法创建目录: $RSM_HOME/$_el_d"
   done
-  for _el_d in data secrets logs backups run scripts scripts/lib; do
+  for _el_d in data secrets logs backups run scripts scripts/lib upgrade; do
     chmod 700 "$RSM_HOME/$_el_d" 2>/dev/null || true
   done
   # 日志文件权限：存在则收紧，避免其他用户读取运行日志。

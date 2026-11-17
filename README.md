@@ -40,14 +40,14 @@ chmod +x rsm.sh scripts/*.sh
 ./rsm.sh logs --follow
 ./rsm.sh backup
 ./rsm.sh verify-backup /path/to/backup.tar.gz
-./rsm.sh upgrade /path/to/release.tar.gz
+./rsm.sh upgrade
 ./rsm.sh rollback
 ./rsm.sh autostart enable
 ./rsm.sh autostart status
 ./rsm.sh version
 ```
 
-升级前自动备份，失败时回退程序。恢复数据须显式执行 `./rsm.sh restore /path/to/backup.tar.gz --yes`，恢复前再次备份当前数据。
+后续将新版源码 ZIP 放进运行目录的 `upgrade/`，执行 `./rsm.sh` 或 `./rsm.sh upgrade` 即可。脚本比较包内实际版本，选择最高新版；构建完成后自动停服、备份、切换、启动，失败时回退程序。没有新版则保持当前版本。恢复数据须显式执行 `./rsm.sh restore /path/to/backup.tar.gz --yes`，恢复前再次备份当前数据。
 
 ## 项目结构
 

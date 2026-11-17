@@ -265,8 +265,7 @@ deploy_activate() {
 
 # ---- 部署入口 ----
 deploy_from_source() {
-  progress_plan 6
-  _dfs_repo="$RSM_ROOT"
+  _dfs_repo="${1:-$RSM_ROOT}"
   if [ ! -f "$_dfs_repo/go.mod" ] || [ ! -f "$_dfs_repo/api/openapi.yaml" ] || [ ! -d "$_dfs_repo/web" ] || [ ! -f "$_dfs_repo/scripts/build.sh" ]; then
     die "当前目录不是完整 RSM 源码仓库（需要 go.mod、api/openapi.yaml、web/、scripts/build.sh）: $_dfs_repo"
   fi
@@ -299,15 +298,28 @@ deploy_from_package() {
 
 deploy_cmd() {
   ensure_download_tools
+  if [ "$RSM_ROOT" = "$RSM_HOME" ] && instance_installed; then
+    if select_source_zip; then
+      upgrade_cmd "$UPGRADE_INPUT" auto
+    else
+      progress_plan 1
+      step "未发现可用升级包：确保当前版本运行"
+      persist_addr_if_explicit
+      start_instance || die "启动失败"
+      print_deploy_summary "$(current_release_dir)" ""
+    fi
+    return $?
+  fi
   case "$RSM_MODE" in
     source)
+      progress_plan 6
       deploy_from_source ;;
     package)
       deploy_from_package "$RSM_ROOT" ;;
     installed)
       progress_plan 1
       require_installed
-      step "已在实例目录：确保服务运行（升级请使用 ./rsm.sh upgrade <发行包>）"
+      step "已在实例目录：确保服务运行（上传新版 ZIP 后执行 ./rsm.sh upgrade）"
       ensure_layout
       resolve_addr
       persist_addr_if_explicit
@@ -325,11 +337,54 @@ deploy_cmd() {
 # ---- 升级 ----
 upgrade_cmd() {
   _uc_pkg="${1:-}"
-  [ -n "$_uc_pkg" ] || die "用法: rsm.sh upgrade <发行包.tar.gz|发行包目录>"
-  require_installed
+  _uc_auto="${2:-}"
+  if [ -z "$_uc_pkg" ]; then
+    if ! select_source_zip; then
+      if instance_installed; then
+        progress_plan 1
+        step "未发现可用升级包：确保当前版本运行"
+        persist_addr_if_explicit
+        start_instance || die "启动失败"
+        print_deploy_summary "$(current_release_dir)" ""
+        return 0
+      fi
+      die "请将新版源码 ZIP 上传到 $RSM_HOME/upgrade/，再执行 ./rsm.sh upgrade"
+    fi
+    _uc_pkg="$UPGRADE_INPUT"
+    _uc_auto=auto
+  fi
   ensure_layout
   resolve_addr
   _uc_cur=$(installed_version 2>/dev/null || true)
+  case "$_uc_pkg" in
+    *.zip)
+      progress_plan 8
+      step "校验并解压源码包（保持当前服务运行）"
+      prepare_source_zip "$_uc_pkg"
+      if [ "$SOURCE_VERSION" = "$_uc_cur" ] && [ "${RSM_FORCE:-0}" != 1 ]; then
+        ok "当前已是 v${_uc_cur}，无需升级；同版本重装可执行 ./rsm.sh upgrade --force"
+        persist_addr_if_explicit
+        start_instance || die "启动失败"
+        print_deploy_summary "$(current_release_dir)" ""
+        return 0
+      fi
+      if stable_version "$_uc_cur" && version_newer "$_uc_cur" "$SOURCE_VERSION"; then
+        if [ "$_uc_auto" = auto ]; then
+          ok "当前 v$_uc_cur 高于 upgrade/ 中的 v${SOURCE_VERSION}，保持当前版本"
+          persist_addr_if_explicit
+          start_instance || die "启动失败"
+          print_deploy_summary "$(current_release_dir)" ""
+          return 0
+        fi
+        die "源码包 v$SOURCE_VERSION 低于当前 v${_uc_cur}；回退程序请使用 ./rsm.sh rollback"
+      fi
+      step "从 v${_uc_cur:-未安装} 安装/升级到 v$SOURCE_VERSION"
+      RSM_VERSION="$SOURCE_VERSION" deploy_from_source "$SOURCE_ROOT"
+      return $?
+      ;;
+  esac
+  require_installed
+  progress_plan 5
   step "校验目标发行包"
   resolve_package "$_uc_pkg"
   if [ "$PKG_VERSION" = "$_uc_cur" ]; then

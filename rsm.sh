@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # RSM 唯一用户入口。
-#   ./rsm.sh                         无参数：源码=联网准备依赖/生成类型/构建/安装/启动；发行包=校验/安装/启动
+#   ./rsm.sh                         首次安装；已安装时检查 upgrade/ 中包内版本并自动升级/启动
 #   ./rsm.sh start|stop|restart|status|logs
-#   ./rsm.sh upgrade <发行包> | rollback [版本]
+#   ./rsm.sh upgrade [源码ZIP或发行包] | rollback [版本]
 #   ./rsm.sh backup [--output FILE] | restore <备份> [--yes] | verify-backup <备份>
 #   ./rsm.sh autostart enable|disable|status
 # 环境变量：RSM_HOME（默认脚本所在目录）、RSM_ADDR（默认 0.0.0.0:1111）、RSM_ASSUME_YES=1、RSM_FORCE=1 等。
@@ -49,6 +49,7 @@ export RSM_MODE
 . "$SCRIPT_DIR/scripts/lib/instance.sh"
 . "$SCRIPT_DIR/scripts/lib/service.sh"
 . "$SCRIPT_DIR/scripts/lib/release.sh"
+. "$SCRIPT_DIR/scripts/lib/source.sh"
 . "$SCRIPT_DIR/scripts/lib/backup.sh"
 
 # ---- 参数解析 ----
@@ -99,6 +100,7 @@ on_exit() {
   progress_stop
   lock_release_all >/dev/null 2>&1 || true
   package_cleanup >/dev/null 2>&1 || true
+  source_cleanup >/dev/null 2>&1 || true
 }
 trap on_exit EXIT
 trap 'exit 130' INT TERM HUP
@@ -108,10 +110,10 @@ print_usage() {
 RSM Request Schedule Manager 一键部署与管理入口（$(os_pretty) $(host_arch)）
 
 用法:
-  ./rsm.sh                              无参数：准备环境→构建（源码）/校验发行包→安装→启动
+  ./rsm.sh                              首次安装；已安装时检查 upgrade/ 中包内版本并自动升级/启动
   ./rsm.sh start|stop|restart|status   实例启停与状态
   ./rsm.sh logs [--follow] [-n N]      查看运行日志
-  ./rsm.sh upgrade <发行包>            升级到指定发行包（.tar.gz 或目录）
+  ./rsm.sh upgrade [包路径]            选择 upgrade/ 中包内版本最高的 ZIP，也可指定源码 ZIP / 发行包
   ./rsm.sh rollback [版本] [--force]   仅回退程序；检查数据库 schema 兼容
   ./rsm.sh backup [--output FILE]      创建一致性备份（默认 backups/rsm-<时间>.tar.gz）
   ./rsm.sh restore <备份> [--yes]      显式恢复备份（先备份现状、停服后恢复、启动并核对）
@@ -238,11 +240,13 @@ case "$CMD" in
 
   upgrade)
     _up_pkg=$(cmd_first_arg)
-    [ -n "$_up_pkg" ] || die "用法: ./rsm.sh upgrade <发行包.tar.gz|发行包目录>"
+    [ "${#ARGS[@]}" -le 1 ] || die "用法: ./rsm.sh upgrade [源码.zip|发行包.tar.gz|发行包目录]"
     prepare_context
-    require_installed
     lock_instance
     ensure_layout
+    init_task_log "$RSM_HOME/logs/deploy-details.log"
+    step "RSM 安装/升级（目标: ${RSM_HOME}，监听: ${RSM_ADDR}）"
+    info "详细日志默认收起，完整记录: ${RSM_LOG_FILE}（RSM_VERBOSE=1 可实时展开）"
     upgrade_cmd "$_up_pkg"
     ;;
 
