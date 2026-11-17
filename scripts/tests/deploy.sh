@@ -164,6 +164,114 @@ pass 'default Go, npm, pnpm and XDG caches stay inside the project'
 ) || fail 'explicit build cache configuration was overwritten'
 pass 'explicit cache locations remain configurable'
 
+toolchain_case() (
+  local action="$1" fixture="$RSM_TEST_TMP/pnpm $1" status=0
+  mkdir -p "$fixture/tools/node/bin" "$fixture/tools/go/bin" "$fixture/tools/pnpm/node_modules/.bin" "$fixture/system"
+  TOOLS_DIR="$fixture/tools"
+  TOOLCHAIN_ENV_FILE="$TOOLS_DIR/toolchain.env"
+  CACHE_DIR="$fixture/cache"
+  export RSM_TEST_NODE_VERSION="$(tc_node_version)"
+  export RSM_TEST_PNPM_VERSION="$(tc_pnpm_version)"
+  export RSM_TEST_GO_VERSION="$(tc_go_version)"
+  export RSM_TEST_NPM_CALLED="$fixture/npm-called"
+  cat >"$TOOLS_DIR/node/bin/node" <<'EOF'
+#!/usr/bin/env bash
+printf 'v%s\n' "$RSM_TEST_NODE_VERSION"
+EOF
+  cat >"$TOOLS_DIR/go/bin/go" <<'EOF'
+#!/usr/bin/env bash
+printf 'go version go%s linux/amd64\n' "$RSM_TEST_GO_VERSION"
+EOF
+  cat >"$TOOLS_DIR/node/bin/npm" <<'EOF'
+#!/usr/bin/env bash
+touch "$RSM_TEST_NPM_CALLED"
+exit 1
+EOF
+  cat >"$fixture/system/node" <<'EOF'
+#!/usr/bin/env bash
+printf 'v22.23.2\n'
+EOF
+  cat >"$TOOLS_DIR/pnpm/node_modules/.bin/pnpm" <<'EOF'
+#!/usr/bin/env bash
+[ "$(node --version)" = "v$RSM_TEST_NODE_VERSION" ] || exit 1
+if [ "${PNPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS:-true}" = false ]; then
+  printf '%s\n' "$RSM_TEST_PNPM_VERSION"
+else
+  printf '11.2.2\n'
+fi
+EOF
+  chmod +x "$TOOLS_DIR/node/bin/"* "$TOOLS_DIR/go/bin/go" "$TOOLS_DIR/pnpm/node_modules/.bin/pnpm" "$fixture/system/node"
+  export PATH="$fixture/system:$PATH"
+  export PNPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS=true
+  RSM_GO_BIN="$TOOLS_DIR/go/bin/go"
+  RSM_NODE_BIN="$TOOLS_DIR/node/bin/node"
+  RSM_NPM_BIN="$TOOLS_DIR/node/bin/npm"
+  RSM_PNPM_BIN="$TOOLS_DIR/pnpm/node_modules/.bin/pnpm"
+  setup_build_cache_env
+  case "$action" in
+    reuse) ensure_pnpm ;;
+    cached) save_toolchain_env; load_toolchain_env || status=$? ;;
+  esac
+  [ "$status" = 0 ] && [ "$RSM_PNPM_BIN" = "$TOOLS_DIR/pnpm/node_modules/.bin/pnpm" ] && [ ! -f "$RSM_TEST_NPM_CALLED" ]
+)
+toolchain_case reuse >"$RSM_TEST_TMP/pnpm-reuse.log" 2>&1 || fail 'a parent pnpm pin or system Node displaced the existing project toolchain'
+pass 'project pnpm uses the selected Node and ignores inherited version switching without reinstalling'
+toolchain_case cached >"$RSM_TEST_TMP/pnpm-cached.log" 2>&1 || fail 'cached toolchain validation used a foreign pnpm or Node version'
+pass 'cached project toolchain validates despite a conflicting parent pnpm pin and system Node'
+
+apt_case() (
+  local scenario="$1" expected="$2" fixture="$RSM_TEST_TMP/apt-$1" status=0
+  mkdir -p "$fixture/bin"
+  export RSM_TEST_APT_SCENARIO="$scenario"
+  export RSM_TEST_APT_FIXTURE="$fixture"
+  cat >"$fixture/bin/apt-get" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >>"$RSM_TEST_APT_FIXTURE/calls"
+case " $* " in
+  *' update '*) touch "$RSM_TEST_APT_FIXTURE/refreshed"; exit 0 ;;
+  *' --simulate '*)
+    case "$RSM_TEST_APT_SCENARIO" in
+      refresh|refresh-upgrade)
+        [ -f "$RSM_TEST_APT_FIXTURE/refreshed" ] || { printf 'E: stale package index\n'; exit 100; } ;;
+      unavailable) printf 'E: unable to resolve dependencies\n'; exit 100 ;;
+    esac
+    case "$RSM_TEST_APT_SCENARIO" in
+      upgrade|refresh-upgrade) printf 'Inst libc6 [2.36-1] (2.36-2 Debian:12 [amd64])\n' ;;
+      remove) printf 'Remv shared-service [1.0]\n' ;;
+      configure) printf 'Conf shared-service (1.0 Debian:12 [amd64])\n' ;;
+      *) printf 'Inst gcc (4:12.2.0-3 Debian:12 [amd64])\nConf gcc (4:12.2.0-3 Debian:12 [amd64])\n' ;;
+    esac
+    exit 0 ;;
+esac
+[ "${NEEDRESTART_MODE:-}" = l ] || exit 90
+case " $* " in *' --no-remove '*) ;; *) exit 91 ;; esac
+case " $* " in *' --no-upgrade '*) ;; *) exit 92 ;; esac
+touch "$RSM_TEST_APT_FIXTURE/installed"
+EOF
+  chmod +x "$fixture/bin/apt-get"
+  export PATH="$fixture/bin:$PATH"
+  RSM_LOG_FILE="$fixture/details.log"
+  pkg_manager() { printf apt; }
+  id() { printf '0\n'; }
+  pkg_install build-essential >"$fixture/output" 2>&1 || status=$?
+  case "$expected" in
+    installed) [ "$status" = 0 ] && [ -f "$fixture/installed" ] ;;
+    blocked) [ "$status" != 0 ] && [ ! -f "$fixture/installed" ] ;;
+  esac
+)
+apt_case new installed || fail 'safe installation of missing Debian packages failed'
+pass 'missing Debian packages install after simulation with upgrades, removals and automatic service restarts disabled'
+for scenario in upgrade remove configure; do
+  apt_case "$scenario" blocked || fail "Debian package plan allowed $scenario of existing system packages"
+  pass "Debian package installation blocks $scenario of existing system packages before execution"
+done
+apt_case refresh installed || fail 'safe Debian installation failed after refreshing a stale package index'
+pass 'Debian package index refresh is followed by a new safe installation plan'
+apt_case refresh-upgrade blocked || fail 'package index refresh bypassed the existing-package protection'
+pass 'refreshed Debian package plan still blocks dependency upgrades'
+apt_case unavailable blocked || fail 'Debian packages installed without a valid simulation'
+pass 'unresolved Debian package plans never proceed to installation'
+
 . "$RSM_TEST_ROOT/scripts/lib/instance.sh"
 RSM_ROOT="$RSM_TEST_TMP/source root with space"
 RSM_HOME_ARG=""

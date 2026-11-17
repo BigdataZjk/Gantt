@@ -21,6 +21,8 @@ setup_build_cache_env() {
   export PNPM_CONFIG_STORE_DIR="${PNPM_CONFIG_STORE_DIR:-$CACHE_DIR/pnpm/store}"
   export PNPM_CONFIG_CACHE_DIR="${PNPM_CONFIG_CACHE_DIR:-$CACHE_DIR/pnpm/cache}"
   export PNPM_CONFIG_STATE_DIR="${PNPM_CONFIG_STATE_DIR:-$CACHE_DIR/pnpm/state}"
+  # 固定工具链由 RSM 管理，避免父目录或全局配置触发 pnpm 自动换版。
+  export PNPM_CONFIG_MANAGE_PACKAGE_MANAGER_VERSIONS=false
   export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$CACHE_DIR/xdg/cache}"
   export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$CACHE_DIR/xdg/config}"
   export XDG_DATA_HOME="${XDG_DATA_HOME:-$CACHE_DIR/xdg/data}"
@@ -115,7 +117,7 @@ load_toolchain_env() {
   [ -n "${RSM_PNPM_BIN:-}" ] && [ -x "$RSM_PNPM_BIN" ] || return 1
   g=$("$RSM_GO_BIN" version 2>/dev/null | sed -n 's/go version go\([0-9.]*\).*/\1/p')
   n=$("$RSM_NODE_BIN" --version 2>/dev/null | sed 's/^v//')
-  p=$("$RSM_PNPM_BIN" --version 2>/dev/null)
+  p=$(PATH="$(dirname "$RSM_NODE_BIN"):$PATH" "$RSM_PNPM_BIN" --version 2>/dev/null)
   [ "$g" = "$(tc_go_version)" ] || return 1
   [ "$n" = "$(tc_node_version)" ] || return 1
   [ "$p" = "$(tc_pnpm_version)" ] || return 1
@@ -288,6 +290,7 @@ ensure_node() {
 
 ensure_pnpm() {
   local want sys_pnpm
+  local PATH="$(dirname "$RSM_NODE_BIN"):$PATH"
   want=$(tc_pnpm_version)
   _ep_local="$TOOLS_DIR/pnpm/node_modules/.bin/pnpm"
   if [ -x "$_ep_local" ]; then
@@ -331,6 +334,32 @@ pkg_manager() {
   else printf ''; fi
 }
 
+apt_install_missing() {
+  local plan blocked
+  if ! plan=$($_pi_sudo env LC_ALL=C apt-get --simulate --no-remove --no-upgrade --no-install-recommends install "$@" 2>&1); then
+    log_file "[apt-plan] $plan"
+    run_logged "刷新系统软件包索引" $_pi_sudo apt-get update || return 1
+    if ! plan=$($_pi_sudo env LC_ALL=C apt-get --simulate --no-remove --no-upgrade --no-install-recommends install "$@" 2>&1); then
+      warn "无法生成系统依赖安装计划，未执行安装: $plan"
+      return 1
+    fi
+  fi
+  log_file "[apt-plan] $plan"
+  blocked=$(printf '%s\n' "$plan" | awk '
+    $1 == "Inst" {
+      if ($3 ~ /^\[/) print
+      else fresh[$2] = 1
+    }
+    $1 == "Remv" || $1 == "Purg" { print }
+    $1 == "Conf" && !($2 in fresh) { print }
+  ')
+  if [ -n "$blocked" ]; then
+    warn "系统依赖需要变更已安装的软件包，已中止，未执行安装: $blocked"
+    return 1
+  fi
+  run_logged "安装缺失系统依赖: $*" $_pi_sudo env LC_ALL=C NEEDRESTART_MODE=l apt-get --no-remove --no-upgrade --no-install-recommends install -y "$@"
+}
+
 pkg_install() {
   _pi_pkgs="$*"
   _pi_pm=$(pkg_manager)
@@ -343,10 +372,7 @@ pkg_install() {
     sudo -v || return 1
   fi
   case "$_pi_pm" in
-    apt)
-      if ! run_logged "安装系统依赖: $_pi_pkgs" $_pi_sudo apt-get install -y $_pi_pkgs; then
-        run_logged "刷新系统软件源" $_pi_sudo apt-get update && run_logged "重试安装系统依赖" $_pi_sudo apt-get install -y $_pi_pkgs
-      fi ;;
+    apt) apt_install_missing "$@" ;;
     dnf) run_logged "安装系统依赖: $_pi_pkgs" $_pi_sudo dnf install -y $_pi_pkgs ;;
     yum) run_logged "安装系统依赖: $_pi_pkgs" $_pi_sudo yum install -y $_pi_pkgs ;;
   esac
