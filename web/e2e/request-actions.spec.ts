@@ -69,7 +69,7 @@ test("需求池与甘特图完整包含未排期、未分配和日期轴外需�
   await expect(page.getByRole("button", { name: "收起-的 2 条需求", exact: true })).toBeVisible();
   await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
   await page.getByRole("tab", { name: "需求池", exact: true }).click();
-  await expect.poll(() => rowIds(page)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  await expect.poll(() => rowIds(page)).toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
   await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
 });
 
@@ -115,11 +115,12 @@ for (const tab of ["甘特图", "需求池"] as const) {
     const { state, mutations } = await preview(page, { theme: tab === "甘特图" ? "light" : "dark" });
     const before = structuredClone(state.requests);
     await page.getByRole("tab", { name: tab, exact: true }).click();
-    await dragTo(page, nameOf(page, "未排期乙"), nameOf(page, "未排期甲"), "before", false);
-    await expect(page.locator('[data-row="3"]')).toHaveAttribute("data-reorder-edge", "before");
+    const edge = tab === "甘特图" ? "before" : "after";
+    await dragTo(page, nameOf(page, "未排期乙"), nameOf(page, "未排期甲"), edge, false);
+    await expect(page.locator('[data-row="3"]')).toHaveAttribute("data-reorder-edge", edge);
     await page.screenshot({ path: testInfo.outputPath(`${tab}-reorder.png`) });
     await page.mouse.up();
-    const expected = tab === "甘特图" ? [1, 2, 4, 3, 5, 8, 6, 7] : [1, 2, 4, 3, 5, 6, 7, 8];
+    const expected = tab === "甘特图" ? [1, 2, 4, 3, 5, 8, 6, 7] : [8, 7, 6, 5, 3, 4, 2, 1];
     await expect.poll(() => rowIds(page)).toEqual(expected);
     await expect(page.locator('[data-slot="request-reorder-hint"]')).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -170,13 +171,13 @@ test("筛选下拖排行保留隐藏行的位置，清除筛选后次序完整",
   await page.getByRole("button", { name: "状态：全部", exact: true }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: "待开发", exact: true }).click();
   await page.keyboard.press("Escape");
-  await expect.poll(() => rowIds(page)).toEqual([1, 3, 4]);
+  await expect.poll(() => rowIds(page)).toEqual([4, 3, 1]);
   await dragTo(page, nameOf(page, "排序4"), nameOf(page, "排序1"), "before");
-  await expect.poll(() => rowIds(page)).toEqual([4, 1, 3]);
+  await expect.poll(() => rowIds(page)).toEqual([3, 4, 1]);
   await page.getByRole("button", { name: "状态：待开发", exact: true }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: "待开发", exact: true }).click();
   await page.keyboard.press("Escape");
-  await expect.poll(() => rowIds(page)).toEqual([4, 2, 1, 3]);
+  await expect.poll(() => rowIds(page)).toEqual([3, 4, 2, 1]);
 });
 
 test("自定义右键不叠浏览器菜单，键盘与窄屏边缘可用，输入保留原生菜单", async ({ page }) => {
@@ -269,7 +270,7 @@ test("长列表名称拖动可沿边缘滚动到虚拟化行", async ({ page }) 
   const { mutations } = await preview(page, { rows });
   await page.getByRole("tab", { name: "需求池", exact: true }).click();
   const wrap = page.locator('[data-scroll-container="table"]');
-  const box = (await nameOf(page, "长列表1").boundingBox())!;
+  const box = (await nameOf(page, "长列表70").boundingBox())!;
   const bounds = (await wrap.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
@@ -278,7 +279,7 @@ test("长列表名称拖动可沿边缘滚动到虚拟化行", async ({ page }) 
   await expect(page.locator('[data-slot="request-reorder-hint"]')).toBeVisible();
   await page.mouse.up();
   await expect(page.locator('[data-slot="request-reorder-hint"]')).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("rsm.ui.v2:u1") ?? "{}").poolRowOrder?.indexOf(1) ?? 0)).toBeGreaterThan(15);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("rsm.ui.v2:u1") ?? "{}").poolRowOrder?.indexOf(70) ?? 0)).toBeGreaterThan(15);
   expect(mutations).toEqual([]);
 });
 

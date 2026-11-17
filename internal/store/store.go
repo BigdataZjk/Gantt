@@ -107,6 +107,10 @@ func Open(home string) (*Store, error) {
 		return nil, e
 	}
 	_, _ = db.Exec("delete from sessions where expires_at < ?", time.Now().Unix())
+	if e = s.backfillRequestTimes(context.Background()); e != nil {
+		db.Close()
+		return nil, e
+	}
 	return s, nil
 }
 func (s *Store) Close() error { return s.DB.Close() }

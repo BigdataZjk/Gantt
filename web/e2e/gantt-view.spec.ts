@@ -4,7 +4,7 @@ import { addDays, diffDays, todayISO } from "../src/lib/dates";
 
 const today = todayISO();
 
-async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: { autoRange?: boolean; count?: number } = {}) {
+async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: { autoRange?: boolean; count?: number; multiplePeople?: boolean } = {}) {
   const response = await page.request.get("/api/state");
   expect(response.ok()).toBeTruthy();
   const state = await response.json() as State;
@@ -34,12 +34,14 @@ async function openGantt(page: Page, theme: "light" | "dark" = "light", density:
     overtime: [],
     archived: false,
   };
+  const otherUser = { ...state.users[0]!, id: "e2e-other", username: "第二开发人" };
   const mockedState: State = {
     ...state,
     me: editable ? state.users.find((user) => user.role === "superadmin")! : null,
     setupRequired: false,
+    users: options.multiplePeople ? [...state.users, otherUser] : state.users,
     requests: [
-      ...Array.from({ length: options.count ?? 40 }, (_, index) => ({ ...request, id: index + 1, name: `并行排期 ${index + 1}` })),
+      ...Array.from({ length: options.count ?? 40 }, (_, index) => ({ ...request, id: index + 1, name: `并行排期 ${index + 1}`, developer: options.multiplePeople && index % 2 ? otherUser.id : request.developer })),
       { ...request, id: 100, name: "归档只读需求", archived: true },
     ],
     preferences: { ...state.preferences, theme, density, domainColors: editable ? { [request.domain]: "#d05d44" } : state.preferences.domainColors },
@@ -108,7 +110,7 @@ test("日期预设支持键盘展开和选择，焦点边框完整位于按钮�
   await page.keyboard.press("Enter");
   await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 60));
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("group", { name: "人员分组", exact: true }).getByRole("button", { name: "全部收起", exact: true })).toBeFocused();
+  await expect(page.getByRole("button", { name: "全部收起", exact: true })).toBeFocused();
   await expect(presets).toHaveCSS("opacity", "0");
 });
 
@@ -179,7 +181,7 @@ test("游客在甘特图、需求池和归档都能打开无表单的只读详�
   const dialog = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "需求详情" }) });
   for (const tab of ["甘特图", "需求池", "已归档"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
-    const name = tab === "已归档" ? "归档只读需求" : "并行排期 1";
+    const name = tab === "已归档" ? "归档只读需求" : tab === "需求池" ? "并行排期 40" : "并行排期 1";
     const button = page.getByRole("button", { name, exact: true });
     await button.dblclick();
     await expect(dialog).toBeVisible();
@@ -211,14 +213,12 @@ test("视图与筛选共用工具栏，优先级仅部分选中时显示全选�
       const date = (await dates.boundingBox())!;
       const tabs = (await core.getByRole("tablist", { name: "需求视图", exact: true }).boundingBox())!;
       const priorities = (await core.getByRole("group", { name: "按优先级筛选，可多选", exact: true }).boundingBox())!;
-      const groups = (await core.getByRole("group", { name: "人员分组", exact: true }).boundingBox())!;
       expect(priorities.x).toBeGreaterThan(developer.x + developer.width);
       expect(date.x).toBeGreaterThan(priorities.x + priorities.width);
-      expect(groups.x).toBeGreaterThan(date.x + date.width);
       expect(Math.abs(date.y - developer.y)).toBeLessThan(2);
       expect(Math.abs(tabs.y + tabs.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
       expect(Math.abs(priorities.y + priorities.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
-      expect(Math.abs(groups.y + groups.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
+      await expect(core.getByRole("button", { name: "全部收起", exact: true })).toHaveCount(0);
       await page.getByLabel("甘特图结束日期", { exact: true }).hover();
       await expect(page.getByLabel("仅设置结束日期", { exact: true })).toHaveCSS("opacity", "1");
       expect(await core.getByRole("tablist", { name: "需求视图", exact: true }).boundingBox()).toEqual(tabs);
@@ -434,5 +434,74 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByLabel("甘特图结束日期", { exact: true }).fill(end);
     await expect.poll(() => wrap.evaluate((el) => el.scrollWidth > el.clientWidth)).toBeTruthy();
     await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(end);
+  });
+}
+
+test("整块左上表头切换全部折叠，部分展开时仍执行全部收起", async ({ page }, testInfo) => {
+  const wrap = await openGantt(page, "light", "compact", false, { count: 8, multiplePeople: true });
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(8);
+  await page.getByRole("button", { name: "收起第二开发人的 4 条需求", exact: true }).click();
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(4);
+  const collapse = page.getByRole("button", { name: "全部收起", exact: true });
+  const header = collapse.locator("..");
+  const buttonBox = (await collapse.boundingBox())!;
+  const headerBox = (await header.boundingBox())!;
+  expect(Math.abs(buttonBox.width - headerBox.width)).toBeLessThanOrEqual(2);
+  expect(Math.abs(buttonBox.height - headerBox.height)).toBeLessThanOrEqual(2);
+  await collapse.click({ position: { x: 5, y: 5 } });
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(0);
+  const expand = page.getByRole("button", { name: "全部展开", exact: true });
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  expect((await wrap.boundingBox())!.height).toBeLessThan(180);
+  await page.screenshot({ path: testInfo.outputPath("collapsed-header.png") });
+  await expand.click({ position: { x: buttonBox.width - 5, y: buttonBox.height - 5 } });
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(8);
+  await expect(collapse).toHaveAttribute("aria-expanded", "true");
+  await collapse.focus();
+  await page.keyboard.press("Enter");
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(0);
+  await expand.press("Space");
+  await expect(wrap.locator("tbody [data-row]")).toHaveCount(8);
+});
+
+for (const theme of ["light", "dark"] as const) {
+  test(`当前开发段粒子分散浮动、缩放隐藏并支持减少动效（${theme}）`, async ({ page }, testInfo) => {
+    const wrap = await openGantt(page, theme, "compact", false, { count: 3 });
+    const particles = wrap.locator('[data-row="1"] [data-live-particles]');
+    await expect(particles.first()).toBeVisible();
+    const points = particles.first().locator("i");
+    await expect(points).toHaveCount(2);
+    const positions = await points.evaluateAll((elements) => elements.map((element) => {
+      const style = getComputedStyle(element);
+      return { left: style.left, top: style.top, animation: style.animationName, width: parseFloat(style.width) };
+    }));
+    expect(new Set(positions.map((point) => `${point.left},${point.top}`)).size).toBe(2);
+    expect(positions.every((point) => point.animation !== "none" && point.width <= 1.5)).toBe(true);
+    const initial = await points.first().evaluate((element) => getComputedStyle(element).transform);
+    await expect.poll(() => points.first().evaluate((element) => getComputedStyle(element).transform)).not.toBe(initial);
+    await page.screenshot({ path: testInfo.outputPath("live-particles.png") });
+    await wrap.locator('td[data-date]').first().hover();
+    const reset = page.getByRole("button", { name: "重置比例", exact: true });
+    await expect(reset).toHaveCount(0);
+    const wrapBox = (await wrap.boundingBox())!;
+    await page.mouse.move(wrapBox.x + 240, wrapBox.y + 60);
+    await page.keyboard.down("Control");
+    await page.mouse.wheel(0, 1000);
+    await page.keyboard.up("Control");
+    await expect(reset).toBeVisible();
+    await expect(particles).toHaveCount(0);
+    const resetBox = (await reset.boundingBox())!;
+    expect(resetBox.x + resetBox.width).toBeLessThan(wrapBox.x + wrapBox.width);
+    expect(resetBox.y).toBeGreaterThan(wrapBox.y);
+    expect(resetBox.y + resetBox.height).toBeLessThan(wrapBox.y + wrapBox.height);
+    await wrap.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    expect(await reset.boundingBox()).toEqual(resetBox);
+    await reset.click();
+    await expect(reset).toHaveCount(0);
+    await expect(particles.first()).toBeVisible();
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expect(points.first()).toHaveCSS("animation-name", "none");
+    await expect(points.first()).toBeVisible();
+    await expect(points.first()).toHaveCSS("opacity", "0.5");
   });
 }

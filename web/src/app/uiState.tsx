@@ -3,6 +3,7 @@ import type { ApiRequest } from "../api/types";
 import { isValidDate } from "../lib/dates";
 import { readStorage, writeStorage } from "../lib/storage";
 import { COLUMN_KEYS, DEFAULT_ARCHIVE_COLUMN_KEYS, DEFAULT_COLUMN_KEYS } from "../lib/format";
+import { normalizeTableSort, type TableSort } from "../features/requests/table/sorting";
 
 export type RequirementTab = "gantt" | "pool" | "archive";
 export type MainView = "requirements" | "settings";
@@ -32,6 +33,8 @@ export interface UiState {
   ganttZoom: number;
   ganttRowOrder: Record<string, number[]>;
   poolRowOrder: number[];
+  poolSorting: TableSort[];
+  archiveSorting: TableSort[];
   collapsedPeople: string[];
   logPagination: { page: number; pageSize: number };
   newDraft: ApiRequest | null;
@@ -88,6 +91,8 @@ function normalize(value: unknown): UiState {
     ganttZoom: typeof raw.ganttZoom === "number" && Number.isFinite(raw.ganttZoom) ? Math.min(1, Math.max(0.001, raw.ganttZoom)) : 1,
     ganttRowOrder: rowOrder,
     poolRowOrder: Array.isArray(raw.poolRowOrder) ? [...new Set(raw.poolRowOrder.filter((id) => Number.isSafeInteger(id) && id > 0))] : [],
+    poolSorting: normalizeTableSort(raw.poolSorting),
+    archiveSorting: normalizeTableSort(raw.archiveSorting).filter((sort) => sort.key !== "status"),
     collapsedPeople: asStringArray(raw.collapsedPeople),
     logPagination: {
       page: Number.isInteger(page) && page > 0 ? page : 1,

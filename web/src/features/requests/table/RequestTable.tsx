@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { CalendarDays, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, RotateCcw } from "lucide-react";
 import type { ApiRequest, State } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
@@ -14,6 +14,7 @@ import { deliveryOf } from "../filtering";
 import { requestMenuItems } from "../requestMenu";
 import { reorderVisibleIds, sortBySavedOrder } from "../rowOrder";
 import { useRequestReorder } from "../useRequestReorder";
+import { newestRequests, sortRequests, toggleTableSort, type TableSort } from "./sorting";
 import styles from "./RequestTable.module.css";
 
 interface Props {
@@ -82,15 +83,29 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const [menu, setMenu] = useState<MenuState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rowHeight = density === "compact" ? 38 : 50;
-  const rows = useMemo(() => archive ? incomingRows : sortBySavedOrder(incomingRows, ui.poolRowOrder), [archive, incomingRows, ui.poolRowOrder]);
+  const sorting = archive ? ui.archiveSorting : ui.poolSorting;
+  const rows = useMemo(() => {
+    const newest = newestRequests(incomingRows, archive);
+    const ordered = archive ? newest : sortBySavedOrder(newest, ui.poolRowOrder, true);
+    return sortRequests(ordered, sorting, state.users);
+  }, [archive, incomingRows, ui.poolRowOrder, sorting, state.users]);
+  const setSorting = (next: TableSort[]) => {
+    patch(archive ? { archiveSorting: next } : { poolSorting: next, ...(!next.length ? { poolRowOrder: [] } : {}) });
+    setMenu(null);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  };
+  useEffect(() => {
+    setMenu(null);
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [archive]);
   const reorder = useRequestReorder({
     containerRef: scrollRef,
     rows,
-    enabled: !archive,
+    enabled: !archive && !sorting.length,
     headerHeight: 40,
     onStart: () => setMenu(null),
     onReorder: (source, target, edge) => {
-      const all = sortBySavedOrder(state.requests.filter((row) => !row.archived), ui.poolRowOrder).map((row) => row.id);
+      const all = sortBySavedOrder(newestRequests(state.requests.filter((row) => !row.archived), false), ui.poolRowOrder, true).map((row) => row.id);
       const order = reorderVisibleIds(all, rows.map((row) => row.id), source, target, edge);
       if (order) patch({ poolRowOrder: order });
     },
@@ -200,37 +215,48 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
 
   return (
     <>
-      <div ref={scrollRef} {...reorder} className={`${styles.wrap} ${archive ? "" : reorder.className}`} data-scroll-container="table" role="table" aria-label={archive ? "归档需求列表" : "需求列表"} aria-rowcount={rows.length + 1}>
-        <div className={styles.table} style={{ width: Math.max(totalWidth, 100) }}>
-          <div className={styles.header} style={{ gridTemplateColumns: template }} role="row">
-            {keys.map((key) => (
-              <div key={key} role="columnheader" className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`} style={key === "name" ? { width: WIDTHS.name } : undefined}>
-                {HEADERS[key] ?? key}
-              </div>
-            ))}
-          </div>
-          <div className={styles.body} style={{ height: virtualizer.getTotalSize() }}>
-            {rows.length === 0 ? <div className={styles.empty}>{archive ? "暂无归档需求" : "没有匹配的需求"}</div> : null}
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index]!;
-              return (
-                <div
-                  key={row.id}
-                  role="row"
-                  className={styles.row}
-                  style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)`, gridTemplateColumns: template }}
-                  data-row={row.id}
-                >
-                  {table.getRowModel().rows.find((candidate) => candidate.original.id === row.id)?.getVisibleCells().map((cell) => (
-                    <div key={cell.id} role="cell" className={`${styles.cell} ${cell.column.id === "name" ? styles.nameCell : ""}`} data-key={cell.column.id}>
-                      {cellContent(row, cell.column.id)}
-                    </div>
-                  ))}
-                </div>
-              );
-            })}
+      <div className={styles.viewport}>
+        <div ref={scrollRef} {...reorder} className={`${styles.wrap} ${archive ? "" : reorder.className}`} data-scroll-container="table" role="table" aria-label={archive ? "归档需求列表" : "需求列表"} aria-rowcount={rows.length + 1}>
+          <div className={styles.table} style={{ width: Math.max(totalWidth, 100) }}>
+            <div className={styles.header} style={{ gridTemplateColumns: template }} role="row">
+              {keys.map((key) => {
+                const index = sorting.findIndex((sort) => sort.key === key);
+                const sort = sorting[index];
+                const Icon = sort ? sort.direction === "asc" ? ArrowUp : ArrowDown : ArrowUpDown;
+                return (
+                  <div key={key} role="columnheader" aria-label={HEADERS[key] ?? key} aria-sort={index === 0 ? sort?.direction === "asc" ? "ascending" : "descending" : undefined} className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`} style={key === "name" ? { width: WIDTHS.name } : undefined}>
+                    <button type="button" className={styles.sortButton} data-sorted={Boolean(sort)} aria-label={`${HEADERS[key]}，${sort ? `第 ${index + 1} 排序，${sort.direction === "asc" ? "升序" : "降序"}，` : ""}点击${sort?.direction === "asc" ? "降序" : "升序"}`} data-tooltip={sort ? `第 ${index + 1} 排序 · ${sort.direction === "asc" ? "升序" : "降序"}，点击切换` : "点击升序，可依次叠加其他字段"} onClick={() => setSorting(toggleTableSort(sorting, key))}>
+                      <span>{HEADERS[key] ?? key}</span>
+                      <span className={styles.sortIndicator}><Icon aria-hidden="true" />{sort && sorting.length > 1 ? <small>{index + 1}</small> : null}</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.body} style={{ height: virtualizer.getTotalSize() }}>
+              {rows.length === 0 ? <div className={styles.empty}>{archive ? "暂无归档需求" : "没有匹配的需求"}</div> : null}
+              {virtualizer.getVirtualItems().map((virtualRow) => {
+                const row = rows[virtualRow.index]!;
+                return (
+                  <div
+                    key={row.id}
+                    role="row"
+                    className={styles.row}
+                    style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)`, gridTemplateColumns: template }}
+                    data-row={row.id}
+                  >
+                    {table.getRowModel().rows[virtualRow.index]?.getVisibleCells().map((cell) => (
+                      <div key={cell.id} role="cell" className={`${styles.cell} ${cell.column.id === "name" ? styles.nameCell : ""}`} data-key={cell.column.id}>
+                        {cellContent(row, cell.column.id)}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
+        {sorting.length ? <button type="button" className={styles.resetSorting} aria-label="重置排序" data-tooltip="清除全部字段排序，恢复最新优先" onClick={() => setSorting([])}><RotateCcw aria-hidden="true" /><span className={styles.sortCount}>{sorting.length}</span></button> : null}
       </div>
       <div className={styles.footer} aria-label={archive ? "归档底部信息" : "需求池底部信息"}>
         <span className={styles.summary} aria-label="需求数量">{rows.length === totalCount ? `${totalCount} 条${archive ? "归档需求" : "需求"}` : `显示 ${rows.length} / 共 ${totalCount} 条${archive ? "归档需求" : "需求"}`}</span>

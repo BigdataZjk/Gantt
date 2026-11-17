@@ -47,7 +47,6 @@
 .preset:focus-visible { outline-offset: -3px; }
 .axisError { flex-basis: 100%; color: var(--rsm-p0); font-size: 12px; }
 .priority { position: relative; display: flex; align-items: center; flex-wrap: nowrap; gap: 2px; padding-right: 32px; flex: none; }
-.ganttControls { flex: none; margin-left: auto; }
 .priorityButton {
   display: inline-flex;
   align-items: center;

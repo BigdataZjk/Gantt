@@ -13,6 +13,10 @@ describe("个人需求展示顺序", () => {
     expect(reorderVisibleIds([1, 2], [1, 2], 1, 1, "after")).toBeNull();
   });
 
+  it("需求池手动排序后，新录入需求仍出现在最前面", () => {
+    expect(sortBySavedOrder([{ id: 4 }, { id: 3 }, { id: 2 }, { id: 1 }], [1, 2], true).map((row) => row.id)).toEqual([4, 3, 1, 2]);
+  });
+
   it("筛选时只重排可见槽位，不丢失或移动隐藏需求", () => {
     expect(reorderVisibleIds([1, 2, 3, 4, 5], [1, 3, 5], 5, 1, "before")).toEqual([5, 2, 1, 4, 3]);
     expect(reorderVisibleIds([1, 2, 3], [1, 3], 1, 2, "after")).toBeNull();

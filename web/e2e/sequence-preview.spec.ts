@@ -96,7 +96,6 @@ for (const theme of ["light", "dark"] as const) {
     const targets = [
       page.locator('tr[data-row="1"] td[data-date="2026-11-10"]'),
       page.locator('tr[data-row="1"] [data-bar]').first(),
-      page.getByText("优先级 / 需求", { exact: true }),
       page.getByTestId("gantt-legend").getByLabel("需求数量", { exact: true }),
       page.getByLabel("甘特图开始日期", { exact: true }),
     ];
@@ -107,6 +106,14 @@ for (const theme of ["light", "dark"] as const) {
       await expect.poll(() => selected(page)).toEqual([]);
       await expect(cell(page, 1)).toHaveCSS("background-image", "none");
     }
+    await selectRange(page);
+    await page.getByRole("button", { name: "全部收起", exact: true }).click();
+    await expect.poll(() => selected(page)).toEqual([]);
+    await expect(cell(page, 1)).toHaveCount(0);
+    await page.getByRole("button", { name: "全部展开", exact: true }).click();
+    await page.mouse.move(0, 0);
+    await expect.poll(() => selected(page)).toEqual([]);
+    await expect(cell(page, 1)).toHaveCSS("background-image", "none");
     expect(state.requests).toEqual(before);
     expect(writes).toHaveLength(0);
   });

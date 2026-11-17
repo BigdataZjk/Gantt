@@ -556,6 +556,10 @@ export interface components {
             vacation: string[];
             overtime: string[];
             archived: boolean;
+            /** @description 服务端记录的最近进池时间，旧记录可能缺失，客户端提交时忽略。 */
+            poolEnteredAt?: string;
+            /** @description 服务端记录的最近归档时间，旧记录可能缺失，客户端提交时忽略。 */
+            archivedAt?: string;
         };
         User: {
             id: string;

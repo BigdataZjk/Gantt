@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RSM API
-  version: 0.1.1
+  version: 0.1.2
 paths:
   /api/state:
     get:
@@ -946,6 +946,12 @@ components:
             type: string
         archived:
           type: boolean
+        poolEnteredAt:
+          type: string
+          description: 服务端记录的最近进池时间，旧记录可能缺失，客户端提交时忽略。
+        archivedAt:
+          type: string
+          description: 服务端记录的最近归档时间，旧记录可能缺失，客户端提交时忽略。
       additionalProperties: false
     User:
       type: object

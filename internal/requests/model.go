@@ -13,30 +13,32 @@ import (
 )
 
 type Request struct {
-	ID          int64              `json:"id"`
-	Revision    int64              `json:"revision"`
-	Name        string             `json:"name"`
-	Priority    string             `json:"priority"`
-	Status      string             `json:"status"`
-	PRD         string             `json:"prd"`
-	Requester   string             `json:"requester"`
-	RequestedAt string             `json:"requestedAt"`
-	Domain      string             `json:"domain"`
-	RequestType string             `json:"requestType"`
-	Wangyue     string             `json:"wangyue"`
-	Developer   string             `json:"developer"`
-	Days        float64            `json:"days"`
-	Start       string             `json:"start"`
-	Delivery    string             `json:"delivery"`
-	Project     string             `json:"project"`
-	BRD         string             `json:"brd"`
-	Review      string             `json:"review"`
-	Expected    string             `json:"expected"`
-	Notes       string             `json:"notes"`
-	Segments    []schedule.Segment `json:"segments"`
-	Vacation    []string           `json:"vacation"`
-	Overtime    []string           `json:"overtime"`
-	Archived    bool               `json:"archived"`
+	ID            int64              `json:"id"`
+	Revision      int64              `json:"revision"`
+	Name          string             `json:"name"`
+	Priority      string             `json:"priority"`
+	Status        string             `json:"status"`
+	PRD           string             `json:"prd"`
+	Requester     string             `json:"requester"`
+	RequestedAt   string             `json:"requestedAt"`
+	Domain        string             `json:"domain"`
+	RequestType   string             `json:"requestType"`
+	Wangyue       string             `json:"wangyue"`
+	Developer     string             `json:"developer"`
+	Days          float64            `json:"days"`
+	Start         string             `json:"start"`
+	Delivery      string             `json:"delivery"`
+	Project       string             `json:"project"`
+	BRD           string             `json:"brd"`
+	Review        string             `json:"review"`
+	Expected      string             `json:"expected"`
+	Notes         string             `json:"notes"`
+	Segments      []schedule.Segment `json:"segments"`
+	Vacation      []string           `json:"vacation"`
+	Overtime      []string           `json:"overtime"`
+	Archived      bool               `json:"archived"`
+	PoolEnteredAt string             `json:"poolEnteredAt,omitempty"`
+	ArchivedAt    string             `json:"archivedAt,omitempty"`
 }
 
 type Domain struct {

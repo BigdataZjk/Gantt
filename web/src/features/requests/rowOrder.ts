@@ -1,8 +1,9 @@
 export type DropEdge = "before" | "after";
 
-export function sortBySavedOrder<T extends { id: number }>(rows: T[], order: number[]): T[] {
+export function sortBySavedOrder<T extends { id: number }>(rows: T[], order: number[], prependNew = false): T[] {
   const rank = new Map(order.map((id, index) => [id, index]));
-  return [...rows].sort((a, b) => (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER));
+  const missing = prependNew ? -1 : Number.MAX_SAFE_INTEGER;
+  return [...rows].sort((a, b) => (rank.get(a.id) ?? missing) - (rank.get(b.id) ?? missing));
 }
 
 export function reorderVisibleIds(allIds: number[], visibleIds: number[], source: number, target: number, edge: DropEdge): number[] | null {

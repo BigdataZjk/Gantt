@@ -1,5 +1,4 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type RefObject, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
-import { createPortal } from "react-dom";
 import {
   AlarmClockPlus,
   ArrowBigDown,
@@ -69,7 +68,6 @@ interface Props {
   onDelete: (row: ApiRequest) => void;
   onArchive: (row: ApiRequest) => void;
   onFitDaysChange: (days: number) => void;
-  controlsHost: HTMLElement | null;
 }
 
 type MenuState =
@@ -129,7 +127,7 @@ const PERSON_ROW_HEIGHT = 28;
 const ROW_HEIGHT = { compact: 38, comfortable: 50 } as const;
 type MarkerMode = "icon" | "tick" | "hidden";
 
-export const GanttView = memo(function GanttView({ state, permissions, rows, totalCount, draftHint, onOpen, onDelete, onArchive, onFitDaysChange, controlsHost, undo }: Props) {
+export const GanttView = memo(function GanttView({ state, permissions, rows, totalCount, draftHint, onOpen, onDelete, onArchive, onFitDaysChange, undo }: Props) {
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
   const notice = useNotice();
@@ -190,6 +188,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   }, [rows, domainColor, state.domains]);
 
   const groups = useMemo(() => groupRequests(rows, state.users, calendar, ui.ganttRowOrder).filter((group) => group.rows.length > 0), [rows, state.users, calendar, ui.ganttRowOrder]);
+  const anyExpanded = groups.some((group) => !ui.collapsedPeople.includes(group.developer));
 
   const resolved = useMemo(() => {
     const map = new Map<number, ResolvedRow>();
@@ -850,26 +849,6 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   return (
     <div className={styles.page}>
-      {controlsHost ? createPortal(
-        <div className={styles.personControls} role="group" aria-label="人员分组">
-          {zoom < 0.999 ? (
-            <Button size="sm" data-tooltip="恢复默认比例及缩放前的日期范围" onClick={resetZoom}>
-              <RotateCcw aria-hidden="true" />
-              重置比例
-            </Button>
-          ) : null}
-          <Button
-            size="sm"
-            disabled={!groups.length}
-            data-tooltip={groups.some((group) => !ui.collapsedPeople.includes(group.developer)) ? "收起当前筛选内的所有人员" : "展开当前筛选内的所有人员"}
-            onClick={() => expandAll(!groups.some((group) => !ui.collapsedPeople.includes(group.developer)))}
-          >
-            <ChevronDown aria-hidden="true" style={{ transform: groups.some((group) => !ui.collapsedPeople.includes(group.developer)) ? "rotate(180deg)" : undefined }} />
-            {groups.some((group) => !ui.collapsedPeople.includes(group.developer)) ? "全部收起" : "全部展开"}
-          </Button>
-        </div>,
-        controlsHost,
-      ) : null}
       <div className={styles.plotArea} data-scroll-container="gantt-content">
         {missingYears.length ? <p className={styles.calendarHint}>节假日日历未覆盖 {missingYears.join("、")} 年，该范围按普通周末计算。</p> : null}
 
@@ -878,7 +857,11 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
             <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{ width: tableWidth, ["--day-width" as string]: `${dayWidth}px`, ["--gantt-row-height" as string]: `${ganttRowHeight}px`, ["--person-row-height" as string]: `${PERSON_ROW_HEIGHT}px`, ["--marker-size" as string]: `${Math.max(8, 12 * zoom)}px`, ["--parallel-scale" as string]: zoom } as CSSProperties}>
               <thead>
                 <tr>
-                  <th className={styles.nameHead} rowSpan={2} scope="col">优先级 / 需求</th>
+                  <th className={styles.nameHead} rowSpan={2} scope="col">
+                    <button type="button" className={styles.groupToggle} aria-label={anyExpanded ? "全部收起" : "全部展开"} aria-expanded={anyExpanded} disabled={!groups.length} data-tooltip={anyExpanded ? "收起当前筛选内的所有人员" : "展开当前筛选内的所有人员"} onClick={() => expandAll(!anyExpanded)}>
+                      <span>优先级 / 需求</span><ChevronDown aria-hidden="true" />
+                    </button>
+                  </th>
                   {leftHidden > 0 ? <th className={styles.monthSpacer} aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
                   {visibleMonthGroups.map((month) => {
                     const [year, number] = month.key.split("-").map(Number);
@@ -966,6 +949,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
               </tbody>
             </table>
           </div>
+          {zoom < 0.999 ? (
+            <button type="button" className={styles.resetZoom} aria-label="重置比例" data-tooltip="恢复默认比例及缩放前的日期范围" onClick={resetZoom}><RotateCcw aria-hidden="true" /></button>
+          ) : null}
           {showReturnToStart ? (
             <button type="button" className={styles.returnToStart} aria-label="返回最左侧" data-tooltip="回到时间轴起点" onClick={() => wrapRef.current?.scrollTo({ left: 0, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" })}>
               <ArrowLeftToLine aria-hidden="true" />
@@ -1153,7 +1139,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 onPointerOut={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.("[data-bar]")) setHovered(null); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectRow(row.id, event as unknown as ReactMouseEvent); } }}
               >
-                {markerMode === "icon" && live === phase && info.active ? <FloatingPoints seed={`${row.id}-${date}`} /> : null}
+                {markerMode !== "hidden" && dayWidth >= 6 && live === phase && info.active ? <FloatingPoints seed={`${row.id}-${date}`} compact={markerMode !== "icon"} /> : null}
                 {info.active && info.overtime ? <CellMarker kind="overtime" mode={markerMode} /> : null}
                 {info.dayType === "leave" ? <CellMarker kind="leave" mode={markerMode} /> : null}
                 {info.active && (Number(row.days) || 0) === 0 && estimates.has(date) ? <CellMarker kind="estimated" mode={markerMode} /> : null}
@@ -1200,21 +1186,23 @@ function CellMarker({ kind, mode }: { kind: keyof typeof MARKER_ICONS; mode: Mar
   );
 }
 
-
-function FloatingPoints({ seed }: { seed: string }) {
+function FloatingPoints({ seed, compact }: { seed: string; compact: boolean }) {
   const points = useMemo(() => {
     let hash = 0;
     for (let index = 0; index < seed.length; index += 1) hash = (hash * 31 + seed.charCodeAt(index)) % 997;
-    return Array.from({ length: 6 }, (_, index) => ({
-      x: 10 + ((hash + index * 37) % 63),
-      duration: 1.9 + (index % 4) * 0.32,
-      delay: -(index * 0.43 + 0.17),
+    return Array.from({ length: compact ? 1 : 2 }, (_, index) => ({
+      x: 18 + ((hash * (index + 3)) % 64),
+      y: 25 + ((hash * (index + 5)) % 50),
+      size: index % 2 === 0 ? 1.5 : 1,
+      duration: 4.5 + index * 1.2,
+      delay: -(index * 0.83 + (hash % 20) * 0.13),
     }));
-  }, [seed]);
+  }, [seed, compact]);
   return (
-    <span className={styles.floatingPoints} aria-hidden="true">
+    <span className={styles.floatingPoints} data-live-particles aria-hidden="true">
+      <span className={styles.liveSheen} />
       {points.map((point, index) => (
-        <i key={index} className={styles.floatingPoint} style={{ ["--point-x" as string]: `${point.x}%`, ["--point-duration" as string]: `${point.duration}s`, ["--point-delay" as string]: `${point.delay}s` } as CSSProperties} />
+        <i key={index} className={styles.floatingPoint} style={{ left: `${point.x}%`, top: `${point.y}%`, width: point.size, height: point.size, ["--point-duration" as string]: `${point.duration}s`, ["--point-delay" as string]: `${point.delay}s` } as CSSProperties} />
       ))}
     </span>
   );

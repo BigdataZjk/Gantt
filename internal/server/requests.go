@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"rsm/internal/auth"
 	"rsm/internal/requests"
@@ -60,6 +61,8 @@ func (s *Server) createRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		item.ID = d.NextID
 		item.Revision = 1
+		item.PoolEnteredAt = time.Now().UTC().Format(time.RFC3339Nano)
+		item.ArchivedAt = ""
 		d.NextID++
 		d.Requests = append(d.Requests, item)
 		return nil
@@ -120,6 +123,7 @@ func (s *Server) updateRequest(w http.ResponseWriter, r *http.Request) {
 			return store.Bad(e.Error())
 		}
 		item.Revision = old.Revision + 1
+		item.PoolEnteredAt, item.ArchivedAt = old.PoolEnteredAt, old.ArchivedAt
 		d.Requests[index] = item
 		return nil
 	})
@@ -184,6 +188,12 @@ func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 			return store.Bad("需求已经处于该归档状态")
 		}
 		d.Requests[index].Archived = in.Archived
+		stamp := time.Now().UTC().Format(time.RFC3339Nano)
+		if in.Archived {
+			d.Requests[index].ArchivedAt = stamp
+		} else {
+			d.Requests[index].PoolEnteredAt = stamp
+		}
 		d.Requests[index].Revision++
 		return nil
 	})
@@ -233,6 +243,7 @@ func (s *Server) batchRequests(w http.ResponseWriter, r *http.Request) {
 				return store.Bad(e.Error())
 			}
 			item.Revision++
+			item.PoolEnteredAt, item.ArchivedAt = old.PoolEnteredAt, old.ArchivedAt
 			d.Requests[index] = item
 		}
 		return nil

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Columns3, SlidersHorizontal } from "lucide-react";
 import type { State } from "../../api/types";
 import { useUiState } from "../../app/uiState";
@@ -21,11 +21,10 @@ interface FilterBarProps {
   scopeRows: { priority: string }[];
   tab: "gantt" | "pool" | "archive";
   ganttFitDays: number;
-  ganttControlsRef: Ref<HTMLDivElement>;
   navigation: ReactNode;
 }
 
-export function FilterBar({ state, scopeRows, tab, ganttFitDays, ganttControlsRef, navigation }: FilterBarProps) {
+export function FilterBar({ state, scopeRows, tab, ganttFitDays, navigation }: FilterBarProps) {
   const { ui, patch, patchFilters } = useUiState();
   const { domainColor } = usePreferences();
   const filters = ui.filters;
@@ -252,7 +251,6 @@ export function FilterBar({ state, scopeRows, tab, ganttFitDays, ganttControlsRe
           </Popover>
         </div>
       ) : null}
-      {tab === "gantt" ? <div ref={ganttControlsRef} className={styles.ganttControls} /> : null}
     </div>
   );
 }

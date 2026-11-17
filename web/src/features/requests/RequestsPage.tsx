@@ -39,7 +39,6 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
   const [deleteTarget, setDeleteTarget] = useState<ApiRequest | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ganttFitDays, setGanttFitDays] = useState(1);
-  const [ganttControlsHost, setGanttControlsHost] = useState<HTMLDivElement | null>(null);
 
   const scoped = useMemo(() => scopeRequests(state.requests, ui.requirementTab), [state.requests, ui.requirementTab]);
   const filtered = useMemo(() => filterRequests(scoped, ui.filters, { applyDates: ui.requirementTab !== "gantt" }), [scoped, ui.filters, ui.requirementTab]);
@@ -70,7 +69,6 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
         scopeRows={scoped}
         tab={ui.requirementTab}
         ganttFitDays={ganttFitDays}
-        ganttControlsRef={setGanttControlsHost}
         navigation={
           <PageTabs
             ariaLabel="需求视图"
@@ -86,7 +84,7 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
       />
       <div className={styles.content} data-scroll-container="requests-content">
         {ui.requirementTab === "gantt" ? (
-          <GanttView undo={ganttUndo} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onFitDaysChange={setGanttFitDays} controlsHost={ganttControlsHost} />
+          <GanttView undo={ganttUndo} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onFitDaysChange={setGanttFitDays} />
         ) : (
           <RequestTable
             state={state}

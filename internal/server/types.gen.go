@@ -391,30 +391,36 @@ type PresenceInput struct {
 
 // Request defines model for Request.
 type Request struct {
-	Archived    bool               `json:"archived"`
-	Brd         string             `json:"brd"`
-	Days        float32            `json:"days"`
-	Delivery    string             `json:"delivery"`
-	Developer   string             `json:"developer"`
-	Domain      string             `json:"domain"`
-	Expected    string             `json:"expected"`
-	Id          int64              `json:"id"`
-	Name        string             `json:"name"`
-	Notes       string             `json:"notes"`
-	Overtime    []string           `json:"overtime"`
-	Prd         string             `json:"prd"`
-	Priority    RequestPriority    `json:"priority"`
-	Project     string             `json:"project"`
-	RequestType RequestRequestType `json:"requestType"`
-	RequestedAt string             `json:"requestedAt"`
-	Requester   string             `json:"requester"`
-	Review      string             `json:"review"`
-	Revision    int64              `json:"revision"`
-	Segments    []Segment          `json:"segments"`
-	Start       string             `json:"start"`
-	Status      RequestStatus      `json:"status"`
-	Vacation    []string           `json:"vacation"`
-	Wangyue     string             `json:"wangyue"`
+	Archived bool `json:"archived"`
+
+	// ArchivedAt 服务端记录的最近归档时间，旧记录可能缺失，客户端提交时忽略。
+	ArchivedAt *string  `json:"archivedAt,omitempty"`
+	Brd        string   `json:"brd"`
+	Days       float32  `json:"days"`
+	Delivery   string   `json:"delivery"`
+	Developer  string   `json:"developer"`
+	Domain     string   `json:"domain"`
+	Expected   string   `json:"expected"`
+	Id         int64    `json:"id"`
+	Name       string   `json:"name"`
+	Notes      string   `json:"notes"`
+	Overtime   []string `json:"overtime"`
+
+	// PoolEnteredAt 服务端记录的最近进池时间，旧记录可能缺失，客户端提交时忽略。
+	PoolEnteredAt *string            `json:"poolEnteredAt,omitempty"`
+	Prd           string             `json:"prd"`
+	Priority      RequestPriority    `json:"priority"`
+	Project       string             `json:"project"`
+	RequestType   RequestRequestType `json:"requestType"`
+	RequestedAt   string             `json:"requestedAt"`
+	Requester     string             `json:"requester"`
+	Review        string             `json:"review"`
+	Revision      int64              `json:"revision"`
+	Segments      []Segment          `json:"segments"`
+	Start         string             `json:"start"`
+	Status        RequestStatus      `json:"status"`
+	Vacation      []string           `json:"vacation"`
+	Wangyue       string             `json:"wangyue"`
 }
 
 // RequestPriority defines model for Request.Priority.

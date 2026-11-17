@@ -221,14 +221,14 @@ export function estimateCenters(request: ApiRequest, dates: string[], calendar: 
 }
 
 export function currentLivePhase(request: ApiRequest, today: string, calendar: Calendar): number {
-  if (!request.developer || request.status !== "开发中") return -1;
+  if (!request.developer || !["待开发", "开发中"].includes(request.status) || request.archived) return -1;
   const info = dayInfo(request, today, calendar);
   return info.active ? info.phaseIndex : -1;
 }
 
 export function motionTitle(request: ApiRequest, today: string, calendar: Calendar, reduced: boolean): string {
   if (!request.developer) return "未播放粒子：未分配开发人";
-  if (request.status !== "开发中") return `未播放粒子：当前状态为${request.status}，需为开发中`;
+  if (!["待开发", "开发中"].includes(request.status) || request.archived) return `未播放粒子：当前状态为${request.archived ? "已归档" : request.status}`;
   const info = dayInfo(request, today, calendar);
   if (info.dayType === "leave") return "未播放粒子：今天已标记休假";
   if (!info.active) return isWorkday(today, calendar) ? "未播放粒子：今天不在有效开发段内" : "未播放粒子：今天是休息日，未安排加班";

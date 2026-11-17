@@ -5,6 +5,7 @@ import { enumerateDates } from "../../../lib/dates";
 import {
   admissionSortOrderForRows,
   buildSequencePlan,
+  currentLivePhase,
   dayInfo,
   estimateCenters,
   extendLastSegment,
@@ -19,6 +20,27 @@ import {
   supplementRequest,
   workingHoldGaps,
 } from "./ganttMath";
+
+describe("当前开发段动效", () => {
+  it("当天有效排期支持待开发与开发中，完成和暂停保持静态", () => {
+    for (const status of ["待开发", "开发中"] as const) {
+      expect(currentLivePhase(request({ status }), "2026-11-18", calendar)).toBe(0);
+    }
+    for (const status of ["待评审", "HOLD", "已完成"] as const) {
+      expect(currentLivePhase(request({ status }), "2026-11-18", calendar)).toBe(-1);
+    }
+    expect(currentLivePhase(request({ developer: "" }), "2026-11-18", calendar)).toBe(-1);
+    expect(currentLivePhase(request({ archived: true }), "2026-11-18", calendar)).toBe(-1);
+    expect(currentLivePhase(request({ vacation: ["2026-11-18"] }), "2026-11-18", calendar)).toBe(-1);
+    expect(currentLivePhase(request({ start: "2026-11-16", delivery: "2026-11-22" }), "2026-11-22", calendar)).toBe(-1);
+  });
+
+  it("HOLD 间隔不播放，只在当日所在段显示", () => {
+    const row = request({ start: "2026-11-12", delivery: "2026-11-20", segments: [{ start: "2026-11-12", end: "2026-11-13", holdBefore: false }, { start: "2026-11-19", end: "2026-11-20", holdBefore: true }] });
+    expect(currentLivePhase(row, "2026-11-18", calendar)).toBe(-1);
+    expect(currentLivePhase(row, "2026-11-19", calendar)).toBe(1);
+  });
+});
 
 const twoSegments = request({
   id: 10,
