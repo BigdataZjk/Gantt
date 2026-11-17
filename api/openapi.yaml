@@ -1,0 +1,1525 @@
+openapi: 3.0.3
+info:
+  title: RSM API
+  version: 0.1.0
+paths:
+  /api/state:
+    get:
+      operationId: getApiState
+      summary: 获取当前共享资料和个人偏好
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+  /api/login:
+    post:
+      operationId: postApiLogin
+      summary: 登录
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+  /api/setup:
+    post:
+      operationId: postApiSetup
+      summary: 设置初始超管密码
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetupInput'
+  /api/logout:
+    post:
+      operationId: postApiLogout
+      summary: 退出登录
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+  /api/auth/password:
+    post:
+      operationId: postApiAuthPassword
+      summary: 修改本人密码
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordInput'
+  /api/auth/password/{id}:
+    get:
+      operationId: getApiAuthPasswordId
+      summary: 超管查看密码
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordValue'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/users:
+    post:
+      operationId: postApiUsers
+      summary: 创建账号
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInput'
+  /api/users/{id}:
+    patch:
+      operationId: patchApiUsersId
+      summary: 更新账号
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/calendar/refresh:
+    post:
+      operationId: postApiCalendarRefresh
+      summary: 管理员刷新公开年度日历
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseRevision, year]
+              properties:
+                baseRevision:
+                  type: integer
+                  format: int64
+                year:
+                  type: integer
+                  minimum: 2000
+                  maximum: 2099
+              additionalProperties: false
+      responses:
+        '200':
+          description: 日历更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 来源不可用或日历无效，保留原日历
+        '401':
+          description: 未登录
+        '403':
+          description: 仅管理员可更新
+        '409':
+          description: 版本冲突
+  /api/calendar/import:
+    post:
+      operationId: postApiCalendarImport
+      summary: 管理员导入年度日历 JSON
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseRevision, year, calendar]
+              properties:
+                baseRevision:
+                  type: integer
+                  format: int64
+                year:
+                  type: integer
+                  minimum: 2000
+                  maximum: 2099
+                calendar:
+                  type: object
+                  additionalProperties: true
+              additionalProperties: false
+      responses:
+        '200':
+          description: 日历更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 来源不可用或日历无效，保留原日历
+        '401':
+          description: 未登录
+        '403':
+          description: 仅管理员可更新
+        '409':
+          description: 版本冲突
+  /api/preferences:
+    put:
+      operationId: putApiPreferences
+      summary: 保存个人偏好
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preferences'
+  /api/requests:
+    post:
+      operationId: postApiRequests
+      summary: 创建需求
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mutation'
+  /api/requests/{id}:
+    put:
+      operationId: putApiRequestsId
+      summary: 修改需求
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Mutation'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: deleteApiRequestsId
+      summary: 删除需求
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/requests/batch:
+    post:
+      operationId: postApiRequestsBatch
+      summary: 批量顺排
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchMutation'
+  /api/requests/{id}/archive:
+    post:
+      operationId: postApiRequestsIdArchive
+      summary: 归档或恢复
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArchiveInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/domains:
+    post:
+      operationId: postApiDomains
+      summary: 新增业务域
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainInput'
+  /api/domains/{id}:
+    put:
+      operationId: putApiDomainsId
+      summary: 调整全局域色
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+    delete:
+      operationId: deleteApiDomainsId
+      summary: 删除业务域
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/fields/merge:
+    post:
+      operationId: postApiFieldsMerge
+      summary: 统一自由字段
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MergeInput'
+  /api/versions:
+    post:
+      operationId: postApiVersions
+      summary: 保存快照
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VersionInput'
+  /api/versions/{id}:
+    delete:
+      operationId: deleteApiVersionsId
+      summary: 删除快照
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/versions/{id}/restore:
+    post:
+      operationId: postApiVersionsIdRestore
+      summary: 恢复快照
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/history/{id}/undo:
+    post:
+      operationId: postApiHistoryIdUndo
+      summary: 撤回到指定动作
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevisionInput'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+  /api/logs/management:
+    get:
+      operationId: getLogManagement
+      summary: 管理员查看日志用量、保留策略和最近清理结果
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogManagement'
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+  /api/logs/policy:
+    put:
+      operationId: saveLogPolicy
+      summary: 管理员保存自动保留天数，0 表示关闭按天清理
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogPolicyInput'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+  /api/logs/cleanup/preview:
+    post:
+      operationId: previewLogCleanup
+      summary: 管理员预览北京时间 N 天前零点之前的日志
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogCleanupInput'
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogCleanupPreview'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+  /api/logs/cleanup:
+    post:
+      operationId: cleanupLogs
+      summary: 管理员确认清理；预览、日期或数据已变化时拒绝执行
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogCleanupConfirm'
+      responses:
+        '200':
+          description: 返回实际清理结果；部分文件失败时 cleanup.error 非空
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogCleanupResponse'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 预览或数据已变化，请重新预览
+  /api/presence:
+    post:
+      operationId: postApiPresence
+      summary: 在线心跳
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Presence'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '409':
+          description: 版本冲突
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresenceInput'
+  /api/events:
+    get:
+      operationId: getEvents
+      summary: SSE 变更通知，重连后重新读取 state
+      responses:
+        '200':
+          description: 事件流
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /api/avatar:
+    post:
+      operationId: postAvatar
+      summary: 上传原始头像，最多 4 MiB，支持 GIF/PNG/JPEG/WebP
+      requestBody:
+        required: true
+        content:
+          image/gif:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: 更新后的 state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+  /api/avatars/{id}:
+    get:
+      operationId: getAvatar
+      summary: 读取原始头像（保留GIF动画）
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 原始图片字节
+components:
+  schemas:
+    Segment:
+      type: object
+      required:
+      - start
+      - end
+      properties:
+        start:
+          type: string
+        end:
+          type: string
+        holdBefore:
+          type: boolean
+          default: false
+      additionalProperties: false
+    Request:
+      type: object
+      required:
+      - id
+      - revision
+      - name
+      - priority
+      - status
+      - prd
+      - requester
+      - requestedAt
+      - domain
+      - requestType
+      - wangyue
+      - developer
+      - days
+      - start
+      - delivery
+      - project
+      - brd
+      - review
+      - expected
+      - notes
+      - segments
+      - vacation
+      - overtime
+      - archived
+      properties:
+        id:
+          type: integer
+          format: int64
+        revision:
+          type: integer
+          format: int64
+        name:
+          type: string
+        priority:
+          type: string
+          enum:
+          - P0
+          - P1
+          - P2
+        status:
+          type: string
+          enum:
+          - 待评审
+          - 待开发
+          - 开发中
+          - 已完成
+          - HOLD
+        prd:
+          type: string
+        requester:
+          type: string
+        requestedAt:
+          type: string
+        domain:
+          type: string
+        requestType:
+          type: string
+          enum:
+          - 常规需求
+          - 数据需求
+        wangyue:
+          type: string
+        developer:
+          type: string
+        days:
+          type: number
+        start:
+          type: string
+        delivery:
+          type: string
+        project:
+          type: string
+        brd:
+          type: string
+        review:
+          type: string
+        expected:
+          type: string
+        notes:
+          type: string
+        segments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Segment'
+        vacation:
+          type: array
+          items:
+            type: string
+        overtime:
+          type: array
+          items:
+            type: string
+        archived:
+          type: boolean
+      additionalProperties: false
+    User:
+      type: object
+      required:
+      - id
+      - username
+      - role
+      - disabled
+      - deleted
+      - avatar
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum:
+          - superadmin
+          - admin
+          - collaborator
+          - readonly
+        disabled:
+          type: boolean
+        deleted:
+          type: boolean
+        avatar:
+          type: string
+      additionalProperties: false
+    Domain:
+      type: object
+      required:
+      - id
+      - name
+      - color
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+      additionalProperties: false
+    Preferences:
+      type: object
+      required:
+      - theme
+      - density
+      - defaultPriority
+      - defaultRequestType
+      - domainColors
+      - ui
+      properties:
+        theme:
+          type: string
+          enum:
+          - system
+          - light
+          - dark
+        density:
+          type: string
+          enum:
+          - compact
+          - comfortable
+        defaultPriority:
+          type: string
+        defaultRequestType:
+          type: string
+        domainColors:
+          type: object
+          additionalProperties:
+            type: string
+        ui:
+          type: object
+          additionalProperties: {}
+      additionalProperties: false
+    LogPolicy:
+      type: object
+      required: [operationRetentionDays, archiveRetentionDays]
+      properties:
+        operationRetentionDays:
+          type: integer
+          minimum: 0
+          maximum: 3650
+          description: 0 关闭按天清理；始终保留最近 200 条上限
+        archiveRetentionDays:
+          type: integer
+          minimum: 0
+          maximum: 3650
+          description: 0 关闭归档文件按天清理
+      additionalProperties: false
+    LogPolicyInput:
+      type: object
+      required: [baseRevision, operationRetentionDays, archiveRetentionDays]
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        operationRetentionDays:
+          type: integer
+          minimum: 0
+          maximum: 3650
+        archiveRetentionDays:
+          type: integer
+          minimum: 0
+          maximum: 3650
+      additionalProperties: false
+    LogCleanupRun:
+      type: object
+      required: [checkedAt, operationsDeleted, archivesDeleted, bytes, error]
+      properties:
+        checkedAt:
+          type: string
+        operationsDeleted:
+          type: integer
+        archivesDeleted:
+          type: integer
+        bytes:
+          type: integer
+          format: int64
+        error:
+          type: string
+      additionalProperties: false
+    LogManagement:
+      type: object
+      required: [policy, operationCount, operationBytes, oldestOperationAt, archiveCount, archiveBytes, activeFileCount, activeFileBytes]
+      properties:
+        policy:
+          $ref: '#/components/schemas/LogPolicy'
+        operationCount:
+          type: integer
+        operationBytes:
+          type: integer
+          format: int64
+        oldestOperationAt:
+          type: string
+        archiveCount:
+          type: integer
+        archiveBytes:
+          type: integer
+          format: int64
+        activeFileCount:
+          type: integer
+        activeFileBytes:
+          type: integer
+          format: int64
+        lastAutomatic:
+          $ref: '#/components/schemas/LogCleanupRun'
+        lastManual:
+          $ref: '#/components/schemas/LogCleanupRun'
+      additionalProperties: false
+    LogCleanupInput:
+      type: object
+      required: [scope, days]
+      properties:
+        scope:
+          type: string
+          enum: [operations, archives]
+        days:
+          type: integer
+          minimum: 1
+          maximum: 3650
+      additionalProperties: false
+    LogCleanupPreview:
+      type: object
+      required: [scope, days, before, revision, token, count, bytes, reversibleCount]
+      properties:
+        scope:
+          type: string
+          enum: [operations, archives]
+        days:
+          type: integer
+        before:
+          type: string
+        revision:
+          type: integer
+          format: int64
+        token:
+          type: string
+        count:
+          type: integer
+        bytes:
+          type: integer
+          format: int64
+        reversibleCount:
+          type: integer
+      additionalProperties: false
+    LogCleanupConfirm:
+      type: object
+      required: [baseRevision, scope, days, before, token]
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        scope:
+          type: string
+          enum: [operations, archives]
+        days:
+          type: integer
+          minimum: 1
+          maximum: 3650
+        before:
+          type: string
+        token:
+          type: string
+      additionalProperties: false
+    LogCleanupResponse:
+      type: object
+      required: [state, cleanup]
+      properties:
+        state:
+          $ref: '#/components/schemas/State'
+        cleanup:
+          $ref: '#/components/schemas/LogCleanupRun'
+      additionalProperties: false
+    Log:
+      type: object
+      required:
+      - id
+      - actor
+      - action
+      - createdAt
+      - reversible
+      - undone
+      properties:
+        id:
+          type: integer
+          format: int64
+        actor:
+          type: string
+        action:
+          type: string
+        createdAt:
+          type: string
+        reversible:
+          type: boolean
+        undone:
+          type: boolean
+      additionalProperties: false
+    Version:
+      type: object
+      required:
+      - id
+      - label
+      - actor
+      - createdAt
+      - revision
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        actor:
+          type: string
+        createdAt:
+          type: string
+        revision:
+          type: integer
+          format: int64
+      additionalProperties: false
+    HolidayDay:
+      type: object
+      required: [name, date, isOffDay]
+      properties:
+        name:
+          type: string
+        date:
+          type: string
+        isOffDay:
+          type: boolean
+      additionalProperties: false
+    CalendarEdition:
+      type: object
+      required: [year, days, papers, source]
+      properties:
+        year:
+          type: integer
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/HolidayDay'
+        papers:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+        updatedAt:
+          type: string
+      additionalProperties: false
+    Calendar:
+      type: object
+      required:
+      - restDays
+      - workDays
+      - years
+      - source
+      properties:
+        restDays:
+          type: array
+          items:
+            type: string
+        workDays:
+          type: array
+          items:
+            type: string
+        years:
+          type: array
+          items:
+            type: integer
+        editions:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarEdition'
+        source:
+          type: string
+      additionalProperties: false
+    State:
+      type: object
+      required:
+      - revision
+      - requests
+      - domains
+      - users
+      - me
+      - preferences
+      - logs
+      - versions
+      - calendar
+      - setupRequired
+      - serverVersion
+      properties:
+        revision:
+          type: integer
+          format: int64
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/Request'
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        me:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          nullable: true
+        preferences:
+          $ref: '#/components/schemas/Preferences'
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Log'
+        logPolicy:
+          $ref: '#/components/schemas/LogPolicy'
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Version'
+        calendar:
+          $ref: '#/components/schemas/Calendar'
+        setupRequired:
+          type: boolean
+        serverVersion:
+          type: string
+      additionalProperties: false
+    Mutation:
+      type: object
+      required:
+      - baseRevision
+      - request
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        request:
+          $ref: '#/components/schemas/Request'
+      additionalProperties: false
+    BatchMutation:
+      type: object
+      required:
+      - baseRevision
+      - requests
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/Request'
+      additionalProperties: false
+    RevisionInput:
+      type: object
+      required:
+      - baseRevision
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+      additionalProperties: false
+    Error:
+      type: object
+      required:
+      - error
+      - code
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+      additionalProperties: false
+    LoginInput:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        remember:
+          type: boolean
+          default: true
+          description: 勾选时保存登录 30 天，否则使用浏览器会话 Cookie。
+      additionalProperties: false
+    SetupInput:
+      type: object
+      required:
+      - password
+      properties:
+        password:
+          type: string
+      additionalProperties: false
+    PasswordInput:
+      type: object
+      required:
+      - currentPassword
+      - password
+      properties:
+        currentPassword:
+          type: string
+        password:
+          type: string
+      additionalProperties: false
+    PasswordValue:
+      type: object
+      required:
+      - password
+      properties:
+        password:
+          type: string
+      additionalProperties: false
+    UserInput:
+      type: object
+      required:
+      - username
+      - password
+      - role
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+      additionalProperties: false
+    UserUpdate:
+      type: object
+      required:
+      - role
+      - disabled
+      - deleted
+      - password
+      properties:
+        role:
+          type: string
+        disabled:
+          type: boolean
+        deleted:
+          type: boolean
+        password:
+          type: string
+      additionalProperties: false
+    ArchiveInput:
+      type: object
+      required:
+      - baseRevision
+      - archived
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        archived:
+          type: boolean
+      additionalProperties: false
+    DomainInput:
+      type: object
+      required:
+      - baseRevision
+      - name
+      - color
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        name:
+          type: string
+        color:
+          type: string
+      additionalProperties: false
+    MergeInput:
+      type: object
+      required:
+      - baseRevision
+      - field
+      - values
+      - target
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        field:
+          type: string
+        values:
+          type: array
+          items:
+            type: string
+        target:
+          type: string
+      additionalProperties: false
+    VersionInput:
+      type: object
+      required:
+      - baseRevision
+      - label
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        label:
+          type: string
+      additionalProperties: false
+    PresenceInput:
+      type: object
+      required:
+      - clientId
+      properties:
+        clientId:
+          type: string
+      additionalProperties: false
+    Presence:
+      type: object
+      required:
+      - users
+      - guests
+      properties:
+        users:
+          type: array
+          items:
+            type: string
+        guests:
+          type: integer
+          format: int64
+      additionalProperties: false
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: rsm_session
+security:
+- session: []

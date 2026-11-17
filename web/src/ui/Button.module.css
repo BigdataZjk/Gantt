@@ -1,0 +1,32 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--rsm-control-height);
+  min-height: var(--rsm-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--rsm-border);
+  border-radius: var(--rsm-control-radius);
+  background: var(--rsm-panel);
+  color: var(--rsm-text);
+  white-space: nowrap;
+  transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
+}
+.button > svg { width: 15px; height: 15px; flex: none; }
+.button:not(:disabled):hover { border-color: color-mix(in srgb, var(--rsm-accent) 32%, var(--rsm-border)); background: color-mix(in srgb, var(--rsm-soft) 55%, var(--rsm-panel)); }
+.primary { background: var(--rsm-accent); border-color: var(--rsm-accent); color: var(--rsm-on-accent); }
+.primary:not(:disabled):hover { background: color-mix(in srgb, var(--rsm-accent) 88%, var(--rsm-text)); border-color: color-mix(in srgb, var(--rsm-accent) 88%, var(--rsm-text)); }
+.quiet { background: transparent; border-color: transparent; color: var(--rsm-muted); }
+.quiet:not(:disabled):hover { background: var(--rsm-soft); color: var(--rsm-accent); border-color: transparent; }
+.danger { background: var(--rsm-priority-p0); border-color: var(--rsm-priority-p0); color: #fff; }
+.danger:not(:disabled):hover { background: color-mix(in srgb, var(--rsm-priority-p0) 84%, #000); border-color: color-mix(in srgb, var(--rsm-priority-p0) 84%, #000); }
+.dangerText { color: var(--rsm-priority-p0); }
+.dangerText:not(:disabled):hover { background: var(--rsm-priority-p0-bg); border-color: transparent; }
+.ghost { background: transparent; border-color: transparent; color: inherit; }
+.ghost:not(:disabled):hover { background: color-mix(in srgb, var(--rsm-soft) 60%, transparent); border-color: transparent; }
+.small { height: var(--rsm-compact-height); min-height: var(--rsm-compact-height); padding: 0 7px; font-size: 12px; }
+.small > svg { width: 13px; height: 13px; }
+.icon { width: var(--rsm-control-height); min-width: var(--rsm-control-height); padding: 0; }
+.icon.small { width: var(--rsm-compact-height); min-width: var(--rsm-compact-height); }
+.block { width: 100%; }

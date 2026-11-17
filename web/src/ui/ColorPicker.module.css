@@ -1,0 +1,30 @@
+.host { display: grid; gap: 12px; min-width: 0; }
+.presets { display: flex; justify-content: center; gap: 4px; flex-wrap: wrap; }
+.preset { display: flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; min-height: 24px; padding: 2px; border: 2px solid transparent; border-radius: 50%; background: transparent; }
+.preset > span { width: 16px; height: 16px; border-radius: 50%; }
+.preset[aria-pressed="true"] { border-color: var(--rsm-accent); }
+.area {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 178px;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent), var(--cp-hue-color);
+  cursor: crosshair;
+  touch-action: none;
+}
+.thumb { position: absolute; width: 16px; height: 16px; border: 2px solid #fff; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px rgb(0 0 0 / 18%), 0 2px 4px rgb(0 0 0 / 20%); pointer-events: none; }
+.hueRow { display: flex; align-items: center; gap: 8px; }
+.hue { flex: 1; width: 0; min-width: 0; height: 10px; min-height: 10px; padding: 0; margin: 0; border: 0; border-radius: 99px; appearance: none; background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00); cursor: ew-resize; }
+.hue::-webkit-slider-thumb { appearance: none; width: 16px; height: 16px; border: 3px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 1px 4px rgb(0 0 0 / 25%); }
+.hue::-moz-range-thumb { width: 12px; height: 12px; border: 3px solid #fff; border-radius: 50%; background: transparent; box-shadow: 0 1px 4px rgb(0 0 0 / 25%); }
+.shuffle { display: flex; align-items: center; justify-content: center; flex: none; width: 28px; height: 28px; min-height: 28px; padding: 0; border: 0; border-radius: 7px; background: var(--rsm-soft); color: var(--rsm-text); }
+.shuffle svg { width: 14px; height: 14px; }
+.hexGroup { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid transparent; border-radius: 9px; background: var(--rsm-soft); }
+.hexGroup:focus-within { border-color: var(--rsm-accent); }
+.swatch { width: 18px; height: 18px; flex: none; border-radius: 5px; box-shadow: inset 0 0 0 1px rgb(0 0 0 / 8%); }
+.hex { flex: 1; width: 0; min-width: 0; height: 32px; min-height: 32px; border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--rsm-text); font-size: 12px; text-transform: uppercase; }
+.hex[aria-invalid="true"] { text-decoration: underline wavy var(--rsm-priority-p0); }
+.format { font-size: 11px; color: var(--rsm-muted); }

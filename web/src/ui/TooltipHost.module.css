@@ -1,0 +1,17 @@
+.bubble {
+  position: fixed;
+  z-index: 200;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 16px));
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: var(--rsm-tooltip-bg, #243044);
+  color: var(--rsm-tooltip-ink, #fff);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  box-shadow: 0 3px 12px rgb(0 0 0 / 18%);
+  animation: rsm-fade-in 90ms ease-out both;
+}
+[data-theme="dark"] .bubble { --rsm-tooltip-bg: #e3ebf4; --rsm-tooltip-ink: #162334; }

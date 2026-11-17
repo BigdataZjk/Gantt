@@ -1,0 +1,24 @@
+.field { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.label { font-size: 12px; }
+.required { padding-left: 3px; color: var(--rsm-p0); }
+.wrap { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
+.wrap input { flex: 1; width: 0; min-width: 0; }
+.actions { display: flex; flex: none; flex-direction: column; justify-content: center; gap: 4px; width: 22px; height: var(--rsm-control-height); }
+.actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 13px;
+  width: 22px;
+  height: 13px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--rsm-muted);
+}
+.actions button:not(:disabled):hover { background: var(--rsm-soft); color: var(--rsm-accent); }
+.actions svg { width: 11px; height: 11px; stroke-width: 1.7; }
+.feedback { color: var(--rsm-muted); font-size: 11px; min-height: 0; }
+.feedback:empty { display: none; }

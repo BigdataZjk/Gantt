@@ -1,0 +1,49 @@
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: var(--rsm-control-height);
+  padding: 0 10px;
+  border: 1px solid var(--rsm-border);
+  border-radius: var(--rsm-control-radius);
+  background: var(--rsm-panel);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 150ms, background-color 150ms;
+}
+.trigger:hover:not(:disabled), .trigger[data-state="open"] { border-color: color-mix(in srgb, var(--rsm-accent) 40%, var(--rsm-border)); background: var(--rsm-surface); }
+.trigger > svg { width: 14px; height: 14px; color: var(--rsm-muted); }
+.trigger .chevron { width: 12px; height: 12px; margin-left: 6px; transition: transform 150ms; }
+.trigger[data-state="open"] .chevron { transform: rotate(180deg); }
+.suffix { margin-left: 4px; color: var(--rsm-muted); font-size: 11px; }
+.panel {
+  z-index: 150;
+  width: 248px;
+  max-width: calc(100vw - 16px);
+  padding: 12px;
+  border: 1px solid var(--rsm-border);
+  border-radius: 12px;
+  background: var(--rsm-panel);
+  box-shadow: var(--rsm-shadow-pop);
+  font-variant-numeric: tabular-nums;
+}
+.panel[data-state="open"] { animation: rsm-pop-in 130ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.header > span { font-size: 12px; font-weight: 500; }
+.header > div { display: flex; gap: 3px; }
+.header button { display: grid; place-items: center; width: 25px; height: 25px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--rsm-muted); }
+.header button:hover:not(:disabled) { background: var(--rsm-soft); color: var(--rsm-text); }
+.header svg { width: 14px; height: 14px; }
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.grid button { position: relative; height: 38px; border: 1px solid transparent; border-radius: 7px; background: transparent; font-size: 13px; transition: background-color 120ms, color 120ms; }
+.grid button:hover { background: var(--rsm-soft); }
+.grid button[aria-current="date"] { border-color: var(--rsm-border); }
+.grid button[aria-pressed="true"] { background: var(--rsm-accent); border-color: var(--rsm-accent); color: var(--rsm-on-accent); }
+.dot { position: absolute; bottom: 4px; left: calc(50% - 1.5px); width: 3px; height: 3px; border-radius: 50%; background: var(--rsm-accent); opacity: 0; }
+.grid button[data-covered="true"] .dot { opacity: 1; }
+.grid button[aria-pressed="true"] .dot { background: currentColor; }
+.footer { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rsm-border); }
+.footer > span { display: inline-flex; align-items: center; gap: 5px; color: var(--rsm-muted); font-size: 10px; }
+.footer i { width: 4px; height: 4px; border-radius: 50%; background: var(--rsm-accent); }
+.footer button { padding: 3px 6px; border: 0; border-radius: 4px; background: transparent; color: var(--rsm-accent); font-size: 11px; }
+.footer button:hover { background: var(--rsm-accent-soft); }

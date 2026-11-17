@@ -1,0 +1,28 @@
+.rain {
+  --rain-color: rgb(73 102 138 / 40%);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--rsm-accent) 4%, var(--rsm-bg)), var(--rsm-bg) 48%, color-mix(in srgb, var(--rsm-accent) 2%, var(--rsm-bg)));
+}
+
+.drop {
+  position: absolute;
+  top: -30px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--rain-color));
+  animation: rain-fall linear infinite;
+}
+
+.rain[data-paused="true"] .drop { animation-play-state: paused; }
+:global([data-theme="dark"]) .rain { --rain-color: rgb(174 194 224 / 60%); }
+
+@keyframes rain-fall {
+  from { transform: translate3d(0, -20px, 0) rotate(10deg); }
+  to { transform: translate3d(calc(-17.6327dvh - 10.58px), calc(100dvh + 60px), 0) rotate(10deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop { top: var(--rain-static-top); animation: none; transform: rotate(10deg); }
+}

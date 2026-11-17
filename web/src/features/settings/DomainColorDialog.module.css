@@ -1,0 +1,3 @@
+.host { display: grid; gap: 12px; }
+.actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.error { color: var(--rsm-priority-p0); font-size: 12px; }

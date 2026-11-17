@@ -1,0 +1,50 @@
+.content { display: grid; gap: 16px; min-width: 0; font-size: 12px; }
+.metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metrics > div { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 3px 7px; padding: 12px; border: 1px solid var(--rsm-border); border-radius: 10px; background: color-mix(in srgb, var(--rsm-soft) 48%, transparent); }
+.metrics svg { width: 14px; height: 14px; color: var(--rsm-accent); align-self: center; }
+.metrics span { font-size: 11px; color: var(--rsm-muted); }
+.metrics strong { grid-column: 2; font-size: 19px; line-height: 1.5; font-weight: 600; font-variant-numeric: tabular-nums; }
+.metrics small { grid-column: 2; color: var(--rsm-muted); font-size: 11px; }
+.section { display: grid; gap: 10px; }
+.section + .section { padding-top: 16px; border-top: 1px solid var(--rsm-border); }
+.heading, .policyRow, .manualRow, .previewAction { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.heading h4 { font-size: 13px; font-weight: 600; }
+.policyRow { min-height: 56px; padding: 8px 12px; border: 1px solid var(--rsm-border); border-radius: 9px; }
+.policyRow > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.policyRow small, .muted { color: var(--rsm-muted); font-size: 11px; }
+.controls { display: inline-flex; align-items: center; flex: none; gap: 8px; white-space: nowrap; }
+.controls input { width: 68px; max-width: 68px; padding: 4px 7px; font-variant-numeric: tabular-nums; }
+.controls input:disabled { opacity: 0.5; }
+.switch { position: relative; display: flex; align-items: center; width: 30px; height: 18px; min-height: 18px; padding: 2px; border: 1px solid var(--rsm-border); border-radius: 10px; background: var(--rsm-soft); transition: background 130ms; }
+.switch > span { width: 12px; height: 12px; border-radius: 50%; background: var(--rsm-muted); transition: transform 130ms; }
+.switch[aria-checked="true"] { background: var(--rsm-accent); border-color: var(--rsm-accent); }
+.switch[aria-checked="true"] > span { transform: translateX(12px); background: white; }
+.hint { color: var(--rsm-muted); font-size: 11px; line-height: 1.65; }
+.scope { display: inline-flex; justify-self: start; gap: 3px; padding: 3px; border: 1px solid var(--rsm-border); border-radius: 8px; background: color-mix(in srgb, var(--rsm-soft) 55%, transparent); }
+.scope button { border-color: transparent; background: transparent; }
+.scope button[aria-pressed="true"] { color: var(--rsm-accent); border-color: color-mix(in srgb, var(--rsm-accent) 24%, var(--rsm-border)); background: var(--rsm-panel); box-shadow: 0 1px 3px color-mix(in srgb, var(--rsm-text) 6%, transparent); }
+.manualRow { flex-wrap: wrap; gap: 8px; }
+.presets { display: inline-flex; gap: 1px; margin-right: auto; }
+.presets button { min-width: 38px; padding-inline: 6px; color: var(--rsm-muted); }
+.presets button[aria-pressed="true"] { color: var(--rsm-accent); background: var(--rsm-soft); }
+.preview, .noResults { display: grid; gap: 7px; padding: 12px; border: 1px solid color-mix(in srgb, var(--rsm-danger) 32%, var(--rsm-border)); border-radius: 9px; background: color-mix(in srgb, var(--rsm-danger) 4%, var(--rsm-panel)); }
+.preview p, .noResults p { font-size: 11px; color: var(--rsm-muted); line-height: 1.6; }
+.preview strong, .noResults strong { font-weight: 500; color: var(--rsm-text); }
+.previewAction { flex-wrap: wrap; }
+.previewAction strong { font-weight: 600; }
+.noResults { border-color: var(--rsm-border); background: color-mix(in srgb, var(--rsm-soft) 45%, transparent); }
+.runs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding-top: 12px; border-top: 1px solid var(--rsm-border); }
+.runs span { color: var(--rsm-muted); font-size: 11px; }
+.runs p { font-size: 11px; margin-top: 4px; line-height: 1.6; overflow-wrap: anywhere; }
+.error { color: var(--rsm-danger); font-size: 11px; line-height: 1.6; }
+div.error { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+@media (max-width: 500px) {
+  .metrics { gap: 6px; }
+  .metrics > div { grid-template-columns: minmax(0, 1fr); padding: 9px; gap: 3px; }
+  .metrics svg { display: none; }
+  .metrics strong, .metrics small { grid-column: 1; }
+  .metrics strong { font-size: 17px; }
+  .policyRow { align-items: flex-start; flex-direction: column; gap: 9px; padding: 10px; }
+  .policyRow .controls { align-self: flex-end; }
+  .runs { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+}

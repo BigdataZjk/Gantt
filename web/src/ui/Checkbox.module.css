@@ -1,0 +1,19 @@
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--rsm-muted) 45%, var(--rsm-border));
+  border-radius: 4px;
+  background: var(--rsm-panel);
+  color: var(--rsm-on-accent);
+  transition: background 120ms, border-color 120ms;
+}
+.root[data-state="checked"], .root[data-state="indeterminate"] { background: var(--rsm-accent); border-color: var(--rsm-accent); }
+.root > span { display: grid; place-items: center; line-height: 0; }
+.root svg { display: block; width: 11px; height: 11px; }
+.label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; cursor: pointer; }
+.labelText { min-width: 0; overflow-wrap: anywhere; }

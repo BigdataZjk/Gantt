@@ -1,0 +1,45 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--rsm-soft) 85%, var(--rsm-panel));
+  color: var(--rsm-muted);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: middle;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.domain { background: var(--tag-bg); color: var(--tag-ink); }
+.requestType.regular { background: color-mix(in srgb, #8b5cf6 14%, var(--rsm-panel)); color: color-mix(in srgb, #6f45a9 78%, var(--rsm-text)); }
+.requestType.data { background: color-mix(in srgb, #06b6d4 14%, var(--rsm-panel)); color: color-mix(in srgb, #126575 78%, var(--rsm-text)); }
+.status.waiting { background: color-mix(in srgb, #eab308 20%, var(--rsm-panel)); color: color-mix(in srgb, #815708 85%, var(--rsm-text)); }
+.status.developing { background: color-mix(in srgb, #3b82f6 16%, var(--rsm-panel)); color: color-mix(in srgb, #245caa 80%, var(--rsm-text)); }
+.status.done { background: color-mix(in srgb, #22c55e 16%, var(--rsm-panel)); color: color-mix(in srgb, #13724f 85%, var(--rsm-text)); }
+.status.hold { background: color-mix(in srgb, #ec4899 16%, var(--rsm-panel)); color: color-mix(in srgb, #943c74 85%, var(--rsm-text)); }
+.status.review { background: color-mix(in srgb, #94a3b8 22%, var(--rsm-panel)); color: color-mix(in srgb, #526078 80%, var(--rsm-text)); }
+.priority {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 26px;
+  padding: 0 5px;
+  border: 1px solid;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+  white-space: nowrap;
+  flex: none;
+}
+.p0 { color: var(--rsm-priority-p0); border-color: color-mix(in srgb, var(--rsm-priority-p0) 28%, var(--rsm-panel)); background: color-mix(in srgb, var(--rsm-priority-p0) 4%, var(--rsm-panel)); }
+.p1 { color: var(--rsm-priority-p1); border-color: color-mix(in srgb, var(--rsm-priority-p1) 28%, var(--rsm-panel)); background: color-mix(in srgb, var(--rsm-priority-p1) 4%, var(--rsm-panel)); }
+.p2 { color: var(--rsm-priority-p2); border-color: color-mix(in srgb, var(--rsm-priority-p2) 28%, var(--rsm-panel)); background: color-mix(in srgb, var(--rsm-priority-p2) 4%, var(--rsm-panel)); }
+.muted { color: var(--rsm-muted); }

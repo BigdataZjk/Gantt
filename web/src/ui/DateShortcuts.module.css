@@ -1,0 +1,4 @@
+.row { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 10px; margin-top: 2px; }
+.button { padding: 1px 0; border: 0; background: transparent; color: var(--rsm-muted); font-size: 11px; line-height: 1.4; min-height: 18px; }
+.button:hover { color: var(--rsm-accent); text-decoration: underline; }
+.button[aria-pressed="true"] { color: var(--rsm-accent); font-weight: 500; }

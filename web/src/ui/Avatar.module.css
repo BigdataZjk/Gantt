@@ -1,0 +1,20 @@
+.avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--rsm-panel);
+  border-radius: 50%;
+  background: var(--rsm-soft);
+  color: var(--rsm-text);
+  overflow: visible;
+  padding: 0;
+}
+.image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.initial { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; background: var(--rsm-soft); font-size: 11px; font-weight: 500; color: var(--rsm-text); }
+.online { position: absolute; bottom: -1px; right: -1px; width: 7px; height: 7px; border: 1px solid var(--rsm-panel); border-radius: 50%; background: var(--rsm-online); }
+.large { width: 56px; height: 56px; border-width: 0; }
+.large .initial { font-size: 23px; }

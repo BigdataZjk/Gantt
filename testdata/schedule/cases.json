@@ -1,0 +1,4184 @@
+{
+  "meta": {
+    "description": "RSM 排期核心共享用例：Go internal/schedule 与 web/src/schedule 必须得到一致结果",
+    "goPackage": "rsm/internal/schedule",
+    "tsModule": "web/src/schedule",
+    "calendar": "2025/2026 中国法定节假日与调休（国务院办公厅通知）"
+  },
+  "calendarIsWorkday": [
+    {
+      "date": "2025-01-01",
+      "expected": false,
+      "note": "元旦（周三）放假"
+    },
+    {
+      "date": "2025-01-26",
+      "expected": true,
+      "note": "春节调休上班（周日）"
+    },
+    {
+      "date": "2025-01-28",
+      "expected": false,
+      "note": "春节假期首日（周二）"
+    },
+    {
+      "date": "2025-02-04",
+      "expected": false,
+      "note": "春节假期最后一天"
+    },
+    {
+      "date": "2025-02-05",
+      "expected": true,
+      "note": "春节后首个工作日"
+    },
+    {
+      "date": "2025-02-08",
+      "expected": true,
+      "note": "春节调休上班（周六）"
+    },
+    {
+      "date": "2025-04-27",
+      "expected": true,
+      "note": "劳动节调休上班（周日）"
+    },
+    {
+      "date": "2025-05-01",
+      "expected": false,
+      "note": "劳动节放假"
+    },
+    {
+      "date": "2025-09-28",
+      "expected": true,
+      "note": "国庆中秋调休上班（周日）"
+    },
+    {
+      "date": "2025-10-01",
+      "expected": false,
+      "note": "国庆中秋放假"
+    },
+    {
+      "date": "2025-10-11",
+      "expected": true,
+      "note": "国庆中秋调休上班（周六）"
+    },
+    {
+      "date": "2026-01-01",
+      "expected": false,
+      "note": "元旦放假（周四）"
+    },
+    {
+      "date": "2026-01-04",
+      "expected": true,
+      "note": "元旦调休上班（周日）"
+    },
+    {
+      "date": "2026-02-14",
+      "expected": true,
+      "note": "春节调休上班（周六）"
+    },
+    {
+      "date": "2026-02-17",
+      "expected": false,
+      "note": "春节假期（周二）"
+    },
+    {
+      "date": "2026-02-23",
+      "expected": false,
+      "note": "春节假期最后一天（周一）"
+    },
+    {
+      "date": "2026-02-24",
+      "expected": true,
+      "note": "春节后首个工作日"
+    },
+    {
+      "date": "2026-02-28",
+      "expected": true,
+      "note": "春节调休上班（周六）"
+    },
+    {
+      "date": "2026-05-09",
+      "expected": true,
+      "note": "劳动节调休上班（周六）"
+    },
+    {
+      "date": "2026-09-20",
+      "expected": true,
+      "note": "国庆节调休上班（周日）"
+    },
+    {
+      "date": "2026-10-01",
+      "expected": false,
+      "note": "国庆节放假"
+    },
+    {
+      "date": "2026-10-10",
+      "expected": true,
+      "note": "国庆节调休上班（周六）"
+    },
+    {
+      "date": "2026-11-14",
+      "expected": false,
+      "note": "普通周六"
+    },
+    {
+      "date": "2026-11-15",
+      "expected": false,
+      "note": "普通周日"
+    },
+    {
+      "date": "2026-11-16",
+      "expected": true,
+      "note": "普通周一"
+    },
+    {
+      "date": "2027-01-01",
+      "expected": false,
+      "note": "2027 年元旦放假"
+    },
+    {
+      "date": "2027-02-05",
+      "expected": false,
+      "note": "春节除夕"
+    },
+    {
+      "date": "2027-02-13",
+      "expected": false,
+      "note": "春节假期最后一天"
+    },
+    {
+      "date": "2027-01-31",
+      "expected": true,
+      "note": "春节调休周日上班"
+    },
+    {
+      "date": "2027-02-14",
+      "expected": true,
+      "note": "春节调休周日上班"
+    },
+    {
+      "date": "2027-05-08",
+      "expected": true,
+      "note": "劳动节调休"
+    },
+    {
+      "date": "2027-06-09",
+      "expected": false,
+      "note": "端午节"
+    },
+    {
+      "date": "2027-09-15",
+      "expected": false,
+      "note": "中秋节"
+    },
+    {
+      "date": "2027-09-26",
+      "expected": true,
+      "note": "国庆调休"
+    },
+    {
+      "date": "2027-10-09",
+      "expected": true,
+      "note": "国庆调休"
+    }
+  ],
+  "calendarSupportedYear": [
+    {
+      "year": 2025,
+      "expected": true
+    },
+    {
+      "year": 2026,
+      "expected": true
+    },
+    {
+      "year": 2024,
+      "expected": false
+    },
+    {
+      "year": 2027,
+      "expected": true
+    },
+    {
+      "year": 2028,
+      "expected": false
+    }
+  ],
+  "addDays": [
+    {
+      "date": "2026-02-28",
+      "n": 1,
+      "expected": "2026-03-01"
+    },
+    {
+      "date": "2026-03-01",
+      "n": -1,
+      "expected": "2026-02-28"
+    },
+    {
+      "date": "2026-12-31",
+      "n": 1,
+      "expected": "2027-01-01"
+    },
+    {
+      "date": "2026-11-16",
+      "n": 0,
+      "expected": "2026-11-16"
+    },
+    {
+      "date": "2026-02-23",
+      "n": 7,
+      "expected": "2026-03-02"
+    },
+    {
+      "date": "2026-11-16",
+      "n": -30,
+      "expected": "2026-10-17"
+    }
+  ],
+  "countWorkdays": [
+    {
+      "start": "2026-11-13",
+      "end": "2026-11-16",
+      "expected": 2,
+      "note": "跨普通周末"
+    },
+    {
+      "start": "2026-02-13",
+      "end": "2026-02-24",
+      "expected": 3,
+      "note": "跨春节法定假日与调休"
+    },
+    {
+      "start": "2025-01-27",
+      "end": "2025-02-05",
+      "expected": 2,
+      "note": "跨2025春节"
+    },
+    {
+      "start": "2026-02-14",
+      "end": "2026-02-14",
+      "expected": 1,
+      "note": "调休上班的周六"
+    },
+    {
+      "start": "2026-02-21",
+      "end": "2026-02-22",
+      "expected": 0,
+      "note": "春节假期内普通周末"
+    },
+    {
+      "start": "2026-11-16",
+      "end": "2026-11-15",
+      "expected": 0,
+      "note": "结束早于开始"
+    }
+  ],
+  "displayDays": [
+    {
+      "days": 0,
+      "expected": 3,
+      "note": "待估按3天占位，但 Plan.Days 仍保留0"
+    },
+    {
+      "days": 5,
+      "expected": 5
+    }
+  ],
+  "normalize": [
+    {
+      "name": "单段：开始、交付、人天按工作日归一",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "人天偏大：延长最后一段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-19"
+          }
+        ],
+        "days": 6,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-23"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-23",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "人天偏小：缩短最后一段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 7,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 7,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "人天小于前面段占用：days_too_small",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "days_too_small"
+    },
+    {
+      "name": "待估0：保留0语义与分段日期",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "空排期只保留预估人天",
+      "input": {
+        "segments": [],
+        "days": 4,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [],
+        "days": 4,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "待估且只有开始日期：按3天占位生成交付",
+      "input": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "仅开始日期与人天：推算交付",
+      "input": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "开始与交付都有：按日期反算人天",
+      "input": {
+        "segments": [],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "跨越法定假日推交付",
+      "input": {
+        "segments": [],
+        "days": 4,
+        "start": "2026-02-13",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [],
+        "days": 4,
+        "start": "2026-02-13",
+        "delivery": "2026-02-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "非法日期（2026-02-30）",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-30",
+            "end": "2026-03-05"
+          }
+        ],
+        "days": 3,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "invalid_date"
+    },
+    {
+      "name": "分段重叠",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-19",
+            "end": "2026-11-23"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "segment_overlap"
+    },
+    {
+      "name": "分段乱序",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          },
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "segment_order"
+    },
+    {
+      "name": "分段开始晚于结束",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-20",
+            "end": "2026-11-16"
+          }
+        ],
+        "days": 1,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "segment_invalid"
+    },
+    {
+      "name": "排期跨度超过5年",
+      "input": {
+        "segments": [
+          {
+            "start": "2025-01-06",
+            "end": "2030-01-07"
+          }
+        ],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "range_exceeded"
+    },
+    {
+      "name": "排期跨度恰为5年（允许）",
+      "input": {
+        "segments": [
+          {
+            "start": "2025-01-06",
+            "end": "2030-01-06"
+          }
+        ],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2025-01-06",
+            "end": "2030-01-06"
+          }
+        ],
+        "days": 0,
+        "start": "2025-01-06",
+        "delivery": "2030-01-06",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "段内没有工作日（整段周末）",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-14",
+            "end": "2026-11-15"
+          }
+        ],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "segment_no_workdays"
+    },
+    {
+      "name": "标记去重排序且不影响日期人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [
+          "2026-11-18",
+          "2026-11-18",
+          "2026-11-17"
+        ],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-17",
+          "2026-11-18"
+        ],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    },
+    {
+      "name": "标记日期非法",
+      "input": {
+        "segments": [],
+        "days": 3,
+        "start": "",
+        "delivery": "",
+        "vacation": [
+          "2026-11-31"
+        ],
+        "overtime": []
+      },
+      "errorCode": "invalid_date"
+    },
+    {
+      "name": "有交付无开始",
+      "input": {
+        "segments": [],
+        "days": 3,
+        "start": "",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "delivery_without_start"
+    },
+    {
+      "name": "交付早于开始",
+      "input": {
+        "segments": [],
+        "days": 3,
+        "start": "2026-11-20",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "delivery_before_start"
+    },
+    {
+      "name": "人天为小数",
+      "input": {
+        "segments": [],
+        "days": 2.5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "invalid_days"
+    },
+    {
+      "name": "人天为负数",
+      "input": {
+        "segments": [],
+        "days": -1,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "invalid_days"
+    },
+    {
+      "name": "人天超过5年上限",
+      "input": {
+        "segments": [],
+        "days": 1306,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "errorCode": "invalid_days"
+    },
+    {
+      "name": "待估多段：不按分段重算人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-27",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "结束于休息日的分段允许",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-15"
+          }
+        ],
+        "days": 2,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-15"
+          }
+        ],
+        "days": 2,
+        "start": "2026-02-13",
+        "delivery": "2026-02-15",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "首段HoldBefore清除，后续段保留",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18",
+            "holdBefore": true
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "存在休假标记时保存不改变已存储人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "存在休假标记时接受已联动的人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 4,
+        "start": "",
+        "delivery": "",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 4,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "存在加班标记时不按日期反算人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "name": "普通周末空档无标记不是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 10,
+        "start": "2026-11-16",
+        "delivery": "2026-11-27",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-11-21",
+          "end": "2026-11-22",
+          "workdays": 0,
+          "hold": false
+        }
+      ]
+    },
+    {
+      "name": "工作日空档未标记HOLD也不是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-11-19",
+          "end": "2026-11-22",
+          "workdays": 2,
+          "hold": false
+        }
+      ]
+    },
+    {
+      "name": "工作日空档显式标记HOLD才是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-11-19",
+          "end": "2026-11-22",
+          "workdays": 2,
+          "hold": true
+        }
+      ]
+    },
+    {
+      "name": "法定假日整段空档无标记不是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-14"
+          },
+          {
+            "start": "2026-02-24",
+            "end": "2026-02-25"
+          }
+        ],
+        "days": 4,
+        "start": "2026-02-13",
+        "delivery": "2026-02-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-02-15",
+          "end": "2026-02-23",
+          "workdays": 0,
+          "hold": false
+        }
+      ]
+    },
+    {
+      "name": "周末空档即使勾选HOLD也不是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27",
+            "holdBefore": true
+          }
+        ],
+        "days": 10,
+        "start": "2026-11-16",
+        "delivery": "2026-11-27",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-11-21",
+          "end": "2026-11-22",
+          "workdays": 0,
+          "hold": false
+        }
+      ]
+    },
+    {
+      "name": "法定假日空档即使勾选HOLD也不是HOLD",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-14"
+          },
+          {
+            "start": "2026-02-24",
+            "end": "2026-02-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 4,
+        "start": "2026-02-13",
+        "delivery": "2026-02-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "afterIndex": 0,
+          "start": "2026-02-15",
+          "end": "2026-02-23",
+          "workdays": 0,
+          "hold": false
+        }
+      ]
+    },
+    {
+      "name": "相邻分段没有空档",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-19",
+            "end": "2026-11-20",
+            "holdBefore": true
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": []
+    }
+  ],
+  "overlap": [
+    {
+      "name": "并行开发日重叠3天",
+      "a": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "b": {
+        "segments": [
+          {
+            "start": "2026-11-18",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-18",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "expectedOverlapDays": 3,
+      "expectedOverlaps": true
+    },
+    {
+      "name": "先后排期不交叠",
+      "a": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "b": {
+        "segments": [
+          {
+            "start": "2026-11-19",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 2,
+        "start": "2026-11-19",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "expectedOverlapDays": 0,
+      "expectedOverlaps": false
+    },
+    {
+      "name": "休假当天不计并行开发日",
+      "a": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "b": {
+        "segments": [
+          {
+            "start": "2026-11-18",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-18",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "expectedOverlapDays": 2,
+      "expectedOverlaps": true
+    },
+    {
+      "name": "无日期需求不参与并行",
+      "a": {
+        "segments": [],
+        "days": 3,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "b": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "expectedOverlapDays": 0,
+      "expectedOverlaps": false
+    }
+  ],
+  "moveSegment": [
+    {
+      "name": "移动单段保持人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "newStart": "2026-11-23",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-23",
+        "delivery": "2026-11-27",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "移动第二段并带走段内休假标记",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-24"
+        ],
+        "overtime": []
+      },
+      "index": 1,
+      "newStart": "2026-11-24",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-24",
+            "end": "2026-11-26"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-26",
+        "vacation": [
+          "2026-11-25"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "移动到周末保持人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "newStart": "2026-11-21",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-21",
+            "end": "2026-11-26"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-21",
+        "delivery": "2026-11-26",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    },
+    {
+      "name": "移动到其他段内：segment_overlap",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 10,
+        "start": "2026-11-16",
+        "delivery": "2026-11-27",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 1,
+      "newStart": "2026-11-20",
+      "errorCode": "segment_overlap"
+    },
+    {
+      "name": "待估排期移动后仍保留0人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "newStart": "2026-11-19",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-19",
+            "end": "2026-11-23"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-19",
+        "delivery": "2026-11-23",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "移动不存在的段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 3,
+      "newStart": "2026-11-19",
+      "errorCode": "index_out_of_range"
+    },
+    {
+      "name": "移动段时保留段前HOLD标记",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 1,
+      "newStart": "2026-11-24",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-24",
+            "end": "2026-11-26",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-26",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "移动段时休假标记随段平移并按有效日保持人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "index": 0,
+      "newStart": "2026-11-23",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-27"
+          }
+        ],
+        "days": 4,
+        "start": "2026-11-23",
+        "delivery": "2026-11-27",
+        "vacation": [
+          "2026-11-25"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "移动段时加班标记随段平移并按有效日保持人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "index": 0,
+      "newStart": "2026-11-23",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-28"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-23",
+        "delivery": "2026-11-28",
+        "vacation": [],
+        "overtime": [
+          "2026-11-28"
+        ]
+      }
+    }
+  ],
+  "resizeSegment": [
+    {
+      "name": "拉伸结束日期联动人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-20",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "收缩开始日期联动人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "start",
+      "date": "2026-11-18",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-18",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-18",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "结束日期在相邻段前停止并回退到工作日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-30",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 8,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "开始日期跳过休假标记到下一个工作日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-17"
+        ],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "start",
+      "date": "2026-11-17",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-18",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-18",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-17"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "收缩开始日期跨过春节假期取工作日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-24",
+            "end": "2026-02-27"
+          }
+        ],
+        "days": 4,
+        "start": "2026-02-24",
+        "delivery": "2026-02-27",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "start",
+      "date": "2026-02-25",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-02-25",
+            "end": "2026-02-27"
+          }
+        ],
+        "days": 3,
+        "start": "2026-02-25",
+        "delivery": "2026-02-27",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "开始日期落在法定假日回退到段内首个工作日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-24",
+            "end": "2026-02-27"
+          }
+        ],
+        "days": 4,
+        "start": "2026-02-24",
+        "delivery": "2026-02-27",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "start",
+      "date": "2026-02-16",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-02-24",
+            "end": "2026-02-27"
+          }
+        ],
+        "days": 4,
+        "start": "2026-02-24",
+        "delivery": "2026-02-27",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "结束日期落在周末回退到周五",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-22",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "待估排期伸缩后按有效日联动人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-20",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "非法边界参数",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "middle",
+      "date": "2026-11-20",
+      "errorCode": "invalid_edge"
+    },
+    {
+      "name": "真HOLD间隔阻止开始日期前移",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 1,
+      "edge": "start",
+      "date": "2026-11-19",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "未标记HOLD时允许开始日期前移吃掉工作日空档",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 1,
+      "edge": "start",
+      "date": "2026-11-19",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-19",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 8,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "伸缩后休假不计入人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-17",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-17"
+          }
+        ],
+        "days": 2,
+        "start": "2026-11-16",
+        "delivery": "2026-11-17",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "伸缩后休息日加班计入人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "index": 0,
+      "edge": "end",
+      "date": "2026-11-21",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    }
+  ],
+  "removeSegment": [
+    {
+      "name": "删除中间段：其他段日期与人天保持",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          },
+          {
+            "start": "2026-11-30",
+            "end": "2026-12-02"
+          }
+        ],
+        "days": 9,
+        "start": "2026-11-16",
+        "delivery": "2026-12-02",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 1,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-30",
+            "end": "2026-12-02"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-12-02",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "删除最后一段：其余段保持，交付取新最后段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          },
+          {
+            "start": "2026-11-30",
+            "end": "2026-12-02"
+          }
+        ],
+        "days": 9,
+        "start": "2026-11-16",
+        "delivery": "2026-12-02",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 2,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "删除最后仅存段：清空准入交付并保留预估",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "expected": {
+        "segments": [],
+        "days": 3,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "删除段时清理段内日期标记",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-17",
+          "2026-11-24"
+        ],
+        "overtime": []
+      },
+      "index": 0,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 2,
+        "start": "2026-11-23",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-24"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "删除不存在的段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 5,
+      "errorCode": "index_out_of_range"
+    },
+    {
+      "name": "没有分段可删",
+      "input": {
+        "segments": [],
+        "days": 3,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "errorCode": "no_segments"
+    },
+    {
+      "name": "删除首段后新首段HoldBefore清除、其余保留",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18",
+            "holdBefore": true
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          },
+          {
+            "start": "2026-11-30",
+            "end": "2026-12-02",
+            "holdBefore": true
+          }
+        ],
+        "days": 9,
+        "start": "2026-11-16",
+        "delivery": "2026-12-02",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          },
+          {
+            "start": "2026-11-30",
+            "end": "2026-12-02",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-23",
+        "delivery": "2026-12-02",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "待估多段删除一段后按剩余有效日联动人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "index": 0,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-23",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    }
+  ],
+  "addSegment": [
+    {
+      "name": "补排期填平HOLD并与相邻段合并",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-19",
+      "end": "2026-11-20",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 8,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "补排期与已有段之间存在未补工作日则新增独立段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-23",
+      "end": "2026-11-24",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "补排期跳过休假并新增独立段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [
+          "2026-11-23"
+        ],
+        "overtime": []
+      },
+      "start": "2026-11-21",
+      "end": "2026-11-24",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-24",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 4,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [
+          "2026-11-23"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "补排期接上调休上班的周六",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-12",
+            "end": "2026-02-13"
+          }
+        ],
+        "days": 2,
+        "start": "2026-02-12",
+        "delivery": "2026-02-13",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-02-14",
+      "end": "2026-02-14",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-02-12",
+            "end": "2026-02-14"
+          }
+        ],
+        "days": 3,
+        "start": "2026-02-12",
+        "delivery": "2026-02-14",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "补排期全在已排范围内：no_workdays",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-17",
+      "end": "2026-11-18",
+      "errorCode": "no_workdays"
+    },
+    {
+      "name": "补排期只有周末：no_workdays",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-21",
+      "end": "2026-11-22",
+      "errorCode": "no_workdays"
+    },
+    {
+      "name": "补排期可覆盖整段HOLD",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-19",
+      "end": "2026-11-23",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 8,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "部分补入原HOLD间隔时保留剩余HOLD标记",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-19",
+      "end": "2026-11-19",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-19"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25",
+            "holdBefore": true
+          }
+        ],
+        "days": 7,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "待估排期补排期后按有效日联动人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "start": "2026-11-23",
+      "end": "2026-11-24",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      }
+    }
+  ],
+  "setDays": [
+    {
+      "name": "增加人天延长最后一段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 7,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-26"
+          }
+        ],
+        "days": 7,
+        "start": "2026-11-16",
+        "delivery": "2026-11-26",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "减少人天缩短最后一段",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 4,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-23"
+          }
+        ],
+        "days": 4,
+        "start": "2026-11-16",
+        "delivery": "2026-11-23",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "人天小于前面段占用：days_too_small",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 3,
+      "errorCode": "days_too_small"
+    },
+    {
+      "name": "人天改0回到待估并保留日期",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 0,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "单段模式修改人天推算交付",
+      "input": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 5,
+      "expected": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "空排期修改预估人天不生成日期",
+      "input": {
+        "segments": [],
+        "days": 0,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 8,
+      "expected": {
+        "segments": [],
+        "days": 8,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "人天为小数：invalid_days",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "days": 2.5,
+      "errorCode": "invalid_days"
+    },
+    {
+      "name": "修改人天时休假不计入有效日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "days": 4,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 4,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "修改人天时休息日加班计入有效日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "days": 6,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    },
+    {
+      "name": "最后一段休假影响末段人天联动",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-24"
+        ],
+        "overtime": []
+      },
+      "days": 5,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-24"
+        ],
+        "overtime": []
+      }
+    }
+  ],
+  "setDelivery": [
+    {
+      "name": "修改交付反算人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-26",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-26"
+          }
+        ],
+        "days": 7,
+        "start": "2026-11-16",
+        "delivery": "2026-11-26",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "交付早于最后一段开始：delivery_before_start",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-24"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-24",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-20",
+      "errorCode": "delivery_before_start"
+    },
+    {
+      "name": "交付落在法定假日允许（结束于休息日）",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-14"
+          }
+        ],
+        "days": 2,
+        "start": "2026-02-13",
+        "delivery": "2026-02-14",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-02-23",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-02-13",
+            "end": "2026-02-23"
+          }
+        ],
+        "days": 2,
+        "start": "2026-02-13",
+        "delivery": "2026-02-23",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "单段模式修改交付反算人天",
+      "input": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-20",
+      "expected": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      }
+    },
+    {
+      "name": "无开始时设置交付：delivery_without_start",
+      "input": {
+        "segments": [],
+        "days": 5,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-20",
+      "errorCode": "delivery_without_start"
+    },
+    {
+      "name": "交付早于开始：delivery_before_start",
+      "input": {
+        "segments": [],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-13",
+      "errorCode": "delivery_before_start"
+    },
+    {
+      "name": "交付范围内没有工作日：no_workdays",
+      "input": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-14",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-15",
+      "errorCode": "no_workdays"
+    },
+    {
+      "name": "修改交付时休假不计入反算人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "delivery": "2026-11-19",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-19"
+          }
+        ],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-19",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "修改交付时休息日加班计入反算人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "delivery": "2026-11-21",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    },
+    {
+      "name": "交付可结束于普通休息日",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "delivery": "2026-11-22",
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-22"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-22",
+        "vacation": [],
+        "overtime": []
+      }
+    }
+  ],
+  "setVacation": [
+    {
+      "name": "工作日标记休假不改日期人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "date": "2026-11-18",
+      "on": true,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "取消休假",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-17",
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "date": "2026-11-17",
+      "on": false,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      }
+    },
+    {
+      "name": "休息日不能标记休假",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "date": "2026-11-21",
+      "on": true,
+      "errorCode": "mark_invalid"
+    },
+    {
+      "name": "休假与加班同日互斥",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "date": "2026-11-18",
+      "on": true,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    }
+  ],
+  "setOvertime": [
+    {
+      "name": "休息日标记加班不改日期人天",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "date": "2026-11-21",
+      "on": true,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      }
+    },
+    {
+      "name": "取消加班",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21",
+          "2026-11-22"
+        ]
+      },
+      "date": "2026-11-21",
+      "on": false,
+      "expected": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": [
+          "2026-11-22"
+        ]
+      }
+    },
+    {
+      "name": "工作日不能标记加班",
+      "input": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "date": "2026-11-18",
+      "on": true,
+      "errorCode": "mark_invalid"
+    }
+  ],
+  "sequence": [
+    {
+      "name": "顺排：选中块顺排，未选需求保持原有交叠",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-20"
+              }
+            ],
+            "days": 5,
+            "start": "2026-11-16",
+            "delivery": "2026-11-20",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-22",
+                "end": "2026-11-23"
+              }
+            ],
+            "days": 1,
+            "start": "2026-11-22",
+            "delivery": "2026-11-23",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "l",
+          "name": "未选需求L",
+          "developer": "李明",
+          "selected": false,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-23",
+                "end": "2026-11-24"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-23",
+            "delivery": "2026-11-24",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [
+          {
+            "id": "b",
+            "before": {
+              "segments": [
+                {
+                  "start": "2026-11-22",
+                  "end": "2026-11-23"
+                }
+              ],
+              "days": 1,
+              "start": "2026-11-22",
+              "delivery": "2026-11-23",
+              "vacation": [],
+              "overtime": []
+            },
+            "after": {
+              "segments": [
+                {
+                  "start": "2026-11-23",
+                  "end": "2026-11-23"
+                }
+              ],
+              "days": 1,
+              "start": "2026-11-23",
+              "delivery": "2026-11-23",
+              "vacation": [],
+              "overtime": []
+            },
+            "selected": true
+          }
+        ],
+        "warnings": [],
+        "selectedCount": 2
+      }
+    },
+    {
+      "name": "顺排：A/C选中而B未选中时交叠无法拆开，保持原样并提示",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "未选需求B",
+          "developer": "李明",
+          "selected": false,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-18",
+                "end": "2026-11-19"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-18",
+            "delivery": "2026-11-19",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "c",
+          "name": "需求C",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-19",
+                "end": "2026-11-20"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-19",
+            "delivery": "2026-11-20",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [],
+        "warnings": [
+          "李明：“未选需求B”未选中，需保持其与前后需求的衔接和交叠关系；“需求A、需求C”不能分开顺排。"
+        ],
+        "selectedCount": 2
+      }
+    },
+    {
+      "name": "顺排：全部选中时展开交叠",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-18",
+                "end": "2026-11-19"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-18",
+            "delivery": "2026-11-19",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "c",
+          "name": "需求C",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-19",
+                "end": "2026-11-20"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-19",
+            "delivery": "2026-11-20",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [
+          {
+            "id": "b",
+            "before": {
+              "segments": [
+                {
+                  "start": "2026-11-18",
+                  "end": "2026-11-19"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-18",
+              "delivery": "2026-11-19",
+              "vacation": [],
+              "overtime": []
+            },
+            "after": {
+              "segments": [
+                {
+                  "start": "2026-11-19",
+                  "end": "2026-11-20"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-19",
+              "delivery": "2026-11-20",
+              "vacation": [],
+              "overtime": []
+            },
+            "selected": true
+          },
+          {
+            "id": "c",
+            "before": {
+              "segments": [
+                {
+                  "start": "2026-11-19",
+                  "end": "2026-11-20"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-19",
+              "delivery": "2026-11-20",
+              "vacation": [],
+              "overtime": []
+            },
+            "after": {
+              "segments": [
+                {
+                  "start": "2026-11-23",
+                  "end": "2026-11-24"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-23",
+              "delivery": "2026-11-24",
+              "vacation": [],
+              "overtime": []
+            },
+            "selected": true
+          }
+        ],
+        "warnings": [],
+        "selectedCount": 3
+      }
+    },
+    {
+      "name": "顺排：多段需求移动时保留段间工作日空档",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "多段需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-18",
+                "end": "2026-11-19"
+              },
+              {
+                "start": "2026-11-23",
+                "end": "2026-11-24",
+                "holdBefore": true
+              }
+            ],
+            "days": 4,
+            "start": "2026-11-18",
+            "delivery": "2026-11-24",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [
+          {
+            "id": "b",
+            "before": {
+              "segments": [
+                {
+                  "start": "2026-11-18",
+                  "end": "2026-11-19"
+                },
+                {
+                  "start": "2026-11-23",
+                  "end": "2026-11-24",
+                  "holdBefore": true
+                }
+              ],
+              "days": 4,
+              "start": "2026-11-18",
+              "delivery": "2026-11-24",
+              "vacation": [],
+              "overtime": []
+            },
+            "after": {
+              "segments": [
+                {
+                  "start": "2026-11-19",
+                  "end": "2026-11-20"
+                },
+                {
+                  "start": "2026-11-24",
+                  "end": "2026-11-25",
+                  "holdBefore": true
+                }
+              ],
+              "days": 4,
+              "start": "2026-11-19",
+              "delivery": "2026-11-25",
+              "vacation": [],
+              "overtime": []
+            },
+            "selected": true
+          }
+        ],
+        "warnings": [],
+        "selectedCount": 2
+      }
+    },
+    {
+      "name": "顺排：各开发人独立处理",
+      "requests": [
+        {
+          "id": "a",
+          "name": "李明需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-20"
+              }
+            ],
+            "days": 5,
+            "start": "2026-11-16",
+            "delivery": "2026-11-20",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "李明需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-18",
+                "end": "2026-11-19"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-18",
+            "delivery": "2026-11-19",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "c",
+          "name": "王五需求C",
+          "developer": "王五",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-18",
+                "end": "2026-11-19"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-18",
+            "delivery": "2026-11-19",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [
+          {
+            "id": "b",
+            "before": {
+              "segments": [
+                {
+                  "start": "2026-11-18",
+                  "end": "2026-11-19"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-18",
+              "delivery": "2026-11-19",
+              "vacation": [],
+              "overtime": []
+            },
+            "after": {
+              "segments": [
+                {
+                  "start": "2026-11-23",
+                  "end": "2026-11-24"
+                }
+              ],
+              "days": 2,
+              "start": "2026-11-23",
+              "delivery": "2026-11-24",
+              "vacation": [],
+              "overtime": []
+            },
+            "selected": true
+          }
+        ],
+        "warnings": [],
+        "selectedCount": 3
+      }
+    },
+    {
+      "name": "顺排：已相互衔接时无需移动",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-19",
+                "end": "2026-11-20"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-19",
+            "delivery": "2026-11-20",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [],
+        "warnings": [],
+        "selectedCount": 2
+      }
+    },
+    {
+      "name": "顺排：只向未来顺排，不把已有空档拉早",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        },
+        {
+          "id": "b",
+          "name": "需求B",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-25",
+                "end": "2026-11-26"
+              }
+            ],
+            "days": 2,
+            "start": "2026-11-25",
+            "delivery": "2026-11-26",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [],
+        "warnings": [],
+        "selectedCount": 2
+      }
+    },
+    {
+      "name": "顺排：输入排期非法时返回错误",
+      "requests": [
+        {
+          "id": "bad",
+          "name": "非法需求",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-20"
+              },
+              {
+                "start": "2026-11-19",
+                "end": "2026-11-23"
+              }
+            ],
+            "days": 0,
+            "start": "2026-11-16",
+            "delivery": "2026-11-23",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "errorCode": "segment_overlap"
+    },
+    {
+      "name": "顺排：单条需求无变更",
+      "requests": [
+        {
+          "id": "a",
+          "name": "需求A",
+          "developer": "李明",
+          "selected": true,
+          "plan": {
+            "segments": [
+              {
+                "start": "2026-11-16",
+                "end": "2026-11-18"
+              }
+            ],
+            "days": 3,
+            "start": "2026-11-16",
+            "delivery": "2026-11-18",
+            "vacation": [],
+            "overtime": []
+          }
+        }
+      ],
+      "expected": {
+        "changes": [],
+        "warnings": [],
+        "selectedCount": 1
+      }
+    }
+  ],
+  "effectiveSegments": [
+    {
+      "name": "单段模式由开始与交付合成一段",
+      "plan": {
+        "segments": [],
+        "days": 3,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "start": "2026-11-16",
+          "end": "2026-11-18"
+        }
+      ]
+    },
+    {
+      "name": "待估单段模式同样合成一段",
+      "plan": {
+        "segments": [],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "start": "2026-11-16",
+          "end": "2026-11-18"
+        }
+      ]
+    },
+    {
+      "name": "多段模式原样返回",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": [
+        {
+          "start": "2026-11-16",
+          "end": "2026-11-18"
+        },
+        {
+          "start": "2026-11-23",
+          "end": "2026-11-25"
+        }
+      ]
+    },
+    {
+      "name": "空排期返回空数组",
+      "plan": {
+        "segments": [],
+        "days": 4,
+        "start": "",
+        "delivery": "",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": []
+    }
+  ],
+  "effectiveDays": [
+    {
+      "name": "无标记时等于工作日数",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": 5
+    },
+    {
+      "name": "休假不计入有效开发日",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-20"
+          }
+        ],
+        "days": 5,
+        "start": "2026-11-16",
+        "delivery": "2026-11-20",
+        "vacation": [
+          "2026-11-18"
+        ],
+        "overtime": []
+      },
+      "expected": 4
+    },
+    {
+      "name": "休息日加班计入有效开发日",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-21"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-21",
+        "vacation": [],
+        "overtime": [
+          "2026-11-21"
+        ]
+      },
+      "expected": 6
+    },
+    {
+      "name": "多段合计有效开发日",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          },
+          {
+            "start": "2026-11-23",
+            "end": "2026-11-25"
+          }
+        ],
+        "days": 6,
+        "start": "2026-11-16",
+        "delivery": "2026-11-25",
+        "vacation": [
+          "2026-11-24"
+        ],
+        "overtime": []
+      },
+      "expected": 5
+    },
+    {
+      "name": "待估人天不改变有效日计数",
+      "plan": {
+        "segments": [
+          {
+            "start": "2026-11-16",
+            "end": "2026-11-18"
+          }
+        ],
+        "days": 0,
+        "start": "2026-11-16",
+        "delivery": "2026-11-18",
+        "vacation": [],
+        "overtime": []
+      },
+      "expected": 3
+    }
+  ]
+}

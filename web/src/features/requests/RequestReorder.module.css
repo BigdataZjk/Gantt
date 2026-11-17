@@ -1,0 +1,38 @@
+.container [data-request-name] { user-select: none; }
+.container [data-request-name] button { cursor: grab; touch-action: none; }
+.container[data-reordering] { user-select: none; }
+.container[data-reordering], .container[data-reordering] :is(button, [data-bar]) { cursor: grabbing; }
+.container [data-reorder-source] [data-request-name] { opacity: 0.45; }
+.container [data-reorder-edge] > :is(td, [role="cell"]):not([data-key="name"]) { position: relative; }
+.container [data-reorder-edge] > :is(th, td, [role="cell"])::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  height: 2px;
+  background: var(--rsm-accent);
+  pointer-events: none;
+}
+.container [data-reorder-edge="before"] > :is(th, td, [role="cell"])::before { top: 0; }
+.container [data-reorder-edge="after"] > :is(th, td, [role="cell"])::before { bottom: 0; }
+.hint {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+  display: grid;
+  gap: 4px;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 9px 12px;
+  border: 1px solid var(--rsm-border);
+  border-radius: 8px;
+  background: var(--rsm-panel);
+  color: var(--rsm-text);
+  box-shadow: var(--rsm-shadow-pop);
+  font-size: 12px;
+  pointer-events: none;
+}
+.hint strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.hint span { color: var(--rsm-muted); font-size: 11px; }
+.hint[data-valid="true"] { border-color: var(--rsm-accent); }

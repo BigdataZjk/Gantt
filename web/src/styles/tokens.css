@@ -1,0 +1,119 @@
+/*
+ * RSM 设计令牌。日夜主题通过 [data-theme="dark"] 覆盖，组件只使用变量。
+ * 变量命名沿用原型（--gm-* 去掉前缀），保持雾面玻璃视觉一致。
+ */
+:root {
+  color-scheme: light;
+  --rsm-bg: #eaf0f3;
+  --rsm-panel: #ffffff;
+  --rsm-text: #243047;
+  --rsm-muted: #526178;
+  --rsm-border: #d7e1e9;
+  --rsm-soft: #edf2f7;
+  --rsm-rest: #e1e5eb;
+  --rsm-accent: #365fe9;
+  --rsm-on-accent: #ffffff;
+  --rsm-accent-soft: #edf2ff;
+  --rsm-gantt-surface: color-mix(in srgb, var(--rsm-panel) 97%, transparent);
+  --rsm-data-header: #dfe7f7;
+  --rsm-data-header-ink: #304773;
+  --rsm-date-header: #f5f7fc;
+  --rsm-person-fill: #eef1f6;
+  --rsm-person-ink: #3e4c64;
+  --rsm-online: #2f975f;
+  --rsm-danger: #c62828;
+  --rsm-warning: #a2640b;
+
+  --rsm-p0: #d32f57;
+  --rsm-p0-bg: #fff0f4;
+  --rsm-p1: #a2640b;
+  --rsm-p1-bg: #fff5df;
+  --rsm-p2: #3764c1;
+  --rsm-p2-bg: #edf3ff;
+  --rsm-purple: #8b4cdb;
+  --rsm-priority-p0: #c62828;
+  --rsm-priority-p0-bg: rgb(220 38 38 / 10%);
+  --rsm-priority-p1: #2563eb;
+  --rsm-priority-p1-bg: #eaf2ff;
+  --rsm-priority-p2: #4b5563;
+  --rsm-priority-p2-bg: #edf0f4;
+  --rsm-arrow-up: #32a653;
+  --rsm-arrow-down: #e53945;
+  --rsm-today-tint: rgb(54 95 233 / 9%);
+  --rsm-particle-core: #ffffff;
+
+  --rsm-control-height: 32px;
+  --rsm-compact-height: 28px;
+  --rsm-control-radius: 6px;
+  --rsm-navigation-row-height: 44px;
+  --rsm-row-height: 38px;
+  --rsm-gantt-row-height: max(24px, calc(var(--rsm-row-height) - 14px));
+  --rsm-day-width: calc(var(--rsm-gantt-row-height) * 1.125);
+  --rsm-drawer-width: 560px;
+
+  --rsm-glass-blur: 16px;
+  --rsm-radius-lg: 16px;
+  --rsm-radius-md: 12px;
+  --rsm-radius-sm: 8px;
+  --rsm-shadow-soft: 0 8px 24px color-mix(in srgb, var(--rsm-text) 7%, transparent);
+  --rsm-shadow-pop: 0 8px 26px color-mix(in srgb, var(--rsm-text) 14%, transparent);
+  --rsm-shadow-drawer: -12px 0 30px color-mix(in srgb, var(--rsm-text) 12%, transparent);
+  --rsm-font: "PingFang SC", -apple-system, "Segoe UI", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --rsm-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --rsm-bg: #17242b;
+  --rsm-panel: #202b33;
+  --rsm-text: #e8eef4;
+  --rsm-muted: #b0becc;
+  --rsm-border: #3b4b59;
+  --rsm-soft: #2b3c4e;
+  --rsm-rest: #344351;
+  --rsm-accent: #94afff;
+  --rsm-on-accent: #10224f;
+  --rsm-accent-soft: #232f4a;
+  --rsm-gantt-surface: var(--rsm-surface);
+  --rsm-data-header: #30425f;
+  --rsm-data-header-ink: #e1eaff;
+  --rsm-date-header: #23303f;
+  --rsm-person-ink: #d2dced;
+  --rsm-online: #74ce9b;
+  --rsm-danger: #ff9c9c;
+  --rsm-warning: #f6ca72;
+  --rsm-p0: #ff9eb5;
+  --rsm-p0-bg: #402235;
+  --rsm-p1: #f6ca72;
+  --rsm-p1-bg: #3d311f;
+  --rsm-p2: #acc5ff;
+  --rsm-p2-bg: #233451;
+  --rsm-purple: #c9a7ff;
+  --rsm-priority-p0: #ff9c9c;
+  --rsm-priority-p0-bg: rgb(248 113 113 / 14%);
+  --rsm-priority-p1: #a9c2ff;
+  --rsm-priority-p1-bg: #223554;
+  --rsm-priority-p2: #c1c8d2;
+  --rsm-priority-p2-bg: #2d3543;
+  --rsm-arrow-up: #68d789;
+  --rsm-arrow-down: #ff7380;
+  --rsm-today-tint: rgb(148 175 255 / 12%);
+  --rsm-particle-core: #f4f8ff;
+  --rsm-person-fill: #29343f;
+  --rsm-shadow-soft: 0 8px 24px rgb(0 0 0 / 24%);
+  --rsm-shadow-pop: 0 8px 26px rgb(0 0 0 / 36%);
+  --rsm-shadow-drawer: -12px 0 30px rgb(0 0 0 / 30%);
+}
+
+:root,
+[data-theme] {
+  --rsm-surface: color-mix(in srgb, var(--rsm-panel) 64%, transparent);
+  --rsm-surface-soft: color-mix(in srgb, var(--rsm-soft) 72%, transparent);
+  --rsm-surface-sticky: color-mix(in srgb, var(--rsm-panel) 92%, transparent);
+  --rsm-surface-header: color-mix(in srgb, var(--rsm-soft) 92%, transparent);
+  --rsm-surface-rest: color-mix(in srgb, var(--rsm-rest) 62%, transparent);
+}
+
+/* 密度：紧凑 / 舒适（契约只允许这两种） */
+[data-density="compact"] { --rsm-row-height: 38px; }
+[data-density="comfortable"] { --rsm-row-height: 50px; }
