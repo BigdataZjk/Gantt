@@ -1,6 +1,5 @@
 import { UsersRound } from "lucide-react";
 import type { Presence, User } from "../api/types";
-import { roleName } from "../lib/format";
 import { Popover } from "../ui/Popover";
 import { Avatar } from "../ui/Avatar";
 import styles from "./PresenceStack.module.css";
@@ -18,8 +17,8 @@ export function PresenceStack({ presence, users }: { presence: Presence; users: 
     <div className={styles.online} aria-label={`${members.length} 位登录用户在线${guests ? `，${guests} 位游客` : ""}`}>
       <span className={styles.stack}>
         {visible.map((user) => (
-          <span key={user.id} className={styles.avatarButton} data-tooltip={`${user.username} · ${roleName(user.role)}`}>
-            <Avatar name={user.username} avatar={user.avatar} online label={`${user.username}，${roleName(user.role)}，在线`} />
+          <span key={user.id} className={styles.avatarButton} data-tooltip={user.username}>
+            <Avatar name={user.username} avatar={user.avatar} online label={`${user.username}，在线`} />
           </span>
         ))}
         {extra.length ? (
@@ -33,9 +32,9 @@ export function PresenceStack({ presence, users }: { presence: Presence; users: 
             className={styles.overflow}
           >
             {extra.map((user) => (
-              <div key={user.id} className={styles.overflowRow}>
+              <div key={user.id} className={styles.overflowRow} data-tooltip={user.username}>
                 <Avatar name={user.username} avatar={user.avatar} online />
-                <span data-tooltip={roleName(user.role)}>{user.username}</span>
+                <span>{user.username}</span>
               </div>
             ))}
           </Popover>

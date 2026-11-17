@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
 import type { Presence, State } from "./types";
+import { createStateWriter, STATE_KEY } from "./stateCache";
 import { useNotice } from "../ui/Notice";
 
-export const STATE_KEY = ["app-state"] as const;
+export { STATE_KEY } from "./stateCache";
 
 export function useAppState() {
   return useQuery<State>({
     queryKey: STATE_KEY,
-    queryFn: () => api.state(),
+    queryFn: ({ signal }) => api.state(signal),
     staleTime: Infinity,
     gcTime: Infinity,
     retry: 1,
@@ -31,9 +32,10 @@ export function useMutationRunner() {
   return useCallback(
     async (mutator: (baseRevision: number) => Promise<State>, options: { silent?: boolean } = {}): Promise<State | null> => {
       const baseRevision = client.getQueryData<State>(STATE_KEY)?.revision ?? 0;
+      const writeState = createStateWriter(client);
       try {
         const next = await mutator(baseRevision);
-        if (next) client.setQueryData<State>(STATE_KEY, next);
+        if (next && !await writeState(next)) return null;
         return next ?? null;
       } catch (error) {
         if (error instanceof ApiError) {

@@ -7,8 +7,8 @@ _tc_self_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)
 if [ -z "${RSM_ROOT:-}" ]; then
   RSM_ROOT=$(cd "$_tc_self_dir/../.." 2>/dev/null && pwd -P)
 fi
-TOOLS_DIR="$RSM_ROOT/.tools"
-CACHE_DIR="$RSM_ROOT/.cache"
+TOOLS_DIR="${RSM_BUILD_ROOT:-$RSM_ROOT}/.tools"
+CACHE_DIR="${RSM_BUILD_ROOT:-$RSM_ROOT}/.cache"
 DOWNLOADS_DIR="$CACHE_DIR/downloads"
 TC_LOG_DIR="$CACHE_DIR/logs"
 TOOLCHAIN_ENV_FILE="$TOOLS_DIR/toolchain.env"
@@ -60,21 +60,22 @@ tc_assert_platform_assets() {
   [ -n "$node_url" ] || die "scripts/toolchain.json 未提供 Node 平台 $pk 的下载地址"
 }
 
-# 轻量网络探测（结果缓存 6 小时），用于选择可用的 Go 代理/校验库。
+# 探测必须成功返回 HTTP 2xx；成功缓存 10 分钟，失败最多缓存 1 分钟。
 probe_cached() {
-  _pc_key="$1"; _pc_url="$2"; _pc_ttl="${3:-21600}"
+  _pc_key="$1"; _pc_url="$2"; _pc_ttl="${3:-600}"
   _pc_file="$CACHE_DIR/probe-$_pc_key"
   if [ -f "$_pc_file" ]; then
     _pc_ts=$(cut -d' ' -f1 "$_pc_file" 2>/dev/null)
     _pc_val=$(cut -d' ' -f2 "$_pc_file" 2>/dev/null)
     _pc_now=$(date +%s)
-    if is_uint "$_pc_ts" && [ "$((_pc_now - _pc_ts))" -lt "$_pc_ttl" ] 2>/dev/null; then
+    if [ "$_pc_val" = 0 ] && [ "$_pc_ttl" -gt 60 ]; then _pc_ttl=60; fi
+    if is_uint "$_pc_ts" && [ "$((_pc_now - _pc_ts))" -ge 0 ] && [ "$((_pc_now - _pc_ts))" -lt "$_pc_ttl" ] 2>/dev/null; then
       [ "$_pc_val" = "1" ]
       return $?
     fi
   fi
   mkdir -p "$CACHE_DIR" 2>/dev/null || true
-  if have_cmd curl && curl -sS -o /dev/null --max-time 5 --connect-timeout 4 "$_pc_url" 2>/dev/null; then
+  if have_cmd curl && curl -fsSL -o /dev/null --max-time 4 --connect-timeout 2 "$_pc_url" 2>/dev/null; then
     printf '%s 1\n' "$(date +%s)" >"$_pc_file" 2>/dev/null || true
     return 0
   fi
@@ -82,25 +83,25 @@ probe_cached() {
   return 1
 }
 
-# 统一 Go 环境：尊重用户已有 GOPROXY/GOSUMDB；否则探测并选择可用镜像（| 分隔表示任意错误即回退）。
+# 默认先探测国内源；保留官方源回退及 Go 校验库验证，尊重显式环境配置。
 setup_go_env() {
   export GOTOOLCHAIN="${GOTOOLCHAIN:-local}"
   export CGO_ENABLED="${CGO_ENABLED:-1}"
   if [ -z "${GOPROXY:-}" ]; then
-    if probe_cached goproxy "https://proxy.golang.org/github.com/mattn/go-sqlite3/@v/list"; then
+    if probe_cached goproxy-cn-v2 "https://goproxy.cn/github.com/mattn/go-sqlite3/@v/v1.14.53.info"; then
+      export GOPROXY="https://goproxy.cn|https://goproxy.io|https://proxy.golang.org|direct"
+    elif probe_cached goproxy-official-v2 "https://proxy.golang.org/github.com/mattn/go-sqlite3/@v/v1.14.53.info"; then
       export GOPROXY="https://proxy.golang.org|https://goproxy.cn|https://goproxy.io|direct"
+    elif probe_cached goproxy-io-v2 "https://goproxy.io/github.com/mattn/go-sqlite3/@v/v1.14.53.info"; then
+      export GOPROXY="https://goproxy.io|https://goproxy.cn|https://proxy.golang.org|direct"
     else
-      export GOPROXY="https://goproxy.cn|https://goproxy.io|direct"
-      debug "proxy.golang.org 不可达，使用 goproxy.cn/goproxy.io 回退"
+      export GOPROXY="https://goproxy.io|https://goproxy.cn|https://proxy.golang.org|direct"
+      debug "首选 Go 源暂不可用，使用备用源并保留官方回退"
     fi
   fi
   if [ -z "${GOSUMDB:-}" ]; then
-    if probe_cached gosumdb "https://sum.golang.org/lookup/github.com/mattn/go-sqlite3@v1.14.53"; then
-      export GOSUMDB="sum.golang.org"
-    else
-      export GOSUMDB="sum.golang.google.cn"
-      debug "sum.golang.org 不可达，使用 sum.golang.google.cn"
-    fi
+    # Go 优先经 GOPROXY 转发校验库请求，无需先直连境外校验库。
+    export GOSUMDB="sum.golang.org"
   fi
 }
 

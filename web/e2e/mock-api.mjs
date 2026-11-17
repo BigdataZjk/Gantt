@@ -94,7 +94,7 @@ function stateFor(req, overrideMe) {
     versions: versions.map((version) => ({ ...version })),
     calendar,
     setupRequired,
-    serverVersion: "0.1.0-e2e",
+    serverVersion: "0.1.1-e2e",
   };
 }
 function send(res, status, payload, headers = {}) {
@@ -204,7 +204,7 @@ const server = http.createServer(async (req, res) => {
   const method = req.method || "GET";
   try {
     if (path === "/healthz") {
-      send(res, 200, { status: "ok", version: "0.1.0-e2e", revision, schemaVersion: 1 });
+      send(res, 200, { status: "ok", version: "0.1.1-e2e", revision, schemaVersion: 1 });
       return;
     }
     if (path === "/api/state" && method === "GET") {

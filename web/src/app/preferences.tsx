@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { STATE_KEY } from "../api/hooks";
+import { createStateWriter } from "../api/stateCache";
 import type { Density, Domain, Preferences } from "../api/types";
 import { isValidHex } from "../lib/color";
 import { readStorage, writeStorage } from "../lib/storage";
@@ -87,9 +87,13 @@ export function PreferencesProvider({ serverPreferences, authenticated, children
       while (pending.current) {
         const target = pending.current;
         pending.current = null;
+        const writeState = createStateWriter(client);
         try {
           const state = await api.savePreferences(target);
-          client.setQueryData(STATE_KEY, state);
+          if (!await writeState(state)) {
+            pending.current = null;
+            return;
+          }
         } catch (error) {
           notice.error(error instanceof Error ? error.message : "个人偏好保存失败");
         }

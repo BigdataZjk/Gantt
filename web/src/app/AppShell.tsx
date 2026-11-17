@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, LogIn } from "lucide-react";
 import { api, ApiError } from "../api/client";
-import { STATE_KEY, usePresence } from "../api/hooks";
+import { usePresence } from "../api/hooks";
+import { createStateWriter } from "../api/stateCache";
 import type { State, User } from "../api/types";
 import { usePreferences } from "./preferences";
 import { useUiState } from "./uiState";
@@ -57,9 +58,10 @@ export function AppShell({ state }: { state: State }) {
   const showCreate = ui.mainView === "requirements";
 
   const logout = async () => {
+    const writeState = createStateWriter(client, true);
     try {
       const next = await api.logout();
-      client.setQueryData(STATE_KEY, next);
+      if (!await writeState(next)) return;
       notice.notify("已退出登录");
       patch({ mainView: "requirements", settingsTab: "roles", newDraft: null });
     } catch (error) {
@@ -110,7 +112,7 @@ export function AppShell({ state }: { state: State }) {
             visible={ui.mainView === "requirements"}
           />
           <PresenceStack presence={presence} users={state.users} />
-          <button type="button" className={styles.avatarButton} onClick={openProfile} data-tooltip={guest ? "游客 · 只读，点击登录" : `${me?.username} · ${roleName(me?.role)}`} aria-label={guest ? "游客，点击登录" : `${me?.username}，${roleName(me?.role)}`}>
+          <button type="button" className={styles.avatarButton} onClick={openProfile} data-tooltip={guest ? "游客 · 只读，点击登录" : me.username} aria-label={guest ? "游客，点击登录" : `${me.username}，${roleName(me.role)}`}>
             <Avatar name={me?.username ?? "游客"} avatar={me?.avatar} />
           </button>
           <ThemeToggle />

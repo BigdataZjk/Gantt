@@ -6,6 +6,7 @@ set -o pipefail
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
 RSM_ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
 . "$SCRIPT_DIR/lib/common.sh"
+. "$SCRIPT_DIR/lib/codegen.sh"
 
 OUT_DIR="${RSM_SOURCE_OUT_DIR:-$HOME/Desktop}"
 while [ "$#" -gt 0 ]; do
@@ -18,6 +19,7 @@ done
 
 have_cmd git || die "源码打包需要 Git"
 [ -z "$(git -C "$RSM_ROOT" status --porcelain --untracked-files=normal)" ] || die "请先提交源码修改，再生成与提交一致的源码包"
+codegen_current || die "接口类型校验清单过期，请先运行 scripts/generate.sh 并提交结果"
 VERSION=$(json_get "$RSM_ROOT/web/package.json" version) || die "无法读取项目版本"
 case "$VERSION" in
   ''|*[!A-Za-z0-9._+-]*) die "项目版本无效: $VERSION" ;;

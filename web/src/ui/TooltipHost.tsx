@@ -14,10 +14,12 @@ export function TooltipHost() {
   const timer = useRef(0);
   const point = useRef({ x: 0, y: 0 });
   const active = useRef<HTMLElement | null>(null);
+  const visible = useRef(false);
 
   useEffect(() => {
     const hide = () => {
       window.clearTimeout(timer.current);
+      visible.current = false;
       setOpen(false);
       active.current = null;
     };
@@ -33,18 +35,20 @@ export function TooltipHost() {
     };
     const show = (node: HTMLElement, event?: PointerEvent | FocusEvent) => {
       const next = node.dataset.tooltip || "";
-      if (!next) return;
-      if (active.current === node && open) return;
+      if (!next) { hide(); return; }
+      if (active.current === node) return;
       window.clearTimeout(timer.current);
-      hide();
       active.current = node;
       if (event && "clientX" in event) point.current = { x: event.clientX, y: event.clientY };
       else point.current = { x: 0, y: 0 };
-      timer.current = window.setTimeout(() => {
+      const reveal = () => {
         setText(next);
         place();
+        visible.current = true;
         setOpen(true);
-      }, 110);
+      };
+      if (visible.current) reveal();
+      else timer.current = window.setTimeout(reveal, 110);
     };
     const over = (event: PointerEvent) => {
       if (event.pointerType === "touch" || event.buttons) { hide(); return; }
@@ -54,7 +58,10 @@ export function TooltipHost() {
     };
     const out = (event: PointerEvent) => {
       const node = (event.target as Element | null)?.closest?.("[data-tooltip]") as HTMLElement | null;
-      if (node && !node.contains(event.relatedTarget as Node | null)) hide();
+      if (!node || node.contains(event.relatedTarget as Node | null)) return;
+      const next = (event.relatedTarget as Element | null)?.closest?.("[data-tooltip]") as HTMLElement | null;
+      if (next) show(next, event);
+      else hide();
     };
     const focusIn = (event: FocusEvent) => {
       const node = (event.target as Element | null)?.closest?.("[data-tooltip]") as HTMLElement | null;
@@ -62,7 +69,7 @@ export function TooltipHost() {
     };
     const move = (event: PointerEvent) => {
       if (event.buttons) { hide(); return; }
-      if (!active.current || !open) return;
+      if (!active.current || !visible.current) return;
       point.current = { x: event.clientX, y: event.clientY };
       place();
     };
@@ -72,6 +79,7 @@ export function TooltipHost() {
     document.addEventListener("focusin", focusIn);
     document.addEventListener("focusout", hide);
     document.addEventListener("pointerdown", hide, true);
+    window.addEventListener("blur", hide);
     window.addEventListener("scroll", hide, true);
     window.addEventListener("resize", hide);
     return () => {
@@ -82,10 +90,11 @@ export function TooltipHost() {
       document.removeEventListener("focusin", focusIn);
       document.removeEventListener("focusout", hide);
       document.removeEventListener("pointerdown", hide, true);
+      window.removeEventListener("blur", hide);
       window.removeEventListener("scroll", hide, true);
       window.removeEventListener("resize", hide);
     };
-  }, [open]);
+  }, []);
 
   if (!open) return null;
   return (

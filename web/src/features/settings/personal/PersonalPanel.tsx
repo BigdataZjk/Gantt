@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { LogIn, LogOut, Upload } from "lucide-react";
 import { api, ApiError } from "../../../api/client";
-import { STATE_KEY } from "../../../api/hooks";
+import { createStateWriter } from "../../../api/stateCache";
 import type { State, User } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useNotice } from "../../../ui/Notice";
@@ -47,9 +47,10 @@ export function PersonalPanel({ state, onLogin, onLogout, onOpenCredential }: Pr
       setAvatarError("请选择 4 MiB 以内的图片");
       return;
     }
+    const writeState = createStateWriter(client);
     try {
       const state = await api.uploadAvatar(file);
-      client.setQueryData(STATE_KEY, state);
+      if (!await writeState(state)) return;
       notice.notify("头像已更新");
     } catch (error) {
       setAvatarError(error instanceof ApiError ? error.message : "头像上传失败");

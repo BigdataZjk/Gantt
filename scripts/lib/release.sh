@@ -274,16 +274,18 @@ deploy_from_source() {
     die "源码缺少 cmd/rsm/main.go，无法构建（当前源码树可能尚未完成）"
   fi
   step "准备源码构建工具链（固定版本；缺失时联网下载到 .tools，不替换系统工具）"
-  "$_dfs_repo/scripts/bootstrap.sh" --ensure-build || die "构建依赖准备失败，未做任何部署变更"
+  RSM_BUILD_ROOT="$RSM_HOME" "$_dfs_repo/scripts/bootstrap.sh" --ensure-build || die "构建依赖准备失败，未做任何部署变更"
   step "生成接口类型并构建发行包"
-  "$_dfs_repo/scripts/build.sh" || die "构建失败，未做任何部署变更"
+  RSM_BUILD_ROOT="$RSM_HOME" "$_dfs_repo/scripts/build.sh" || die "构建失败，未做任何部署变更"
   _dfs_pkg=$(cat "$_dfs_repo/build/package.path" 2>/dev/null | head -n1)
   [ -n "$_dfs_pkg" ] || die "构建未产生发行包（build/package.path 缺失）"
   [ -f "$_dfs_pkg" ] || die "构建输出的发行包不存在: $_dfs_pkg"
   step "校验发行包"
   resolve_package "$_dfs_pkg"
+  _dfs_mode=deploy
+  if instance_installed; then _dfs_mode=upgrade; fi
   prepare_release_dir "$PKG_ROOT"
-  deploy_activate "$CANDIDATE_DIR" "deploy"
+  deploy_activate "$CANDIDATE_DIR" "$_dfs_mode"
 }
 
 deploy_from_package() {

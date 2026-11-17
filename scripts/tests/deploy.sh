@@ -164,6 +164,100 @@ pass 'default Go, npm, pnpm and XDG caches stay inside the project'
 ) || fail 'explicit build cache configuration was overwritten'
 pass 'explicit cache locations remain configurable'
 
+source_case() (
+  local scenario="$1" fixture="$RSM_TEST_TMP/source-$1"
+  RSM_ROOT="$fixture/new source"
+  RSM_HOME="$fixture/original instance"
+  export RSM_SOURCE_TEST_CALLS="$fixture/calls"
+  mkdir -p "$RSM_ROOT/api" "$RSM_ROOT/cmd/rsm" "$RSM_ROOT/web" "$RSM_ROOT/scripts" "$RSM_ROOT/build" "$RSM_HOME"
+  touch "$RSM_ROOT/go.mod" "$RSM_ROOT/api/openapi.yaml" "$RSM_ROOT/cmd/rsm/main.go" "$RSM_ROOT/build/package.tar.gz"
+  cat >"$RSM_ROOT/scripts/bootstrap.sh" <<'EOF'
+#!/usr/bin/env bash
+printf 'bootstrap %s\n' "$RSM_BUILD_ROOT" >>"$RSM_SOURCE_TEST_CALLS"
+EOF
+  cat >"$RSM_ROOT/scripts/build.sh" <<'EOF'
+#!/usr/bin/env bash
+printf 'build %s\n' "$RSM_BUILD_ROOT" >>"$RSM_SOURCE_TEST_CALLS"
+[ "${RSM_SOURCE_TEST_FAIL:-0}" = 0 ] || exit 9
+root=$(cd "$(dirname "$0")/.." && pwd -P)
+printf '%s/build/package.tar.gz\n' "$root" >"$root/build/package.path"
+EOF
+  chmod +x "$RSM_ROOT/scripts/bootstrap.sh" "$RSM_ROOT/scripts/build.sh"
+  . "$RSM_TEST_ROOT/scripts/lib/release.sh"
+  instance_installed() { [ "$scenario" != fresh ]; }
+  resolve_package() { PKG_ROOT="$RSM_ROOT"; }
+  prepare_release_dir() { CANDIDATE_DIR="$RSM_HOME/candidate"; }
+  deploy_activate() { printf 'activate %s\n' "$2" >>"$RSM_SOURCE_TEST_CALLS"; }
+  stop_instance() { touch "$fixture/stopped"; }
+  if [ "$scenario" = failure ]; then export RSM_SOURCE_TEST_FAIL=1; fi
+  deploy_from_source >"$fixture/output" 2>&1
+)
+for scenario in fresh existing failure; do
+  status=0
+  source_case "$scenario" || status=$?
+  fixture="$RSM_TEST_TMP/source-$scenario"
+  grep -Fxq "bootstrap $fixture/original instance" "$fixture/calls" &&
+    grep -Fxq "build $fixture/original instance" "$fixture/calls" || fail "source $scenario lost the original build cache root"
+  [ ! -f "$fixture/stopped" ] || fail "source $scenario stopped the service while building"
+  case "$scenario" in
+    fresh) [ "$status" = 0 ] && grep -Fxq 'activate deploy' "$fixture/calls" || fail 'fresh source used upgrade mode' ;;
+    existing) [ "$status" = 0 ] && grep -Fxq 'activate upgrade' "$fixture/calls" || fail 'source upgrade bypassed schema protection' ;;
+    failure) [ "$status" != 0 ] && ! grep -q '^activate ' "$fixture/calls" || fail 'build failure activated an incomplete release' ;;
+  esac
+  pass "source $scenario preserves the running instance, shares caches and selects the correct activation mode"
+done
+
+(
+  RSM_ROOT="$RSM_TEST_TMP/new source"
+  RSM_BUILD_ROOT="$RSM_TEST_TMP/original instance"
+  . "$RSM_TEST_ROOT/scripts/lib/toolchain.sh"
+  [ "$TOOLS_DIR" = "$RSM_BUILD_ROOT/.tools" ] && [ "$CACHE_DIR" = "$RSM_BUILD_ROOT/.cache" ]
+) || fail 'source upgrades discarded the original instance toolchain and build caches'
+pass 'source upgrades reuse toolchains and build caches inside the original instance'
+
+proxy_case() (
+  local scenario="$1" fixture="$RSM_TEST_TMP/proxy-$1"
+  CACHE_DIR="$fixture"
+  mkdir -p "$CACHE_DIR"
+  unset GOPROXY GOSUMDB
+  curl() {
+    printf '%s\n' "$*" >>"$fixture/requests"
+    case "$scenario:$*" in
+      cn:*goproxy.cn*|failure-cache:*|success-cache:*) return 0 ;;
+      http-error:*goproxy.cn*)
+        case " $* " in *' -fsSL '*) return 22 ;; *) return 0 ;; esac ;;
+      http-error:*proxy.golang.org*) return 0 ;;
+      alternate:*goproxy.io*) return 0 ;;
+      *) return 28 ;;
+    esac
+  }
+  case "$scenario" in
+    explicit)
+      export GOPROXY='https://company.invalid|direct' GOSUMDB='company-checksum.invalid'
+      setup_go_env
+      [ "$GOPROXY" = 'https://company.invalid|direct' ] && [ "$GOSUMDB" = company-checksum.invalid ] && [ ! -f "$fixture/requests" ] ;;
+    failure-cache)
+      printf '%s 0\n' "$(($(date +%s)-61))" >"$CACHE_DIR/probe-stale"
+      probe_cached stale https://test.invalid && [ -f "$fixture/requests" ] ;;
+    success-cache)
+      probe_cached current https://test.invalid
+      probe_cached current https://test.invalid
+      [ "$(wc -l <"$fixture/requests" | tr -d ' ')" = 1 ] ;;
+    *)
+      setup_go_env
+      [ "$GOSUMDB" = sum.golang.org ] || exit 1
+      case "$scenario:$GOPROXY" in
+        cn:https://goproxy.cn\|*) [ "$(wc -l <"$fixture/requests" | tr -d ' ')" = 1 ] ;;
+        http-error:https://proxy.golang.org\|*|alternate:https://goproxy.io\|*) : ;;
+        *) exit 1 ;;
+      esac ;;
+  esac
+)
+for scenario in cn http-error alternate explicit failure-cache success-cache; do
+  proxy_case "$scenario" || fail "Go proxy selection or bounded probe caching failed: $scenario"
+  pass "Go proxy selection preserves checksum validation and handles $scenario"
+done
+
 toolchain_case() (
   local action="$1" fixture="$RSM_TEST_TMP/pnpm $1" status=0
   mkdir -p "$fixture/tools/node/bin" "$fixture/tools/go/bin" "$fixture/tools/pnpm/node_modules/.bin" "$fixture/system"

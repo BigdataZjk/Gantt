@@ -1,4 +1,4 @@
-# RSM v0.1.0
+# RSM v0.1.1
 
 **Request Schedule Manager**，用于多人协作管理需求与开发排期。
 
@@ -22,7 +22,9 @@ chmod +x rsm.sh scripts/*.sh
 
 解压后的 `rsm/` 就是项目与运行根目录，放在哪里就使用哪里，不固定 `/app/rsm`。工具链位于 `.tools/`，依赖缓存位于 `.cache/`；配置、数据库、密钥、日志和备份均保存在该目录下。操作系统依赖与自启动注册按系统规范安装。
 
-首次访问按页面提示设置超级管理员密码，再创建成员账号。新实例不含演示需求，游客只读访问。已保存的需求及归档永久保留，日志清理不删除需求。
+首次访问按页面提示设置超级管理员密码并进入，再创建成员账号。新实例不含演示需求，游客只读访问。已保存的需求及归档永久保留，日志清理不删除需求。
+
+源码部署先校验已提交的接口类型；契约、生成器配置和类型文件一致时直接复用，避免每次下载并编译生成器。Go 依赖源短超时探测国内镜像，保留官方回退及校验。源码升级自动复用原实例的 `.tools/`、`.cache/`，减少重复下载与编译。
 
 安装、升级和备份步骤见 [DEPLOYMENT.md](DEPLOYMENT.md)。
 
@@ -51,7 +53,7 @@ chmod +x rsm.sh scripts/*.sh
 
 ```text
 rsm/
-├── api/openapi.yaml          # 接口契约
+├── api/                     # 接口契约及生成类型校验清单
 ├── cmd/rsm/                  # 服务端及备份恢复命令入口
 ├── internal/                 # 权限、接口、排期算法、SQLite 与历史记录
 ├── web/                      # React 页面、组件、样式及前端测试
@@ -78,10 +80,13 @@ rsm/
 
 ```sh
 ./scripts/generate.sh                  # 生成接口类型
+./scripts/generate.sh --check          # 实际重新生成并核对类型与校验清单
 ./scripts/build.sh                     # 按项目版本构建，产物位于 build/
 ./scripts/build.sh --version 0.1.1     # 显式覆盖构建版本
 ./scripts/package-source.sh            # 将已提交源码打包到桌面
 ```
+
+契约或生成器配置变更后运行 `generate.sh`，同时提交类型文件和 `api/generated.sha256`；打包会拒绝过期的校验清单。
 
 产品版本记录在 `web/package.json`。构建版本优先级为 `--version`、`RSM_VERSION`、Git 精确标签、项目版本。源码 ZIP 默认保存在 `~/Desktop/rsm-source-<版本>.zip`，顶层目录为 `rsm/`，内容与当前提交一致。
 

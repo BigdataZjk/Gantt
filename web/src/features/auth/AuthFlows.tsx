@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, Eye, EyeOff, X } from "lucide-react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { api, ApiError } from "../../api/client";
-import { STATE_KEY } from "../../api/hooks";
+import { createStateWriter } from "../../api/stateCache";
 import type { User } from "../../api/types";
 import { Button } from "../../ui/Button";
 import { Checkbox } from "../../ui/Checkbox";
@@ -94,9 +94,10 @@ export function LoginDialog({ open, onOpenChange }: { open: boolean; onOpenChang
     }
     setPending(true);
     setError("");
+    const writeState = createStateWriter(client, true);
     try {
       const state = await api.login(username.trim(), password, remember);
-      client.setQueryData(STATE_KEY, state);
+      if (!await writeState(state)) return;
       notice.notify(`欢迎回来，${state.me?.username ?? username}`);
       setPassword("");
       changeOpen(false);
@@ -222,9 +223,10 @@ export function SetupScreen() {
     }
     setPending(true);
     setError("");
+    const writeState = createStateWriter(client, true);
     try {
       const state = await api.setup(password);
-      client.setQueryData(STATE_KEY, state);
+      if (!await writeState(state)) return;
       notice.notify("初始超级管理员密码已设置");
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "设置失败，请稍后重试");
@@ -298,14 +300,15 @@ export function PasswordDialog({ open, onOpenChange, mode, user }: { open: boole
       return;
     }
     setPending(true);
+    const writeState = createStateWriter(client, mode === "self");
     try {
       if (mode === "self") {
         const state = await api.changePassword(current, next);
-        client.setQueryData(STATE_KEY, state);
+        if (!await writeState(state)) return;
         notice.notify("密码已更新");
       } else if (user) {
         const state = await api.updateUser(user.id, { password: next });
-        client.setQueryData(STATE_KEY, state);
+        if (!await writeState(state)) return;
         notice.notify(`已重设 ${user.username} 的密码`);
       }
       setCurrent("");

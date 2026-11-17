@@ -44,7 +44,7 @@ async function send<T>(path: string, method: string, body?: unknown, options: Re
 }
 
 export const api = {
-  state: (): Promise<State> => send<State>("/api/state", "GET"),
+  state: (signal?: AbortSignal): Promise<State> => send<State>("/api/state", "GET", undefined, { signal }),
   setup: (password: string): Promise<State> => send<State>("/api/setup", "POST", { password }),
   login: (username: string, password: string, remember = true): Promise<State> => send<State>("/api/login", "POST", { username, password, remember }),
   logout: (): Promise<State> => send<State>("/api/logout", "POST", {}),

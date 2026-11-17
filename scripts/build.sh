@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 源码构建：生成接口类型 → 构建前端 → 编译 Go（内嵌前端）→ 打开发行包（tar.gz + SHA256 + release.json 元数据）。
+# 源码构建：安装依赖 → 校验/按需生成接口类型 → 构建前端 → 编译 Go（内嵌前端）→ 打开发行包。
 # 用法：scripts/build.sh [--version V] [--out-dir DIR]
 #   --version  指定发行版本（默认 RSM_VERSION 环境变量；否则 git 精确 tag；否则 web/package.json 的版本）
 #   --out-dir  输出目录（默认仓库 build/）
@@ -64,9 +64,6 @@ case "$VERSION" in
 esac
 info "构建版本: ${VERSION}（$(os_pretty) $(host_arch)）"
 
-step "生成接口类型（固定版本生成器）"
-"$SCRIPT_DIR/generate.sh" || die "接口类型生成失败"
-
 step "安装前端依赖（按 pnpm 锁文件）"
 _web="$RSM_ROOT/web"
 _need_install=0
@@ -84,6 +81,9 @@ if [ "$_need_install" = "1" ]; then
 else
   ok "前端依赖已就绪，复用锁文件对应的已安装依赖"
 fi
+
+step "校验接口类型（变更时重新生成）"
+"$SCRIPT_DIR/generate.sh" --ensure || die "接口类型校验或生成失败"
 
 step "构建前端（pnpm build → web/dist）"
 ( cd "$_web" && run_logged "构建前端页面" "$RSM_PNPM_BIN" run build ) || die "前端构建失败（pnpm run build）"
