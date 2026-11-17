@@ -2,6 +2,7 @@ package store
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"bytes"
 	"compress/gzip"
 	"context"
@@ -61,6 +62,26 @@ func backupChange(t *testing.T, s *Store, name string) int64 {
 
 func readArchive(t *testing.T, path string) map[string][]byte {
 	t.Helper()
+	if strings.HasSuffix(path, ".zip") {
+		reader, err := zip.OpenReader(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer reader.Close()
+		files := map[string][]byte{}
+		for _, entry := range reader.File {
+			content, err := entry.Open()
+			if err != nil {
+				t.Fatal(err)
+			}
+			files[entry.Name], err = io.ReadAll(content)
+			content.Close()
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		return files
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -92,6 +113,25 @@ func readArchive(t *testing.T, path string) map[string][]byte {
 func writeArchive(t *testing.T, path string, files map[string][]byte) {
 	t.Helper()
 	var b bytes.Buffer
+	if strings.HasSuffix(path, ".zip") {
+		writer := zip.NewWriter(&b)
+		for name, content := range files {
+			entry, err := writer.Create(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = entry.Write(content); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, b.Bytes(), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return
+	}
 	gz := gzip.NewWriter(&b)
 	tr := tar.NewWriter(gz)
 	for name, content := range files {
@@ -114,10 +154,24 @@ func writeArchive(t *testing.T, path string, files map[string][]byte) {
 }
 
 func TestLiveBackupRestoresCommittedWALAndPreservesNewerData(t *testing.T) {
+	for _, extension := range []string{".zip", ".tar.gz"} {
+		t.Run(extension, func(t *testing.T) { testLiveBackupRestoresCommittedWAL(t, extension) })
+	}
+}
+
+func testLiveBackupRestoresCommittedWAL(t *testing.T, extension string) {
 	ctx := context.Background()
 	s := backupFixture(t)
-	before := backupChange(t, s, "备份时已提交")
-	backup := filepath.Join(t.TempDir(), "snapshot.tar.gz")
+	backupChange(t, s, "备份时已提交")
+	before, err := s.Change(ctx, "owner", nil, "admin", "加入已归档需求", true, func(_ *sql.Tx, data *requests.Data, _ auth.User) error {
+		data.Requests = append(data.Requests, requests.Request{ID: data.NextID, Name: "已归档需求", Archived: true, Revision: 1})
+		data.NextID++
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup := filepath.Join(t.TempDir(), "snapshot"+extension)
 	m, err := s.Backup(ctx, backup, "0.1.0-test")
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +214,7 @@ func TestLiveBackupRestoresCommittedWALAndPreservesNewerData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if snap.Revision != before || len(snap.Requests) != 1 || snap.Requests[0].Name != "备份时已提交" {
+	if snap.Revision != before || len(snap.Requests) != 2 || snap.Requests[0].Name != "备份时已提交" || !snap.Requests[1].Archived || snap.Requests[1].Name != "已归档需求" {
 		t.Fatal("restore missed committed WAL", snap)
 	}
 	if _, err := restored.Session(ctx, token); err == nil {
@@ -169,7 +223,7 @@ func TestLiveBackupRestoresCommittedWALAndPreservesNewerData(t *testing.T) {
 	if password, err := restored.Password(ctx, "owner"); err != nil || password != "backup-test-password" {
 		t.Fatal("key mismatch", err)
 	}
-	preserved, err := filepath.Glob(filepath.Join(s.Home, "backups", "pre-restore-*.tar.gz"))
+	preserved, err := filepath.Glob(filepath.Join(s.Home, "backups", "pre-restore-*.zip"))
 	if err != nil || len(preserved) != 1 {
 		t.Fatal("missing pre-restore backup", err)
 	}
@@ -180,9 +234,15 @@ func TestLiveBackupRestoresCommittedWALAndPreservesNewerData(t *testing.T) {
 }
 
 func TestInvalidBackupsLeaveExistingInstanceUntouched(t *testing.T) {
+	for _, extension := range []string{".zip", ".tar.gz"} {
+		t.Run(extension, func(t *testing.T) { testInvalidBackupsLeaveInstanceUntouched(t, extension) })
+	}
+}
+
+func testInvalidBackupsLeaveInstanceUntouched(t *testing.T, extension string) {
 	s := backupFixture(t)
 	before := backupChange(t, s, "不能丢失")
-	good := filepath.Join(t.TempDir(), "good.tar.gz")
+	good := filepath.Join(t.TempDir(), "good"+extension)
 	if _, err := s.Backup(context.Background(), good, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +258,7 @@ func TestInvalidBackupsLeaveExistingInstanceUntouched(t *testing.T) {
 			if err := json.Unmarshal(files["manifest.json"], &m); err != nil {
 				t.Fatal(err)
 			}
-			path := filepath.Join(t.TempDir(), "invalid.tar.gz")
+			path := filepath.Join(t.TempDir(), "invalid"+extension)
 			switch kind {
 			case "truncated":
 				if err := os.WriteFile(path, raw[:len(raw)-8], 0600); err != nil {
@@ -279,7 +339,7 @@ func TestConcurrentBackupIsTransactionallyConsistent(t *testing.T) {
 		}
 		done <- nil
 	}()
-	path := filepath.Join(t.TempDir(), "concurrent.tar.gz")
+	path := filepath.Join(t.TempDir(), "concurrent.zip")
 	if _, err := s.Backup(context.Background(), path, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +373,7 @@ func TestRestoreHomeWithSpacesAndURICharacters(t *testing.T) {
 	ctx := context.Background()
 	s := backupFixture(t)
 	revision := backupChange(t, s, "特殊路径备份")
-	backup := filepath.Join(t.TempDir(), "snapshot.tar.gz")
+	backup := filepath.Join(t.TempDir(), "snapshot.zip")
 	if _, err := s.Backup(ctx, backup, "test"); err != nil {
 		t.Fatal(err)
 	}
@@ -329,5 +389,98 @@ func TestRestoreHomeWithSpacesAndURICharacters(t *testing.T) {
 	snap, err := restored.Snapshot(ctx, "owner")
 	if err != nil || snap.Revision != revision || len(snap.Requests) != 1 {
 		t.Fatal("restore to special path failed", err, snap.Revision)
+	}
+}
+
+func TestZIPBackupRejectsInvalidEntries(t *testing.T) {
+	s := backupFixture(t)
+	revision := backupChange(t, s, "损坏备份不能修改需求")
+	good := filepath.Join(t.TempDir(), "good.zip")
+	if _, err := s.Backup(context.Background(), good, "0.1.1"); err != nil {
+		t.Fatal(err)
+	}
+	files := readArchive(t, good)
+	for _, kind := range []string{"duplicate", "symlink", "directory", "traversal", "unexpected-file", "too-many-files", "oversized", "crc"} {
+		t.Run(kind, func(t *testing.T) {
+			var buffer bytes.Buffer
+			writer := zip.NewWriter(&buffer)
+			add := func(header *zip.FileHeader, data []byte, raw bool) {
+				t.Helper()
+				var entry io.Writer
+				var err error
+				if raw {
+					entry, err = writer.CreateRaw(header)
+				} else {
+					entry, err = writer.CreateHeader(header)
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = entry.Write(data); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, name := range []string{"manifest.json", "data/rsm.db", "secrets/password.key"} {
+				header := &zip.FileHeader{Name: name, Method: zip.Store}
+				if name == "data/rsm.db" {
+					switch kind {
+					case "symlink":
+						header.SetMode(os.ModeSymlink | 0600)
+					case "directory":
+						header.SetMode(os.ModeDir | 0700)
+					case "traversal":
+						header.Name = "../data/rsm.db"
+					case "oversized":
+						header.UncompressedSize64 = (1 << 30) + 1
+						add(header, nil, true)
+						continue
+					}
+				}
+				add(header, files[name], false)
+			}
+			if kind == "duplicate" {
+				add(&zip.FileHeader{Name: "manifest.json"}, nil, false)
+			} else {
+				name := "config.json"
+				if kind == "unexpected-file" {
+					name = "outside.txt"
+				}
+				add(&zip.FileHeader{Name: name}, files["config.json"], false)
+			}
+			if kind == "too-many-files" {
+				add(&zip.FileHeader{Name: "outside.txt"}, []byte("forbidden"), false)
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			if kind == "crc" {
+				reader, err := zip.NewReader(bytes.NewReader(buffer.Bytes()), int64(buffer.Len()))
+				if err != nil {
+					t.Fatal(err)
+				}
+				offset, err := reader.File[0].DataOffset()
+				if err != nil {
+					t.Fatal(err)
+				}
+				buffer.Bytes()[offset] ^= 1
+			}
+			path := filepath.Join(t.TempDir(), "invalid.zip")
+			if err := os.WriteFile(path, buffer.Bytes(), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := readBackupArchive(path); err == nil {
+				t.Fatal("invalid ZIP structure accepted")
+			}
+			if _, err := VerifyBackup(context.Background(), path); err == nil {
+				t.Fatal("invalid ZIP accepted")
+			}
+			if err := RestoreBackup(context.Background(), s.Home, path, "0.1.1"); err == nil {
+				t.Fatal("invalid ZIP restored")
+			}
+			snapshot, err := s.Snapshot(context.Background(), "owner")
+			if err != nil || snapshot.Revision != revision || len(snapshot.Requests) != 1 {
+				t.Fatal("invalid ZIP changed the instance", err)
+			}
+		})
 	}
 }

@@ -185,19 +185,61 @@ for (const theme of ["light", "dark"] as const) {
     const profile = page.locator('header button[data-tooltip="张金科"]');
     const tooltip = page.getByRole("tooltip");
     for (let count = 0; count < 3; count += 1) {
+      await page.setViewportSize({ width: count === 1 ? 1024 : 1440, height: 900 });
       for (const [avatar, name] of [[first, "张金科"], [second, "李明"], [profile, "张金科"]] as const) {
         await avatar.hover();
         await expect(tooltip).toHaveText(name);
         await expect(tooltip).toBeVisible();
+        const target = (await avatar.boundingBox())!;
+        const bubble = (await tooltip.boundingBox())!;
+        expect(Math.max(target.x - bubble.x - bubble.width, bubble.x - target.x - target.width, 0)).toBeLessThanOrEqual(16);
+        expect(Math.max(target.y - bubble.y - bubble.height, bubble.y - target.y - target.height, 0)).toBeLessThanOrEqual(20);
+        expect(bubble.x).toBeGreaterThanOrEqual(8);
+        expect(bubble.x + bubble.width).toBeLessThanOrEqual(page.viewportSize()!.width - 8);
       }
       await page.mouse.move(600, 400);
       await expect(tooltip).toHaveCount(0);
     }
     await profile.focus();
     await expect(tooltip).toHaveText("张金科");
+    await expect.poll(async () => {
+      const anchor = await profile.boundingBox();
+      const bubble = await tooltip.boundingBox();
+      if (!anchor || !bubble) return Infinity;
+      return Math.abs(bubble.x + bubble.width / 2 - anchor.x - anchor.width / 2);
+    }).toBeLessThanOrEqual(16);
     await profile.click();
     await expect(tooltip).toHaveCount(0);
     await expect(page.getByRole("tab", { name: "个性化", exact: true })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("alert")).toHaveCount(0);
   });
 }
+
+test("长提示在视窗右下角向上避让，并保持靠近目标", async ({ page }) => {
+  await openSession(page, "member");
+  const message = "需求开始与结束时间、开发人与当前状态的说明。".repeat(10);
+  await page.evaluate((text) => {
+    const parent = document.createElement("div");
+    parent.style.cssText = "position:fixed;inset:0;transform:translate(0);pointer-events:none;z-index:100";
+    const target = document.createElement("button");
+    target.textContent = "边缘提示检查";
+    target.dataset.tooltip = text;
+    target.style.cssText = "position:absolute;right:8px;bottom:8px;pointer-events:auto";
+    parent.append(target);
+    document.body.append(parent);
+  }, message);
+  const target = page.getByRole("button", { name: "边缘提示检查", exact: true });
+  await target.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toHaveText(message);
+  const anchor = (await target.boundingBox())!;
+  const bubble = (await tooltip.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(bubble.x).toBeGreaterThanOrEqual(8);
+  expect(bubble.y).toBeGreaterThanOrEqual(8);
+  expect(bubble.x + bubble.width).toBeLessThanOrEqual(viewport.width - 8);
+  expect(bubble.y + bubble.height).toBeLessThanOrEqual(anchor.y + anchor.height / 2);
+  expect(anchor.y - bubble.y - bubble.height).toBeLessThanOrEqual(20);
+  await page.mouse.move(500, 300);
+  await expect(tooltip).toHaveCount(0);
+});

@@ -4,6 +4,8 @@
 
 ## 首次安装
 
+从旧实例重新安装时，先在原目录执行 `./rsm.sh stop`；已注册自启动的实例还需执行 `./rsm.sh autostart disable`。将旧目录改名保留，再在空位置解压。空实例会重新要求设置超级管理员密码。
+
 1. 上传 `rsm-source-0.1.1.zip` 到服务器。支持 `rz` 时，在目标父目录执行 `rz -be`。
 
    纯网页终端不支持 `rz` 弹窗时，在目标目录粘贴配套 `rsm-upload-0.1.1.txt` 的全部内容。文本只生成源码 ZIP，传输完成后自动校验 SHA256，再继续解压。
@@ -77,11 +79,15 @@ Debian 安装缺失系统依赖前先检查 apt 安装计划；涉及已安装�
 
 ```sh
 ./rsm.sh backup
-./rsm.sh verify-backup /path/to/backup.tar.gz
-./rsm.sh restore /path/to/backup.tar.gz --yes
+./rsm.sh verify-backup /path/to/backup.zip
+./rsm.sh restore /path/to/backup.zip --yes
 ```
 
-备份包含 SQLite 一致性快照、密钥、配置与校验清单。恢复会先备份当前实例，再停服恢复。跨机器恢复保留目标实例的监听地址。
+备份默认保存为 `backups/rsm-backup-v0.1.1-20261117-233015.zip`。文件名依次为程序版本、北京时间日期与时分秒，同一秒重复备份追加 `-1`、`-2`，不会覆盖；命令结束会打印本次完整路径。执行 `ls -lt backups/*.zip`，第一项为最新备份。
+
+ZIP 包含 SQLite 一致性快照、密钥、配置与校验清单，覆盖需求、归档与账号；可在服务运行时备份，无需压缩整个项目。旧版 `.tar.gz` 仍可校验和恢复。恢复会先备份当前实例，再停服恢复。跨机器恢复保留目标实例的监听地址。
+
+下载到 Mac：终端支持 ZMODEM 才能用 `sz`。有 SSH 通道时，在 Mac 执行 `scp 用户@服务器:/实际路径/rsm/backups/实际文件.zip ~/Desktop/`。只有纯网页终端时，小备份可执行 `base64 -w 0 backups/实际文件.zip`，复制完整输出，再在 Mac 执行 `pbpaste | base64 -D > ~/Desktop/实际文件.zip`；用 `unzip -t ~/Desktop/实际文件.zip` 校验下载。若网页终端截断输出，应改用 SSH/SFTP 或平台文件导出功能。源码 ZIP 只含程序代码，不是业务备份。
 
 不要直接复制运行中的数据库；迁移必须同时保留密钥。已保存及归档的需求永久保留；管理员的日志清理仅处理操作记录和指定归档日志，不删除需求。
 

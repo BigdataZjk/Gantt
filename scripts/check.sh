@@ -169,7 +169,7 @@ smoke_test() {
   [ "$_state_code" = "200" ] || die "/api/state 状态异常: $_state_code"
   ( cd "$_home" && ./rsm.sh status >>"$LOG" 2>&1 ) || die "status 失败"
   ( cd "$_home" && ./rsm.sh backup >>"$LOG" 2>&1 ) || die "备份失败"
-  _bk=$(ls -t "$_home"/backups/*.tar.gz 2>/dev/null | head -n1) || true
+  _bk=$(ls -t "$_home"/backups/*.zip 2>/dev/null | head -n1) || true
   [ -n "$_bk" ] || die "未找到备份文件"
   ( cd "$_home" && ./rsm.sh verify-backup "$_bk" >>"$LOG" 2>&1 ) || die "备份校验失败"
   ( cd "$_home" && ./rsm.sh stop >>"$LOG" 2>&1 ) || die "停止失败"

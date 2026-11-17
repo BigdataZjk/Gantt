@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import styles from "./TooltipHost.module.css";
 
 interface Position {
@@ -12,9 +13,28 @@ export function TooltipHost() {
   const [position, setPosition] = useState<Position>({ left: 0, top: 0 });
   const [open, setOpen] = useState(false);
   const timer = useRef(0);
-  const point = useRef({ x: 0, y: 0 });
+  const point = useRef<{ x: number; y: number } | null>(null);
+  const bubble = useRef<HTMLDivElement>(null);
   const active = useRef<HTMLElement | null>(null);
   const visible = useRef(false);
+
+  const place = useCallback(() => {
+    if (!active.current || !bubble.current) return;
+    const target = active.current.getBoundingClientRect();
+    const bounds = bubble.current.getBoundingClientRect();
+    const pointer = point.current;
+    let left = pointer ? pointer.x + 14 : target.left + (target.width - bounds.width) / 2;
+    let top = pointer ? pointer.y + 18 : target.bottom + 8;
+    if (pointer && left + bounds.width > window.innerWidth - 8) left = pointer.x - bounds.width - 14;
+    if (top + bounds.height > window.innerHeight - 8) top = (pointer ? pointer.y - 12 : target.top - 8) - bounds.height;
+    left = Math.max(8, Math.min(left, window.innerWidth - bounds.width - 8));
+    top = Math.max(8, Math.min(top, window.innerHeight - bounds.height - 8));
+    setPosition((current) => current.left === left && current.top === top ? current : { left, top });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (open) place();
+  }, [open, text, place]);
 
   useEffect(() => {
     const hide = () => {
@@ -23,16 +43,6 @@ export function TooltipHost() {
       setOpen(false);
       active.current = null;
     };
-    const place = () => {
-      if (!active.current) return;
-      const rect = active.current.getBoundingClientRect();
-      const x = point.current.x || rect.left + rect.width / 2;
-      const y = point.current.y || rect.bottom;
-      const width = 260;
-      const left = Math.max(8, Math.min(x + 14, window.innerWidth - width - 8));
-      const top = Math.max(8, Math.min(y + 18, window.innerHeight - 60));
-      setPosition({ left, top });
-    };
     const show = (node: HTMLElement, event?: PointerEvent | FocusEvent) => {
       const next = node.dataset.tooltip || "";
       if (!next) { hide(); return; }
@@ -40,7 +50,7 @@ export function TooltipHost() {
       window.clearTimeout(timer.current);
       active.current = node;
       if (event && "clientX" in event) point.current = { x: event.clientX, y: event.clientY };
-      else point.current = { x: 0, y: 0 };
+      else point.current = null;
       const reveal = () => {
         setText(next);
         place();
@@ -69,9 +79,9 @@ export function TooltipHost() {
     };
     const move = (event: PointerEvent) => {
       if (event.buttons) { hide(); return; }
-      if (!active.current || !visible.current) return;
+      if (!active.current) return;
       point.current = { x: event.clientX, y: event.clientY };
-      place();
+      if (visible.current) place();
     };
     document.addEventListener("pointerover", over);
     document.addEventListener("pointerout", out);
@@ -94,12 +104,12 @@ export function TooltipHost() {
       window.removeEventListener("scroll", hide, true);
       window.removeEventListener("resize", hide);
     };
-  }, []);
+  }, [place]);
 
   if (!open) return null;
-  return (
-    <div className={styles.bubble} style={{ left: position.left, top: position.top }} role="tooltip">
+  return createPortal(
+    <div ref={bubble} className={styles.bubble} style={{ left: position.left, top: position.top }} role="tooltip">
       {text}
-    </div>
+    </div>, document.body,
   );
 }

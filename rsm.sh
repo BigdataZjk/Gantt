@@ -3,7 +3,7 @@
 #   ./rsm.sh                         首次安装；已安装时检查 upgrade/ 中包内版本并自动升级/启动
 #   ./rsm.sh start|stop|restart|status|logs
 #   ./rsm.sh upgrade [源码ZIP或发行包] | rollback [版本]
-#   ./rsm.sh backup [--output FILE] | restore <备份> [--yes] | verify-backup <备份>
+#   ./rsm.sh backup [--output FILE.zip] | restore <备份> [--yes] | verify-backup <备份>
 #   ./rsm.sh autostart enable|disable|status
 # 环境变量：RSM_HOME（默认脚本所在目录）、RSM_ADDR（默认 0.0.0.0:1111）、RSM_ASSUME_YES=1、RSM_FORCE=1 等。
 set -u
@@ -115,7 +115,7 @@ RSM Request Schedule Manager 一键部署与管理入口（$(os_pretty) $(host_a
   ./rsm.sh logs [--follow] [-n N]      查看运行日志
   ./rsm.sh upgrade [包路径]            选择 upgrade/ 中包内版本最高的 ZIP，也可指定源码 ZIP / 发行包
   ./rsm.sh rollback [版本] [--force]   仅回退程序；检查数据库 schema 兼容
-  ./rsm.sh backup [--output FILE]      创建一致性备份（默认 backups/rsm-<时间>.tar.gz）
+  ./rsm.sh backup [--output FILE.zip]  创建一致性备份（默认 backups/rsm-backup-v<版本>-<北京时间>.zip）
   ./rsm.sh restore <备份> [--yes]      显式恢复备份（先备份现状、停服后恢复、启动并核对）
   ./rsm.sh verify-backup <备份>        校验备份完整性
   ./rsm.sh autostart enable|disable|status

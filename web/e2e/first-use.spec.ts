@@ -30,6 +30,11 @@ test("全新生产实例首次设密、刷新、退出、重登及会话失效�
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "首次使用 RSM", exact: true })).toBeVisible();
     await page.locator("#rsm-setup-password").fill("🙂");
+    await page.getByRole("button", { name: "显示初始密码", exact: true }).click();
+    await expect(page.locator("[data-attention]")).toHaveAttribute("data-attention", "privacy");
+    await expect(page.locator("#rsm-setup-password")).toHaveAttribute("type", "text");
+    await page.getByRole("button", { name: "隐藏初始密码", exact: true }).click();
+    await expect(page.locator("[data-attention]")).toHaveAttribute("data-attention", "idle");
     await page.locator("#rsm-setup-confirm").fill("🙂");
     await page.getByRole("button", { name: "设置密码并进入", exact: true }).click();
     const guest = page.getByText("当前为游客只读访问，登录后可编辑需求。", { exact: true });

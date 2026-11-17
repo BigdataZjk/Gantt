@@ -645,8 +645,14 @@ access_urls() {
 }
 
 latest_backup_path() {
-  [ -d "$(home_backups_dir)" ] || return 1
-  ls -t "$(home_backups_dir)"/*.tar.gz 2>/dev/null | head -n1
+  local dir path files=()
+  dir=$(home_backups_dir)
+  [ -d "$dir" ] || return 1
+  for path in "$dir"/*.zip "$dir"/*.tar.gz; do
+    [ ! -f "$path" ] || files+=("$path")
+  done
+  [ "${#files[@]}" -gt 0 ] || return 1
+  ls -t "${files[@]}" | sed -n '1p'
 }
 
 print_status() {

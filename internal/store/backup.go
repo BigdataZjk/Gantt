@@ -2,6 +2,7 @@ package store
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
@@ -14,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -114,25 +116,7 @@ func (s *Store) Backup(ctx context.Context, output, version string) (BackupManif
 	name := f.Name()
 	defer os.Remove(name)
 	_ = f.Chmod(0600)
-	g := gzip.NewWriter(f)
-	tw := tar.NewWriter(g)
-	for _, name := range []string{"manifest.json", "data/rsm.db", "secrets/password.key", "config.json"} {
-		b, ok := files[name]
-		if !ok {
-			continue
-		}
-		if e = tw.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: int64(len(b)), Typeflag: tar.TypeReg, ModTime: time.Now()}); e != nil {
-			f.Close()
-			return manifest, e
-		}
-		if _, e = tw.Write(b); e != nil {
-			f.Close()
-			return manifest, e
-		}
-	}
-	if e = tw.Close(); e == nil {
-		e = g.Close()
-	}
+	e = writeBackupArchive(f, files, strings.EqualFold(filepath.Ext(output), ".zip"))
 	if e == nil {
 		e = f.Sync()
 	}
@@ -151,21 +135,100 @@ func (s *Store) Backup(ctx context.Context, output, version string) (BackupManif
 	}
 	return manifest, nil
 }
-func unpackBackup(input, dir string) (BackupManifest, error) {
-	var manifest BackupManifest
+
+func writeBackupArchive(output io.Writer, files map[string][]byte, zipFormat bool) error {
+	if zipFormat {
+		writer := zip.NewWriter(output)
+		for _, name := range []string{"manifest.json", "data/rsm.db", "secrets/password.key", "config.json"} {
+			content, ok := files[name]
+			if !ok {
+				continue
+			}
+			header := &zip.FileHeader{Name: name, Method: zip.Deflate, Modified: time.Now()}
+			header.SetMode(0600)
+			entry, err := writer.CreateHeader(header)
+			if err != nil {
+				return err
+			}
+			if _, err = entry.Write(content); err != nil {
+				return err
+			}
+		}
+		return writer.Close()
+	}
+	g := gzip.NewWriter(output)
+	tw := tar.NewWriter(g)
+	for _, name := range []string{"manifest.json", "data/rsm.db", "secrets/password.key", "config.json"} {
+		b, ok := files[name]
+		if !ok {
+			continue
+		}
+		if e := tw.WriteHeader(&tar.Header{Name: name, Mode: 0600, Size: int64(len(b)), Typeflag: tar.TypeReg, ModTime: time.Now()}); e != nil {
+			return e
+		}
+		if _, e := tw.Write(b); e != nil {
+			return e
+		}
+	}
+	if e := tw.Close(); e != nil {
+		return e
+	}
+	return g.Close()
+}
+
+func readBackupArchive(input string) (map[string][]byte, error) {
 	f, e := os.Open(input)
 	if e != nil {
-		return manifest, e
+		return nil, e
 	}
 	defer f.Close()
+	var signature [4]byte
+	if _, e = f.ReadAt(signature[:], 0); e != nil {
+		return nil, e
+	}
+	if signature[0] == 'P' && signature[1] == 'K' {
+		info, e := f.Stat()
+		if e != nil {
+			return nil, e
+		}
+		reader, e := zip.NewReader(f, info.Size())
+		if e != nil {
+			return nil, e
+		}
+		if len(reader.File) > 4 {
+			return nil, errors.New("备份内含多余文件")
+		}
+		files := map[string][]byte{}
+		var total uint64
+		for _, entry := range reader.File {
+			_, duplicate := files[entry.Name]
+			if !entry.Mode().IsRegular() || duplicate || !validBackupName(entry.Name) || entry.UncompressedSize64 > 1<<30 {
+				return nil, errors.New("备份内含非法路径、类型或过大文件")
+			}
+			total += entry.UncompressedSize64
+			if total > 1<<30 {
+				return nil, errors.New("备份解压内容超过1 GiB")
+			}
+			content, e := entry.Open()
+			if e != nil {
+				return nil, e
+			}
+			data, readErr := io.ReadAll(io.LimitReader(content, int64(entry.UncompressedSize64)+1))
+			closeErr := content.Close()
+			if readErr != nil || closeErr != nil || uint64(len(data)) != entry.UncompressedSize64 {
+				return nil, errors.New("备份文件不完整或 ZIP 校验失败")
+			}
+			files[entry.Name] = data
+		}
+		return files, nil
+	}
 	gz, e := gzip.NewReader(f)
 	if e != nil {
-		return manifest, e
+		return nil, e
 	}
 	defer gz.Close()
 	limited := &io.LimitedReader{R: gz, N: (1 << 30) + 1}
 	tr := tar.NewReader(limited)
-	seen := map[string]bool{}
 	files := map[string][]byte{}
 	var total int64
 	for {
@@ -174,30 +237,43 @@ func unpackBackup(input, dir string) (BackupManifest, error) {
 			break
 		}
 		if e != nil {
-			return manifest, e
+			return nil, e
 		}
-		if h.Typeflag != tar.TypeReg || seen[h.Name] || !(h.Name == "manifest.json" || h.Name == "data/rsm.db" || h.Name == "secrets/password.key" || h.Name == "config.json") || h.Size < 0 || h.Size > 1<<30 {
-			return manifest, errors.New("备份内含非法路径、类型或过大文件")
+		_, duplicate := files[h.Name]
+		if h.Typeflag != tar.TypeReg || duplicate || !validBackupName(h.Name) || h.Size < 0 || h.Size > 1<<30 {
+			return nil, errors.New("备份内含非法路径、类型或过大文件")
 		}
 		total += h.Size
 		if total > 1<<30 {
-			return manifest, errors.New("备份解压内容超过1 GiB")
+			return nil, errors.New("备份解压内容超过1 GiB")
 		}
-		seen[h.Name] = true
 		b, e := io.ReadAll(tr)
 		if e != nil || int64(len(b)) != h.Size {
-			return manifest, errors.New("备份文件不完整")
+			return nil, errors.New("备份文件不完整")
 		}
 		files[h.Name] = b
 	}
 	// Reading through the gzip trailer detects truncated or corrupt archives.
 	if _, e = io.Copy(io.Discard, limited); e != nil {
-		return manifest, e
+		return nil, e
 	}
 	if limited.N == 0 {
-		return manifest, errors.New("备份解压内容超过1 GiB")
+		return nil, errors.New("备份解压内容超过1 GiB")
 	}
-	if !seen["manifest.json"] || !seen["data/rsm.db"] || !seen["secrets/password.key"] {
+	return files, nil
+}
+
+func validBackupName(name string) bool {
+	return name == "manifest.json" || name == "data/rsm.db" || name == "secrets/password.key" || name == "config.json"
+}
+
+func unpackBackup(input, dir string) (BackupManifest, error) {
+	var manifest BackupManifest
+	files, e := readBackupArchive(input)
+	if e != nil {
+		return manifest, e
+	}
+	if files["manifest.json"] == nil || files["data/rsm.db"] == nil || files["secrets/password.key"] == nil {
 		return manifest, errors.New("备份缺少数据库、密钥或清单")
 	}
 	if e = json.Unmarshal(files["manifest.json"], &manifest); e != nil || manifest.Format != 1 || manifest.SchemaVersion != 1 {
@@ -308,7 +384,8 @@ func RestoreBackup(ctx context.Context, home, input, version string) error {
 		if e != nil {
 			return e
 		}
-		_, backupErr := current.Backup(ctx, filepath.Join(home, "backups", "pre-restore-"+time.Now().UTC().Format("20060102T150405.000000000")+".tar.gz"), version)
+		backupName := "pre-restore-v" + version + "-" + time.Now().In(time.FixedZone("CST", 8*60*60)).Format("20060102-150405.000000000") + ".zip"
+		_, backupErr := current.Backup(ctx, filepath.Join(home, "backups", backupName), version)
 		closeErr := current.Close()
 		if backupErr != nil {
 			return backupErr

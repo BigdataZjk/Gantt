@@ -386,4 +386,35 @@ resolve_home
 [ "$RSM_HOME" = "$(abs_path "$RSM_HOME_ARG")" ] || fail 'explicit target was ignored'
 pass 'explicit instance directory still overrides the portable default'
 
+(
+  . "$RSM_TEST_ROOT/scripts/lib/backup.sh"
+  RSM_HOME="$RSM_TEST_TMP/backup instance"
+  mkdir -p "$RSM_HOME/backups"
+  installed_version() { printf 0.1.1; }
+  date() {
+    [ "${TZ:-}" = CST-8 ] && [ "$*" = '+%Y%m%d-%H%M%S' ] || return 1
+    printf 20261117-233015
+  }
+  expected="$RSM_HOME/backups/rsm-backup-v0.1.1-20261117-233015.zip"
+  [ "$(backup_unique_path "$RSM_HOME/backups" rsm-backup)" = "$expected" ] || exit 1
+  touch "$expected"
+  [ "$(backup_unique_path "$RSM_HOME/backups" rsm-backup)" = "${expected%.zip}-1.zip" ] || exit 1
+  touch "${expected%.zip}-1.zip"
+  [ "$(backup_unique_path "$RSM_HOME/backups" rsm-backup)" = "${expected%.zip}-2.zip" ]
+) || fail 'ZIP backup names lost version, Beijing time or collision protection'
+pass 'ZIP backup filenames include version and Beijing time, without overwriting same-second backups'
+
+(
+  RSM_HOME="$RSM_TEST_TMP/backup discovery"
+  mkdir -p "$RSM_HOME/backups"
+  if latest_backup_path >/dev/null 2>&1; then exit 1; fi
+  touch -t 202611171000 "$RSM_HOME/backups/old.tar.gz"
+  [ "$(latest_backup_path)" = "$RSM_HOME/backups/old.tar.gz" ] || exit 1
+  touch -t 202611171100 "$RSM_HOME/backups/new.zip"
+  [ "$(latest_backup_path)" = "$RSM_HOME/backups/new.zip" ] || exit 1
+  rm "$RSM_HOME/backups/old.tar.gz"
+  [ "$(latest_backup_path)" = "$RSM_HOME/backups/new.zip" ]
+) || fail 'latest backup discovery failed for empty, legacy, mixed or ZIP-only directories'
+pass 'latest backup discovery supports old tar.gz and new ZIP archives without missing-glob failures'
+
 printf '%s deployment regression checks passed\n' "$passed"

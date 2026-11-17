@@ -149,7 +149,7 @@ record_active_release() {
 # 切换前备份（调用 Go CLI，由调用方保证此时服务已停止或允许在线备份）。
 backup_for_change() {
   _bfc_label="$1"
-  _bfc_out=$(backup_unique_path "$RSM_HOME/backups" "$_bfc_label")
+  _bfc_out=$(backup_unique_path "$RSM_HOME/backups" "$_bfc_label") || return 1
   BACKUP_CREATED_PATH=""
   backup_create_file "$_bfc_out" || return 1
   BACKUP_CREATED_PATH="$_bfc_out"

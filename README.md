@@ -39,7 +39,7 @@ chmod +x rsm.sh scripts/*.sh
 ./rsm.sh restart
 ./rsm.sh logs --follow
 ./rsm.sh backup
-./rsm.sh verify-backup /path/to/backup.tar.gz
+./rsm.sh verify-backup /path/to/backup.zip
 ./rsm.sh upgrade
 ./rsm.sh rollback
 ./rsm.sh autostart enable
@@ -47,7 +47,9 @@ chmod +x rsm.sh scripts/*.sh
 ./rsm.sh version
 ```
 
-后续将新版源码 ZIP 放进运行目录的 `upgrade/`，执行 `./rsm.sh` 或 `./rsm.sh upgrade` 即可。脚本比较包内实际版本，选择最高新版；构建完成后自动停服、备份、切换、启动，失败时回退程序。没有新版则保持当前版本。恢复数据须显式执行 `./rsm.sh restore /path/to/backup.tar.gz --yes`，恢复前再次备份当前数据。
+后续将新版源码 ZIP 放进运行目录的 `upgrade/`，执行 `./rsm.sh` 或 `./rsm.sh upgrade` 即可。脚本比较包内实际版本，选择最高新版；构建完成后自动停服、备份、切换、启动，失败时回退程序。没有新版则保持当前版本。恢复数据须显式执行 `./rsm.sh restore /path/to/backup.zip --yes`，恢复前再次备份当前数据。
+
+手动备份默认生成 `backups/rsm-backup-v0.1.1-20261117-233015.zip`，文件名为程序版本与北京时间；同一秒重复备份自动追加序号。备份包含需求、归档、账号、密钥和配置，不需要打包整个运行目录。旧版 `.tar.gz` 备份仍可校验及恢复。
 
 ## 项目结构
 

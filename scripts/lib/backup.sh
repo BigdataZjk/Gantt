@@ -3,15 +3,17 @@
 # 依赖 common.sh / instance.sh / service.sh / release.sh 已 source。
 
 backup_unique_path() {
-  _bup_dir="$1"; _bup_prefix="$2"
-  _bup_name="${_bup_prefix}-$(timestamp_compact).tar.gz"
-  _bup_path="$_bup_dir/$_bup_name"
-  _bup_n=1
-  while [ -e "$_bup_path" ]; do
-    _bup_path="$_bup_dir/${_bup_prefix}-$(timestamp_compact)-$_bup_n.tar.gz"
-    _bup_n=$((_bup_n+1))
+  local dir="$1" prefix="$2" version stamp stem output count=1
+  version=$(installed_version) || return 1
+  case "$version" in ''|*[!A-Za-z0-9._+-]*) return 1 ;; esac
+  stamp=$(TZ=CST-8 date '+%Y%m%d-%H%M%S') || return 1
+  stem="${prefix}-v${version}-${stamp}"
+  output="$dir/$stem.zip"
+  while [ -e "$output" ]; do
+    output="$dir/$stem-$count.zip"
+    count=$((count+1))
   done
-  printf '%s' "$_bup_path"
+  printf '%s' "$output"
 }
 
 backup_binary() {
@@ -69,7 +71,7 @@ backup_cmd() {
   ensure_layout
   resolve_addr
   if [ -z "$_bc_out" ]; then
-    _bc_out=$(backup_unique_path "$(home_backups_dir)" "rsm")
+    _bc_out=$(backup_unique_path "$(home_backups_dir)" "rsm-backup") || die "无法生成备份文件名"
   else
     case "$_bc_out" in
       /*) ;;
@@ -79,6 +81,7 @@ backup_cmd() {
   fi
   backup_create_file "$_bc_out" || die "备份失败（服务与数据保持不变）"
   printf '\n备份文件: %s\n' "$_bc_out"
+  printf '默认文件名包含程序版本和北京时间；本次已完成完整性校验。\n'
 }
 
 verify_backup_cmd() {
