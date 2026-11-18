@@ -143,6 +143,47 @@ for (const tab of ["甘特图", "需求池"] as const) {
   });
 }
 
+test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 800, height: 900 });
+  const { state, mutations } = await preview(page);
+  const before = structuredClone(state.requests);
+  const wrap = page.locator('[data-scroll-container="gantt"]');
+  const source = wrap.locator('tr[data-row="4"] [data-request-select]');
+  const target = wrap.locator('tr[data-row="3"]');
+  const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
+  const width = await separator.getAttribute("aria-valuenow");
+  await wrap.evaluate((element) => { element.scrollLeft = 150; });
+  await expect.poll(() => wrap.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+
+  const cell = (await source.boundingBox())!;
+  const badge = (await source.getByText("P1", { exact: true }).boundingBox())!;
+  const destination = (await target.boundingBox())!;
+  const centerY = cell.y + cell.height / 2;
+  const positions = [
+    { x: cell.x + 2, y: centerY },
+    { x: cell.x + cell.width / 2, y: cell.y + 1 },
+    { x: badge.x + badge.width / 2, y: badge.y + badge.height / 2 },
+    { x: cell.x + cell.width - 2, y: centerY },
+  ];
+  for (const [index, { x, y }] of positions.entries()) {
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x, destination.y + destination.height / 4, { steps: 4 });
+    await expect(target).toHaveAttribute("data-reorder-edge", "before");
+    if (index < positions.length - 1) await page.keyboard.press("Escape");
+    else await page.screenshot({ path: testInfo.outputPath("gantt-reorder-from-right-edge.png") });
+    await page.mouse.up();
+  }
+
+  const expected = [1, 2, 4, 3, 5, 8, 6, 7];
+  await expect.poll(() => rowIds(page)).toEqual(expected);
+  await expect(separator).toHaveAttribute("aria-valuenow", width!);
+  await page.reload();
+  await expect.poll(() => rowIds(page)).toEqual(expected);
+  expect(state.requests).toEqual(before);
+  expect(mutations).toEqual([]);
+});
+
 test("甘特拖排行保留开发人及未排期末尾规则，多选右键仍有需求操作", async ({ page }) => {
   const { mutations } = await preview(page);
   await dragTo(page, nameOf(page, "未排期甲"), nameOf(page, "已排期甲"), "before", false);

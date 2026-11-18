@@ -171,8 +171,8 @@ export function useRequestReorder(options: Options) {
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button === 0) suppressUntil.current = 0;
     if (latest.current.enabled === false || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-    const name = (event.target as Element).closest("[data-request-name]");
-    const row = name?.closest<HTMLElement>("[data-row]");
+    const handle = (event.target as Element).closest("[data-request-select], [data-request-name]");
+    const row = handle?.closest<HTMLElement>("[data-row]");
     if (!row || !latest.current.containerRef.current?.contains(row)) return;
     cleanupRef.current();
     drag.current = { id: Number(row.dataset.row), pointerId: event.pointerId, x: event.clientX, y: event.clientY, downX: event.clientX, downY: event.clientY, active: false, target: null, edge: "before" };

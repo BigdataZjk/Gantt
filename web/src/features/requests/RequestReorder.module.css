@@ -1,7 +1,8 @@
 .container [data-request-name] { user-select: none; }
 .container [data-request-name] button { cursor: grab; touch-action: none; }
+.container [data-request-select] { cursor: grab; }
 .container[data-reordering] { user-select: none; }
-.container[data-reordering], .container[data-reordering] :is(button, [data-bar]) { cursor: grabbing; }
+.container[data-reordering], .container[data-reordering] :is(button, [data-bar], [data-request-select]) { cursor: grabbing; }
 .container [data-reorder-source] [data-request-name] { opacity: 0.45; }
 .container [data-reorder-edge] > :is(td, [role="cell"]):not([data-key="name"]) { position: relative; }
 .container [data-reorder-edge] > :is(th, td, [role="cell"])::before {

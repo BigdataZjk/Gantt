@@ -147,7 +147,7 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
   const maxWidth = Number(await separator.getAttribute("aria-valuemax"));
   expect(maxWidth).toBe(Math.floor(contentWidth * 1.2));
   const initialWidth = Number(await separator.getAttribute("aria-valuenow"));
-  const edge = (await cell.locator("[data-gantt-column-resize]").boundingBox())!;
+  const edge = (await separator.boundingBox())!;
   const x = edge.x + edge.width / 2;
   const y = edge.y + edge.height / 2;
   await page.mouse.move(x, y);

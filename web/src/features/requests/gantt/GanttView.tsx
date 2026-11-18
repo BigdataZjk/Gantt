@@ -1220,7 +1220,6 @@ const GanttRequestRow = memo(function GanttRequestRow({
             {row.name}
           </button>
         </div>
-        <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" />
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
       {visibleDates.map((date, index) => {
