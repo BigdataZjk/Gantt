@@ -22,18 +22,20 @@
   top: 0;
   left: 0;
   z-index: 200;
-  display: grid;
-  gap: 4px;
+  display: flex;
   max-width: min(280px, calc(100vw - 16px));
-  padding: 9px 12px;
+  padding: 4px 8px;
   border: 1px solid var(--rsm-border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--rsm-panel);
   color: var(--rsm-text);
-  box-shadow: var(--rsm-shadow-pop);
+  box-shadow: var(--rsm-shadow-soft);
   font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
   pointer-events: none;
 }
-.hint strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.hint span { color: var(--rsm-muted); font-size: 11px; }
-.hint[data-valid="true"] { border-color: var(--rsm-accent); }
+.hint[hidden] { display: none; }
+.hint span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.hint span:last-child { flex: none; }
+.hint[data-valid="true"] { border-color: color-mix(in srgb, var(--rsm-accent) 48%, var(--rsm-border)); }

@@ -64,21 +64,31 @@ export function useRequestReorder(options: Options) {
       const targetElement = inBounds ? document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>("[data-row]") : null;
       const target = targetElement && container.contains(targetElement) ? rows.find((row) => row.id === Number(targetElement.dataset.row)) : undefined;
       const reason = target ? blockedReason?.(source, target) ?? "" : "";
-      const valid = Boolean(target && target.id !== source.id && !reason);
       clearMarks();
       container.querySelector(`[data-row="${source.id}"]`)?.setAttribute("data-reorder-source", "true");
-      current.target = valid ? target!.id : null;
-      if (valid && targetElement) {
+      current.target = null;
+      let label = reason;
+      let suffix = "";
+      if (target && targetElement && target.id !== source.id && !reason) {
         const rect = targetElement.getBoundingClientRect();
+        current.target = target.id;
         current.edge = current.y < rect.top + rect.height / 2 ? "before" : "after";
         targetElement.dataset.reorderEdge = current.edge;
+        label = `在「${target.name}`;
+        suffix = current.edge === "before" ? "」前" : "」后";
       }
       const bubble = hint.current;
-      if (bubble) {
-        bubble.dataset.valid = String(valid);
-        bubble.lastElementChild!.textContent = reason || (valid ? "松开调整顺序" : "拖到目标需求上方或下方");
+      if (bubble && label) {
+        const text = bubble.firstElementChild!;
+        const direction = bubble.lastElementChild!;
+        if (text.textContent !== label) text.textContent = label;
+        if (direction.textContent !== suffix) direction.textContent = suffix;
+        bubble.dataset.valid = String(current.target !== null);
+        bubble.hidden = false;
         const rect = bubble.getBoundingClientRect();
         bubble.style.transform = `translate3d(${Math.max(8, Math.min(innerWidth - rect.width - 8, current.x + 14))}px, ${Math.max(8, Math.min(innerHeight - rect.height - 8, current.y + 16))}px, 0)`;
+      } else if (bubble) {
+        bubble.hidden = true;
       }
       if (current.x >= bounds.left && current.x < bounds.right) {
         const top = bounds.top + headerHeight;
@@ -102,8 +112,7 @@ export function useRequestReorder(options: Options) {
       if (!(event.buttons & 1) || latest.current.enabled === false) { cleanup(); return; }
       event.preventDefault();
       if (!current.active) {
-        const source = latest.current.rows.find((row) => row.id === current.id);
-        if (!source) { cleanup(); return; }
+        if (!latest.current.rows.some((row) => row.id === current.id)) { cleanup(); return; }
         current.active = true;
         latest.current.onStart?.();
         window.getSelection()?.removeAllRanges();
@@ -112,10 +121,8 @@ export function useRequestReorder(options: Options) {
         bubble.className = styles.hint;
         bubble.dataset.slot = "request-reorder-hint";
         bubble.setAttribute("role", "status");
-        const title = document.createElement("strong");
-        title.textContent = source.name;
-        const caption = document.createElement("span");
-        bubble.append(title, caption);
+        bubble.hidden = true;
+        bubble.append(document.createElement("span"), document.createElement("span"));
         document.body.append(bubble);
         hint.current = bubble;
       }
