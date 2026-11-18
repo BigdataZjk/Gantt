@@ -22,6 +22,7 @@ interface Props {
 
 export function SettingsPage({ state, permissions, onLogin, onLogout, onOpenCredential }: Props) {
   const { ui, patch } = useUiState();
+  const serverVersion = state.serverVersion?.trim();
 
   useEffect(() => {
     if (ui.settingsTab === "calendar" && !permissions.isAdmin || ui.settingsTab === "fields" && !permissions.isSuper) patch({ settingsTab: "roles" });
@@ -39,7 +40,12 @@ export function SettingsPage({ state, permissions, onLogin, onLogout, onOpenCred
 
   return (
     <div className={styles.page}>
-      <PageTabs ariaLabel="设置分类" value={ui.settingsTab} onChange={(tab) => patch({ settingsTab: tab })} items={items} className={styles.settingsTabs} />
+      <div className={styles.tabsRow}>
+        <PageTabs ariaLabel="设置分类" value={ui.settingsTab} onChange={(tab) => patch({ settingsTab: tab })} items={items} className={styles.settingsTabs} />
+        {serverVersion ? (
+          <span className={styles.serverVersion}>{serverVersion.startsWith("v") ? serverVersion : `v${serverVersion}`}</span>
+        ) : null}
+      </div>
       <div className={styles.panel} data-scroll-container="settings-content">
         {ui.settingsTab === "roles" ? <RolePanel state={state} permissions={permissions} onOpenCredential={onOpenCredential} /> : null}
         {ui.settingsTab === "fields" && permissions.isSuper ? <FieldPanel state={state} /> : null}
