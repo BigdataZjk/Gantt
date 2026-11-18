@@ -124,11 +124,28 @@ test("日期预设支持键盘展开和选择，焦点边框完整位于按钮�
 
 test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求计算", async ({ page }) => {
   const name = "验证列宽和时间轴联动的较长需求名称".repeat(3);
-  const wrap = await openGantt(page, "light", "compact", false, { autoRange: true, count: 70, lastName: name });
+  const wrap = await openGantt(page, "light", "compact", false, {
+    autoRange: true,
+    count: 70,
+    lastName: name,
+    fixture: (state) => ({
+      requests: state.requests.map((row) => row.id === 1 || row.id === 70 ? { ...row, status: "HOLD" } : row),
+    }),
+  });
   const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
   const firstRow = wrap.locator('tr[data-row="1"]');
   const cell = firstRow.locator("[data-request-select]");
   const date = firstRow.locator("[data-date]").first();
+  const icon = cell.locator("[data-request-hold]");
+  await expect(icon).toBeVisible();
+  const iconFits = () => cell.evaluate((element) => {
+    const text = element.querySelector("[data-name]")!.getBoundingClientRect();
+    const icon = element.querySelector("[data-request-hold]")!.getBoundingClientRect();
+    const { paddingRight, borderRightWidth } = getComputedStyle(element);
+    const innerRight = element.getBoundingClientRect().right - parseFloat(paddingRight) - parseFloat(borderRightWidth);
+    return icon.width === 14 && text.right < icon.left && Math.abs(icon.right - innerRight) < 1;
+  });
+  expect(await iconFits()).toBe(true);
   await expect(wrap.getByText(name, { exact: true })).toHaveCount(0);
   const contentWidth = await cell.evaluate((element, title) => {
     const name = element.querySelector<HTMLButtonElement>("[data-name]")!;
@@ -140,7 +157,8 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
     const style = getComputedStyle(element);
     const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth);
     const gap = parseFloat(getComputedStyle(name.parentElement!).columnGap);
-    const width = probe.getBoundingClientRect().width + priority.getBoundingClientRect().width + gap + padding;
+    const iconWidth = element.querySelector("[data-request-hold]")!.getBoundingClientRect().width;
+    const width = probe.getBoundingClientRect().width + priority.getBoundingClientRect().width + iconWidth + 2 * gap + padding;
     probe.remove();
     return width;
   }, name);
@@ -156,6 +174,7 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
   await expect(separator).toHaveAttribute("aria-valuenow", String(initialWidth + 64));
   const expanded = (await cell.boundingBox())!;
   expect(expanded.width).toBe(initialWidth + 64);
+  expect(await iconFits()).toBe(true);
   expect((await date.boundingBox())!.x).toBeCloseTo(expanded.x + expanded.width, 0);
   await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   await page.mouse.move(1390, y);
@@ -165,6 +184,7 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
 
   await page.setViewportSize({ width: 320, height: 640 });
   await expect.poll(() => separator.getAttribute("aria-valuenow").then(Number)).toBeLessThan(maxWidth);
+  expect(await iconFits()).toBe(true);
   expect(await wrap.evaluate((el) => el.clientWidth - Number(el.querySelector('[role="separator"]')?.getAttribute("aria-valuenow")))).toBeGreaterThanOrEqual(80);
   await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -175,6 +195,10 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
   await expect(separator).toBeInViewport();
   await separator.press("ArrowLeft");
   await expect(separator).toHaveAttribute("aria-valuenow", String(maxWidth - 8));
+  await separator.press("Home");
+  const minWidth = await separator.getAttribute("aria-valuemin");
+  await expect(separator).toHaveAttribute("aria-valuenow", minWidth!);
+  expect(await iconFits()).toBe(true);
   await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 90));
 });
 

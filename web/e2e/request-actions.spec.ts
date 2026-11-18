@@ -143,9 +143,11 @@ for (const tab of ["甘特图", "需求池"] as const) {
   });
 }
 
-test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ page }, testInfo) => {
+test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排序", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 800, height: 900 });
-  const { state, mutations } = await preview(page);
+  const { state, mutations } = await preview(page, {
+    rows: requests.map((row) => row.id === 4 || row.id === 9 ? { ...row, status: "HOLD" } : row),
+  });
   const before = structuredClone(state.requests);
   const wrap = page.locator('[data-scroll-container="gantt"]');
   const source = wrap.locator('tr[data-row="4"] [data-request-select]');
@@ -157,6 +159,9 @@ test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ pa
 
   const cell = (await source.boundingBox())!;
   const badge = (await source.getByText("P1", { exact: true }).boundingBox())!;
+  const holdIcon = source.locator("[data-request-hold]");
+  await expect(holdIcon).toBeVisible();
+  const icon = (await holdIcon.boundingBox())!;
   const destination = (await target.boundingBox())!;
   const centerY = cell.y + cell.height / 2;
   const positions = [
@@ -164,6 +169,7 @@ test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ pa
     { x: cell.x + cell.width / 2, y: cell.y + 1 },
     { x: badge.x + badge.width / 2, y: badge.y + badge.height / 2 },
     { x: cell.x + cell.width - 2, y: centerY },
+    { x: icon.x + icon.width / 2, y: icon.y + icon.height / 2 },
   ];
   for (const [index, { x, y }] of positions.entries()) {
     await page.mouse.move(x, y);
@@ -171,7 +177,7 @@ test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ pa
     await page.mouse.move(x, destination.y + destination.height / 4, { steps: 4 });
     await expect(target).toHaveAttribute("data-reorder-edge", "before");
     if (index < positions.length - 1) await page.keyboard.press("Escape");
-    else await page.screenshot({ path: testInfo.outputPath("gantt-reorder-from-right-edge.png") });
+    else await wrap.screenshot({ path: testInfo.outputPath("gantt-reorder-from-hold-icon.png") });
     await page.mouse.up();
   }
 
@@ -180,6 +186,12 @@ test("甘特需求格的两侧空白和优先级均可拖动排序", async ({ pa
   await expect(separator).toHaveAttribute("aria-valuenow", width!);
   await page.reload();
   await expect.poll(() => rowIds(page)).toEqual(expected);
+  await page.getByRole("tab", { name: "需求池", exact: true }).click();
+  await expect(nameOf(page, "未排期乙")).toBeVisible();
+  await expect(page.locator("[data-request-hold]")).toHaveCount(0);
+  await page.getByRole("tab", { name: "已归档", exact: true }).click();
+  await expect(nameOf(page, "归档需求")).toBeVisible();
+  await expect(page.locator("[data-request-hold]")).toHaveCount(0);
   expect(state.requests).toEqual(before);
   expect(mutations).toEqual([]);
 });

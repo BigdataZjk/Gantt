@@ -28,6 +28,7 @@ async function openMarkers(page: Page, theme: "light" | "dark", density: Density
       request({ ...base, id: 6, name: "待估与加班休假", status: "开发中", start: "2026-11-16", delivery: "2026-11-23", days: 0, vacation: ["2026-11-18"], overtime: ["2026-11-21"] }),
       request({ ...base, id: 7, name: "未排期休假", start: "", delivery: "", vacation: ["2026-11-18"] }),
       segmented(8, "HOLD 长间隔", "2026-11-17", "2026-12-16"),
+      request({ ...base, id: 9, name: "等待资料确认的需求", status: "HOLD", start: "", delivery: "" }),
     ],
   };
   const writes: string[] = [];
@@ -58,6 +59,9 @@ for (const theme of ["light", "dark"] as const) {
     test(`HOLD 居中连接排期，所有标记按缩放简化并恢复（${theme}/${density}）`, async ({ page }, testInfo) => {
       const { wrap, writes, errors } = await openMarkers(page, theme, density);
       const table = wrap.locator("table");
+      const requestHold = wrap.locator('tr[data-row="9"] [data-request-select] [data-request-hold]');
+      await expect(requestHold).toBeVisible();
+      await expect(wrap.locator("[data-request-hold]")).toHaveCount(1);
       const checkHold = async (id: number) => {
         const row = wrap.locator(`tr[data-row="${id}"]`);
         const left = (await row.locator('[data-bar][data-phase="0"]').last().boundingBox())!;
@@ -117,6 +121,7 @@ for (const theme of ["light", "dark"] as const) {
       await zoom(1000);
       await expect(table).toHaveAttribute("data-marker-mode", "hidden");
       await expect(wrap.locator("[data-marker]")).toHaveCount(0);
+      await expect(requestHold).toBeVisible();
       await expect(wrap.locator("[data-live-particles]")).toHaveCount(0);
       await expect(wrap.locator('[data-date="2026-11-21"]').filter({ has: page.locator("[data-bar]") }).first()).toHaveAttribute("aria-label", /加班/);
       expect((await legendArrow.boundingBox())!.width).toBe(18);

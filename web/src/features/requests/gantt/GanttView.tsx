@@ -294,8 +294,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   useLayoutEffect(() => {
     const measure = nameMeasureRef.current;
-    const label = measure?.querySelector(`.${styles.requestName}`);
-    if (!rows.length || !measure || !label) {
+    const content = measure?.querySelector(`.${styles.nameContent}`);
+    const label = content?.querySelector(`.${styles.requestName}`);
+    if (!rows.length || !measure || !content || !label) {
       setNameColumnContentLimit(DEFAULT_NAME_COLUMN_WIDTH);
       return;
     }
@@ -303,10 +304,13 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     if (!context) return;
     const { fontWeight, fontSize, fontFamily } = getComputedStyle(label);
     context.font = `${fontWeight} ${fontSize} ${fontFamily}`;
+    const contentStyle = getComputedStyle(content);
+    const holdWidth = parseFloat(contentStyle.getPropertyValue("--request-hold-icon-size")) + parseFloat(contentStyle.columnGap);
     let widest = 0;
-    for (const { name } of rows) {
+    for (const { name, status } of rows) {
       const text = name.replace(/[ \t\n\r\f]+/g, " ").replace(/^ | $/g, "");
-      widest = Math.max(widest, context.measureText(text).width);
+      const width = context.measureText(text).width + (status === "HOLD" ? holdWidth : 0);
+      widest = Math.max(widest, width);
     }
     setNameColumnContentLimit(Math.floor((widest + measure.getBoundingClientRect().width) * MAX_NAME_COLUMN_SCALE));
   }, [rows]);
@@ -1063,7 +1067,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       <div className={styles.legend} aria-label="甘特图图例" data-testid="gantt-legend">
         <span className={styles.summary} aria-label="需求数量">{rows.length === totalCount ? `${totalCount} 条需求` : `显示 ${rows.length} / 共 ${totalCount} 条需求`}</span>
         <span data-tooltip="尚未预估开发人天，暂按 3 个工作日占位"><Hourglass aria-hidden="true" />待估人天</span>
-        <span data-tooltip="两段之间含工作日的手动暂停，图标居中、细线连接两侧排期"><CirclePause aria-hidden="true" />HOLD</span>
+        <span data-tooltip="需求名右侧表示 HOLD 状态，时间轴中表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
         <span data-tooltip="同一开发人的连续交叠区域只显示一组箭头，需求保持原色"><span className={styles.parallelSymbol}><ArrowBigUp className={styles.arrowUp} preserveAspectRatio="none" aria-hidden="true" /><ArrowBigDown className={styles.arrowDown} preserveAspectRatio="none" aria-hidden="true" /></span>需求并行</span>
         <span data-tooltip="非工作日手动安排开发"><AlarmClockPlus aria-hidden="true" />加班</span>
         <span data-tooltip="个人主动请假，区别于法定节假日和周末"><CalendarOff aria-hidden="true" />休假</span>
@@ -1150,6 +1154,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
   today, suppressClickRef, selectRow, onOpen, onNameMenu, setHovered,
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
+  const isOnHold = row.status === "HOLD";
   const estimated = (Number(row.days) || 0) === 0;
   const hovered = hoveredPhase >= 0 ? { rowId: row.id, phaseIndex: hoveredPhase } : null;
   const isHovered = Boolean(hovered);
@@ -1201,6 +1206,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             className={styles.requestName}
             data-name
             data-tooltip={`${row.name}　${state.activeDays}人天`}
+            aria-description={isOnHold ? "状态为 HOLD" : undefined}
             aria-pressed={rowSelected}
             aria-haspopup="menu"
             onClick={(event) => { if (performance.now() < suppressClickRef.current) return; selectRow(row.id, event); }}
@@ -1219,6 +1225,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
           >
             {row.name}
           </button>
+          {isOnHold ? <CirclePause className={styles.requestHoldIcon} data-request-hold aria-hidden="true" /> : null}
         </div>
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}

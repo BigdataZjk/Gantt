@@ -107,9 +107,10 @@
   left: 0;
   border-bottom: 1px solid currentColor;
 }
-.nameContent { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.nameContent { --request-hold-icon-size: 14px; display: flex; align-items: center; gap: 6px; min-width: 0; }
 .requestName { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--rsm-text); text-align: left; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .requestName:hover { color: var(--rsm-accent); text-decoration: underline; }
+.requestHoldIcon { flex: none; width: var(--request-hold-icon-size); height: var(--request-hold-icon-size); color: var(--rsm-muted); stroke-width: 1.7; }
 .personRow { cursor: pointer; }
 .personRow > th, .personRow > td { height: var(--person-row-height); background: var(--rsm-person-fill); border-top: 1px solid color-mix(in srgb, var(--rsm-person-ink) 24%, var(--rsm-border)); border-bottom: 1px solid var(--rsm-border); }
 .personRow > th { position: sticky; left: 0; z-index: 3; padding: 3px 10px !important; text-align: left; font-weight: 600; color: var(--rsm-person-ink); border-right: 1px solid var(--rsm-border); box-shadow: inset 3px 0 color-mix(in srgb, var(--rsm-accent) 42%, var(--rsm-person-fill)); }
