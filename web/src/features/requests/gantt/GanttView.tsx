@@ -1150,10 +1150,39 @@ const GanttRequestRow = memo(function GanttRequestRow({
   today, suppressClickRef, selectRow, onOpen, onNameMenu, setHovered,
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
+  const estimated = (Number(row.days) || 0) === 0;
   const hovered = hoveredPhase >= 0 ? { rowId: row.id, phaseIndex: hoveredPhase } : null;
   const isHovered = Boolean(hovered);
   const holds = useMemo(() => holdLayout(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const estimates = useMemo(() => estimateCenters(row, visibleDates, calendar), [row, visibleDates, calendar]);
+  const visibleDays = useMemo(() => visibleDates.map(resolve), [visibleDates, resolve]);
+  const liveStart = state.fillBounds[live]?.start;
+  const particles = useMemo(() => {
+    if (!liveStart || markerMode === "hidden" || dayWidth < 6) return null;
+
+    const runs: { start: number; end: number }[] = [];
+    visibleDays.forEach((day, index) => {
+      if (day.phaseIndex !== live || !day.active) return;
+      const previous = runs.at(-1);
+      if (previous?.end === index) previous.end = index + 1;
+      else runs.push({ start: index, end: index + 1 });
+    });
+    const first = runs[0];
+    if (!first) return null;
+
+    const offset = (index: number) => `${(index - first.start) * dayWidth}px`;
+    const mask = runs.length > 1 ? runs.map(({ start, end }) => (
+      `transparent ${offset(start)}, black ${offset(start)} ${offset(end)}, transparent ${offset(end)}`
+    )).join(", ") : null;
+    // Keep the texture anchored to the segment as the rendered date window moves.
+    const phaseOffset = diffDays(liveStart, visibleDates[first.start]!) * dayWidth;
+    return {
+      left: `calc(var(--name-column-width) + ${(leftHidden + first.start) * dayWidth}px)`,
+      width: offset(runs.at(-1)!.end),
+      maskImage: mask ? `linear-gradient(to right, ${mask})` : undefined,
+      "--live-particle-offset": `${(row.id % 19) * 7 - phaseOffset}px`,
+    } as CSSProperties;
+  }, [visibleDays, visibleDates, live, liveStart, markerMode, dayWidth, leftHidden, row.id]);
   const previewCell = (_rowId: number, date: string): "valid" | "invalid" | null => {
     if (!preview) return null;
     const included = preview.kind === "add" ? preview.dates?.includes(date) : preview.start && preview.end && date >= preview.start && date <= preview.end;
@@ -1194,8 +1223,8 @@ const GanttRequestRow = memo(function GanttRequestRow({
         <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" />
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
-      {visibleDates.map((date) => {
-        const info = resolve(date);
+      {visibleDates.map((date, index) => {
+        const info = visibleDays[index]!;
         const phase = info.phaseIndex;
         const segment = plan.segments[phase];
         const fill = state.fillBounds[phase];
@@ -1235,16 +1264,15 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 role="button"
                 tabIndex={0}
                 data-tooltip={`${row.name}　${state.activeDays}人天`}
-                className={[styles.barPiece, info.active ? "" : styles.inactive, !filled ? styles.unfilled : "", info.active && (Number(row.days) || 0) === 0 ? styles.estimated : "", date === fill?.start ? styles.barStart : "", date === fill?.end ? styles.barEnd : "", filled && hovered?.rowId === row.id && hovered?.phaseIndex === phase ? styles.dayGrid : "", live === phase && info.active ? styles.livePhase : ""].filter(Boolean).join(" ")}
+                className={[styles.barPiece, info.active ? "" : styles.inactive, !filled ? styles.unfilled : "", info.active && estimated ? styles.estimated : "", date === fill?.start ? styles.barStart : "", date === fill?.end ? styles.barEnd : "", filled && hovered?.rowId === row.id && hovered?.phaseIndex === phase ? styles.dayGrid : ""].filter(Boolean).join(" ")}
                 aria-label={`${row.name}，${date}${info.active ? "，开发排期" : "，非开发日"}`}
                 onPointerOver={() => setHovered((current) => current?.rowId === row.id && current.phaseIndex === phase ? current : { rowId: row.id, phaseIndex: phase })}
                 onPointerOut={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.("[data-bar]")) setHovered(null); }}
                 onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectRow(row.id, event as unknown as ReactMouseEvent); } }}
               >
-                {markerMode !== "hidden" && dayWidth >= 6 && live === phase && info.active ? <FloatingPoints seed={`${row.id}-${date}`} compact={markerMode !== "icon"} /> : null}
                 {info.active && info.overtime ? <CellMarker kind="overtime" mode={markerMode} /> : null}
                 {info.dayType === "leave" ? <CellMarker kind="leave" mode={markerMode} /> : null}
-                {info.active && (Number(row.days) || 0) === 0 && estimates.has(date) ? <CellMarker kind="estimated" mode={markerMode} /> : null}
+                {info.active && estimated && estimates.has(date) ? <CellMarker kind="estimated" mode={markerMode} /> : null}
                 {showDelivery ? <span className={styles.deliveryGuide} aria-hidden="true" /> : null}
                 {isAdmin ? (
                   <>
@@ -1272,6 +1300,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
         );
       })}
       {rightHidden > 0 ? <td aria-hidden="true" colSpan={rightHidden} style={{ width: rightHidden * dayWidth }} /> : null}
+      {particles ? <td className={styles.liveParticles} data-live-particles data-estimated={estimated ? "" : undefined} style={particles} aria-hidden="true" /> : null}
     </tr>
   );
 });
@@ -1284,28 +1313,6 @@ function CellMarker({ kind, mode }: { kind: keyof typeof MARKER_ICONS; mode: Mar
   return (
     <span className={styles.cellMarker} data-marker={kind} data-marker-mode={mode} aria-hidden="true">
       {mode === "icon" ? <Icon className={styles.cellIcon} /> : <span className={styles.markerTick} />}
-    </span>
-  );
-}
-
-function FloatingPoints({ seed, compact }: { seed: string; compact: boolean }) {
-  const points = useMemo(() => {
-    let hash = 0;
-    for (let index = 0; index < seed.length; index += 1) hash = (hash * 31 + seed.charCodeAt(index)) % 997;
-    return Array.from({ length: compact ? 1 : 2 }, (_, index) => ({
-      x: 18 + ((hash * (index + 3)) % 64),
-      y: 25 + ((hash * (index + 5)) % 50),
-      size: index % 2 === 0 ? 1.5 : 1,
-      duration: 4.5 + index * 1.2,
-      delay: -(index * 0.83 + (hash % 20) * 0.13),
-    }));
-  }, [seed, compact]);
-  return (
-    <span className={styles.floatingPoints} data-live-particles aria-hidden="true">
-      <span className={styles.liveSheen} />
-      {points.map((point, index) => (
-        <i key={index} className={styles.floatingPoint} style={{ left: `${point.x}%`, top: `${point.y}%`, width: point.size, height: point.size, ["--point-duration" as string]: `${point.duration}s`, ["--point-delay" as string]: `${point.delay}s` } as CSSProperties} />
-      ))}
     </span>
   );
 }

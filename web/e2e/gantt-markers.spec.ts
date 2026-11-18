@@ -117,7 +117,7 @@ for (const theme of ["light", "dark"] as const) {
       await zoom(1000);
       await expect(table).toHaveAttribute("data-marker-mode", "hidden");
       await expect(wrap.locator("[data-marker]")).toHaveCount(0);
-      await expect(wrap.locator('[class*="floatingPoints"]')).toHaveCount(0);
+      await expect(wrap.locator("[data-live-particles]")).toHaveCount(0);
       await expect(wrap.locator('[data-date="2026-11-21"]').filter({ has: page.locator("[data-bar]") }).first()).toHaveAttribute("aria-label", /加班/);
       expect((await legendArrow.boundingBox())!.width).toBe(18);
       expect(await legend.boundingBox()).toEqual(legendBox);

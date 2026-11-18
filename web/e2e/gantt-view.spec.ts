@@ -1,10 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiRequest, Density, State } from "../src/api/types";
-import { addDays, diffDays, todayISO } from "../src/lib/dates";
+import { addDays, diffDays, enumerateDates, todayISO } from "../src/lib/dates";
 
 const today = todayISO();
 
-async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: { autoRange?: boolean; count?: number; multiplePeople?: boolean; lastName?: string } = {}) {
+async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: {
+  autoRange?: boolean;
+  count?: number;
+  multiplePeople?: boolean;
+  lastName?: string;
+  fixture?: (state: State, defaultRow: ApiRequest) => Partial<State>;
+} = {}) {
   const response = await page.request.get("/api/state");
   expect(response.ok()).toBeTruthy();
   const state = await response.json() as State;
@@ -47,6 +53,7 @@ async function openGantt(page: Page, theme: "light" | "dark" = "light", density:
     ],
     preferences: { ...state.preferences, theme, density, domainColors: editable ? { [request.domain]: "#d05d44" } : state.preferences.domainColors },
   };
+  Object.assign(mockedState, options.fixture?.(mockedState, request));
   await page.route("**/api/state", (route) => route.fulfill({ json: mockedState }));
   if (editable) {
     await page.route("**/api/requests/1", (route) => {
@@ -333,17 +340,18 @@ for (const theme of ["light", "dark"] as const) {
     const next = page.locator('tr[data-row="2"]');
     const name = row.locator("[data-name]");
     await page.mouse.move(0, 0);
-    const background = () => row.evaluate((el) => [...el.children].map((cell) => ({
+    const background = (target = row) => target.locator(":scope > :not([data-live-particles])").evaluateAll((cells) => cells.map((cell) => ({
       color: getComputedStyle(cell).backgroundColor,
       image: getComputedStyle(cell).backgroundImage,
     })));
     const original = await background();
+    expect(original.length).toBeGreaterThan(1);
     await row.locator("[data-bar]").first().click();
     await expect(name).toHaveAttribute("aria-pressed", "false");
     expect((await background()).every((cell) => cell.image !== "none")).toBeTruthy();
     await next.locator("[data-name]").hover();
     expect(await background()).toEqual(original);
-    expect(await next.evaluate((el) => [...el.children].every((cell) => getComputedStyle(cell).backgroundImage !== "none"))).toBeTruthy();
+    expect((await background(next)).every((cell) => cell.image !== "none")).toBeTruthy();
     await page.mouse.move(0, 0);
     expect(await background()).toEqual(original);
     await expect(name).toHaveAttribute("aria-pressed", "false");
@@ -533,22 +541,77 @@ test("整块左上表头切换全部折叠，部分展开时仍执行全部收�
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`当前开发段粒子分散浮动、缩放隐藏并支持减少动效（${theme}）`, async ({ page }, testInfo) => {
-    const wrap = await openGantt(page, theme, "compact", false, { count: 3 });
-    const particles = wrap.locator('[data-row="1"] [data-live-particles]');
-    await expect(particles.first()).toBeVisible();
-    const points = particles.first().locator("i");
-    await expect(points).toHaveCount(2);
-    const positions = await points.evaluateAll((elements) => elements.map((element) => {
-      const style = getComputedStyle(element);
-      return { left: style.left, top: style.top, animation: style.animationName, width: parseFloat(style.width) };
-    }));
-    expect(new Set(positions.map((point) => `${point.left},${point.top}`)).size).toBe(2);
-    expect(positions.every((point) => point.animation !== "none" && point.width <= 1.5)).toBe(true);
-    const initial = await points.first().evaluate((element) => getComputedStyle(element).transform);
-    await expect.poll(() => points.first().evaluate((element) => getComputedStyle(element).transform)).not.toBe(initial);
-    await page.screenshot({ path: testInfo.outputPath("live-particles.png") });
-    await wrap.locator('td[data-date]').first().hover();
+  test(`当前开发段粒子跨日期格向右流动并适配线段底色（${theme}）`, async ({ page }, testInfo) => {
+    const start = addDays(today, -4);
+    const end = addDays(today, 36);
+    const leave = addDays(today, 3);
+    const rest = addDays(today, 6);
+    const overtime = addDays(today, 7);
+    const nextStart = addDays(today, 50);
+    const nextEnd = addDays(today, 53);
+    const wrap = await openGantt(page, theme, "compact", false, {
+      fixture: (state, base) => {
+        const blue = { id: "e2e-blue", name: "深蓝色", color: "#2457b8" };
+        const green = { id: "e2e-green", name: "浅绿色", color: "#4fc788" };
+        return {
+          domains: [blue, green],
+          preferences: { ...state.preferences, domainColors: {} },
+          calendar: { ...state.calendar, restDays: [rest, overtime], workDays: enumerateDates(start, nextEnd).filter((date) => date !== rest && date !== overtime) },
+          requests: [
+            { ...base, id: 1, name: "当前分段", status: "开发中", domain: blue.name, start, delivery: nextEnd, vacation: [leave], overtime: [overtime], segments: [{ start, end, holdBefore: false }, { start: nextStart, end: nextEnd, holdBefore: true }] },
+            { ...base, id: 2, name: "浅色开发段", status: "开发中", domain: green.name, delivery: addDays(today, 3) },
+            { ...base, id: 3, name: "待估开发段", status: "开发中", domain: blue.name, days: 0, delivery: addDays(today, 2) },
+          ],
+        };
+      },
+    });
+    const row = wrap.locator('[data-row="1"]');
+    const particles = row.locator("[data-live-particles]");
+    const firstBar = row.locator(`[data-date="${start}"] [data-bar]`);
+    await expect(particles).toHaveCount(1);
+    const box = (await particles.boundingBox())!;
+    const barBox = (await firstBar.boundingBox())!;
+    expect(Math.abs(box.x - barBox.x)).toBeLessThan(1);
+    expect(box.width).toBeGreaterThan(barBox.width * 2);
+    await expect(particles).toHaveCSS("pointer-events", "none");
+    await expect(particles).not.toHaveCSS("mask-image", "none");
+    await expect(particles).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(wrap.locator('[data-row="2"] [data-live-particles]')).toHaveCSS("color", "rgb(16, 24, 40)");
+    await expect(wrap.locator('[data-row="3"] [data-live-particles]')).toHaveCSS("color", theme === "light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
+
+    const motion = await particles.evaluate((element) => {
+      const animation = element.getAnimations({ subtree: true })[0]!;
+      const playState = animation.playState;
+      animation.pause();
+      const position = (time: number) => {
+        animation.currentTime = time;
+        return new DOMMatrixReadOnly(getComputedStyle(element, "::before").transform);
+      };
+      const before = position(900);
+      const after = position(2400);
+      return { playState, x: after.m41 - before.m41, y: after.m42 - before.m42 };
+    });
+    expect(motion.playState).toBe("running");
+    expect(motion.x).toBeGreaterThan(barBox.width);
+    expect(motion.y).toBe(0);
+    await wrap.screenshot({ path: testInfo.outputPath("live-particles.png") });
+
+    const textureOrigin = () => particles.evaluate((element) => (
+      element.getBoundingClientRect().left + element.closest('[data-scroll-container="gantt"]')!.scrollLeft
+      + parseFloat(getComputedStyle(element, "::before").backgroundPositionX)
+    ));
+    const initialOrigin = await textureOrigin();
+    await wrap.evaluate((element, width) => { element.scrollLeft = width * 15; }, barBox.width);
+    await expect(firstBar).toHaveCount(0);
+    await expect(particles).toHaveCount(1);
+    expect(await textureOrigin()).toBeCloseTo(initialOrigin, 0);
+    expect(await particles.evaluate((element) => element.getAnimations({ subtree: true })[0]?.currentTime)).toBe(2400);
+    await wrap.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    await expect(row.locator(`[data-date="${nextStart}"] [data-bar]`)).toBeInViewport();
+    await expect(particles).toHaveCount(0);
+    await wrap.evaluate((element) => { element.scrollLeft = 0; });
+    await expect(particles).toBeVisible();
+
     const reset = page.getByRole("button", { name: "重置比例", exact: true });
     await expect(reset).toHaveCount(0);
     const wrapBox = (await wrap.boundingBox())!;
@@ -566,10 +629,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(await reset.boundingBox()).toEqual(resetBox);
     await reset.click();
     await expect(reset).toHaveCount(0);
-    await expect(particles.first()).toBeVisible();
+    await expect(particles).toBeVisible();
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect(points.first()).toHaveCSS("animation-name", "none");
-    await expect(points.first()).toBeVisible();
-    await expect(points.first()).toHaveCSS("opacity", "0.5");
+    await expect.poll(() => particles.evaluate((element) => getComputedStyle(element, "::before").animationName)).toBe("none");
+    await expect(particles).toBeVisible();
   });
 }

@@ -90,7 +90,10 @@ for (const theme of ["light", "dark"] as const) {
     await selectRange(page);
     await page.mouse.move(0, 0);
     for (const id of [1, 2, 3]) {
-      expect(await page.locator(`tr[data-row="${id}"]`).evaluate((element) => [...element.children].every((child) => getComputedStyle(child).backgroundImage === getComputedStyle(element.querySelector("th")!).backgroundImage))).toBe(true);
+      const cells = page.locator(`tr[data-row="${id}"] > :not([data-live-particles])`);
+      expect(await cells.evaluateAll((elements, image) => (
+        elements.length > 1 && elements.every((element) => getComputedStyle(element).backgroundImage === image)
+      ), hover)).toBe(true);
       await expect(cell(page, id)).toHaveCSS("background-image", hover);
     }
     const targets = [
