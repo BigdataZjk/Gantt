@@ -4,7 +4,7 @@ import { addDays, diffDays, todayISO } from "../src/lib/dates";
 
 const today = todayISO();
 
-async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: { autoRange?: boolean; count?: number; multiplePeople?: boolean } = {}) {
+async function openGantt(page: Page, theme: "light" | "dark" = "light", density: Density = "compact", editable = false, options: { autoRange?: boolean; count?: number; multiplePeople?: boolean; lastName?: string } = {}) {
   const response = await page.request.get("/api/state");
   expect(response.ok()).toBeTruthy();
   const state = await response.json() as State;
@@ -35,13 +35,14 @@ async function openGantt(page: Page, theme: "light" | "dark" = "light", density:
     archived: false,
   };
   const otherUser = { ...state.users[0]!, id: "e2e-other", username: "第二开发人" };
+  const count = options.count ?? 40;
   const mockedState: State = {
     ...state,
     me: editable ? state.users.find((user) => user.role === "superadmin")! : null,
     setupRequired: false,
     users: options.multiplePeople ? [...state.users, otherUser] : state.users,
     requests: [
-      ...Array.from({ length: options.count ?? 40 }, (_, index) => ({ ...request, id: index + 1, name: `并行排期 ${index + 1}`, developer: options.multiplePeople && index % 2 ? otherUser.id : request.developer })),
+      ...Array.from({ length: count }, (_, index) => ({ ...request, id: index + 1, name: index === count - 1 && options.lastName ? options.lastName : `并行排期 ${index + 1}`, developer: options.multiplePeople && index % 2 ? otherUser.id : request.developer })),
       { ...request, id: 100, name: "归档只读需求", archived: true },
     ],
     preferences: { ...state.preferences, theme, density, domainColors: editable ? { [request.domain]: "#d05d44" } : state.preferences.domainColors },
@@ -112,6 +113,62 @@ test("日期预设支持键盘展开和选择，焦点边框完整位于按钮�
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "全部收起", exact: true })).toBeFocused();
   await expect(presets).toHaveCSS("opacity", "0");
+});
+
+test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求计算", async ({ page }) => {
+  const name = "验证列宽和时间轴联动的较长需求名称".repeat(3);
+  const wrap = await openGantt(page, "light", "compact", false, { autoRange: true, count: 70, lastName: name });
+  const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
+  const firstRow = wrap.locator('tr[data-row="1"]');
+  const cell = firstRow.locator("[data-request-select]");
+  const date = firstRow.locator("[data-date]").first();
+  await expect(wrap.getByText(name, { exact: true })).toHaveCount(0);
+  const contentWidth = await cell.evaluate((element, title) => {
+    const name = element.querySelector<HTMLButtonElement>("[data-name]")!;
+    const priority = name.previousElementSibling!;
+    const probe = name.cloneNode() as HTMLButtonElement;
+    probe.textContent = title;
+    probe.style.cssText = "position:absolute; width:max-content; visibility:hidden";
+    element.append(probe);
+    const style = getComputedStyle(element);
+    const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth);
+    const gap = parseFloat(getComputedStyle(name.parentElement!).columnGap);
+    const width = probe.getBoundingClientRect().width + priority.getBoundingClientRect().width + gap + padding;
+    probe.remove();
+    return width;
+  }, name);
+  const maxWidth = Number(await separator.getAttribute("aria-valuemax"));
+  expect(maxWidth).toBe(Math.floor(contentWidth * 1.2));
+  const initialWidth = Number(await separator.getAttribute("aria-valuenow"));
+  const edge = (await cell.locator("[data-gantt-column-resize]").boundingBox())!;
+  const x = edge.x + edge.width / 2;
+  const y = edge.y + edge.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 64, y, { steps: 4 });
+  await expect(separator).toHaveAttribute("aria-valuenow", String(initialWidth + 64));
+  const expanded = (await cell.boundingBox())!;
+  expect(expanded.width).toBe(initialWidth + 64);
+  expect((await date.boundingBox())!.x).toBeCloseTo(expanded.x + expanded.width, 0);
+  await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  await page.mouse.move(1390, y);
+  await expect(separator).toHaveAttribute("aria-valuenow", String(maxWidth));
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("rsm.ui.v2:guest") || "{}").ganttNameColumnWidth)).toBe(maxWidth);
+
+  await page.setViewportSize({ width: 320, height: 640 });
+  await expect.poll(() => separator.getAttribute("aria-valuenow").then(Number)).toBeLessThan(maxWidth);
+  expect(await wrap.evaluate((el) => el.clientWidth - Number(el.querySelector('[role="separator"]')?.getAttribute("aria-valuenow")))).toBeGreaterThanOrEqual(80);
+  await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(separator).toHaveAttribute("aria-valuenow", String(maxWidth));
+
+  await page.getByLabel("甘特图结束日期", { exact: true }).fill(addDays(today, 90));
+  await wrap.evaluate((el) => { el.scrollLeft = el.scrollWidth; });
+  await expect(separator).toBeInViewport();
+  await separator.press("ArrowLeft");
+  await expect(separator).toHaveAttribute("aria-valuenow", String(maxWidth - 8));
+  await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 90));
 });
 
 for (const [theme, density] of [["light", "compact"], ["dark", "compact"], ["dark", "comfortable"]] as const) {
@@ -208,23 +265,34 @@ test("视图与筛选共用工具栏，优先级仅部分选中时显示全选�
     const core = page.getByRole("group", { name: "核心筛选", exact: true });
     const dates = core.getByLabel("甘特图显示日期范围", { exact: true });
     await expect(dates).toBeVisible();
+    const date = (await dates.boundingBox())!;
+    const tabs = core.getByRole("tablist", { name: "需求视图", exact: true });
+    const priorities = core.getByRole("group", { name: "按优先级筛选，可多选", exact: true });
+    const tabBox = (await tabs.boundingBox())!;
+    const priorityBox = (await priorities.boundingBox())!;
     if (width >= 1366) {
       const developer = (await core.getByRole("button", { name: /^开发人：/ }).boundingBox())!;
-      const date = (await dates.boundingBox())!;
-      const tabs = (await core.getByRole("tablist", { name: "需求视图", exact: true }).boundingBox())!;
-      const priorities = (await core.getByRole("group", { name: "按优先级筛选，可多选", exact: true }).boundingBox())!;
-      expect(priorities.x).toBeGreaterThan(developer.x + developer.width);
-      expect(date.x).toBeGreaterThan(priorities.x + priorities.width);
+      expect(priorityBox.x).toBeGreaterThan(developer.x + developer.width);
+      expect(date.x).toBeGreaterThan(priorityBox.x + priorityBox.width);
       expect(Math.abs(date.y - developer.y)).toBeLessThan(2);
-      expect(Math.abs(tabs.y + tabs.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
-      expect(Math.abs(priorities.y + priorities.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
+      expect(Math.abs(tabBox.y + tabBox.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
+      expect(Math.abs(priorityBox.y + priorityBox.height / 2 - date.y - date.height / 2)).toBeLessThan(1);
       await expect(core.getByRole("button", { name: "全部收起", exact: true })).toHaveCount(0);
-      await page.getByLabel("甘特图结束日期", { exact: true }).hover();
-      await expect(page.getByLabel("仅设置结束日期", { exact: true })).toHaveCSS("opacity", "1");
-      expect(await core.getByRole("tablist", { name: "需求视图", exact: true }).boundingBox()).toEqual(tabs);
-      expect(await core.getByRole("group", { name: "按优先级筛选，可多选", exact: true }).boundingBox()).toEqual(priorities);
-      await page.mouse.move(0, 0);
     }
+    const endDate = dates.getByLabel("甘特图结束日期", { exact: true });
+    const presets = dates.getByLabel("仅设置结束日期", { exact: true });
+    const endBox = (await endDate.boundingBox())!;
+    await endDate.hover();
+    await expect(presets).toHaveCSS("opacity", "1");
+    await expect(presets.getByRole("button", { name: "60D", exact: true })).toBeInViewport({ ratio: 1 });
+    const presetBox = (await presets.boundingBox())!;
+    expect(presetBox.x).toBeGreaterThan(endBox.x + endBox.width);
+    expect(Math.abs(presetBox.y + presetBox.height / 2 - endBox.y - endBox.height / 2)).toBeLessThan(1);
+    expect(await dates.boundingBox()).toEqual(date);
+    expect(await tabs.boundingBox()).toEqual(tabBox);
+    expect(await priorities.boundingBox()).toEqual(priorityBox);
+    await page.mouse.move(0, 0);
+
     const all = core.getByRole("button", { name: "全选", exact: true });
     const p0 = core.getByRole("button", { name: /^P0，/ });
     const p1 = core.getByRole("button", { name: /^P1，/ });

@@ -38,11 +38,35 @@
 .axisControls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .axisControls label { display: inline-flex; align-items: center; gap: 6px; color: var(--rsm-muted); font-size: 12px; white-space: nowrap; flex-shrink: 0; }
 .bar .axisControls label > input[type="date"] { width: 112px; height: var(--rsm-control-height); min-height: var(--rsm-control-height); padding: 4px 6px; font-size: 12px; }
-.endWrap { position: relative; display: inline-flex; align-items: center; }
-.endWrap::after { content: ""; position: absolute; top: 100%; left: 0; right: 0; height: 5px; }
-.axisPresets { position: absolute; top: calc(100% + 4px); right: 0; z-index: 2; display: flex; align-items: center; gap: 2px; width: max-content; max-width: 0; opacity: 0; overflow: hidden; border-radius: var(--rsm-control-radius); background: var(--rsm-panel); box-shadow: 0 0 0 1px var(--rsm-border), var(--rsm-shadow-soft); transition: max-width 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms; }
-.endWrap:hover .axisPresets, .endWrap:has(.preset:focus-visible) .axisPresets { max-width: 120px; opacity: 1; }
-.preset { min-height: var(--rsm-control-height); padding: 0 7px; border: 0; border-radius: var(--rsm-control-radius); background: transparent; color: var(--rsm-muted); font-size: 12px; white-space: nowrap; }
+.endWrap {
+  --preset-gap: 6px;
+  --preset-width: 74px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-right: calc(var(--preset-gap) + var(--preset-width));
+}
+.endWrap::after { content: ""; position: absolute; inset: 0 auto 0 100%; width: var(--preset-gap); }
+.axisPresets {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + var(--preset-gap));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: var(--preset-width);
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transform: translateY(-50%);
+  border-radius: var(--rsm-control-radius);
+  background: var(--rsm-panel);
+  box-shadow: 0 0 0 1px var(--rsm-border), var(--rsm-shadow-soft);
+  transition: max-width 200ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 140ms;
+}
+.endWrap:hover .axisPresets, .endWrap:has(.preset:focus-visible) .axisPresets { max-width: var(--preset-width); opacity: 1; }
+.preset { flex: 0 0 calc((var(--preset-width) - 2px) / 2); min-height: var(--rsm-control-height); padding: 0; border: 0; border-radius: var(--rsm-control-radius); background: transparent; color: var(--rsm-muted); font-size: 12px; white-space: nowrap; }
 .preset:hover { background: var(--rsm-soft); color: var(--rsm-accent); }
 .preset:focus-visible { outline-offset: -3px; }
 .axisError { flex-basis: 100%; color: var(--rsm-p0); font-size: 12px; }
@@ -89,3 +113,9 @@
 .columnRow[data-dragging="true"] { background: var(--rsm-soft); box-shadow: 0 0 0 1px var(--rsm-accent); cursor: grabbing; }
 .columnRow label { flex: 1; min-width: 0; }
 .dragHint { color: var(--rsm-muted); font-size: 11px; padding: 4px 4px 6px; }
+
+@media (max-width: 620px) {
+  .axisControls { gap: 6px; }
+  .axisControls label { gap: 4px; }
+  .bar .axisControls label > input[type="date"] { width: 100px; }
+}

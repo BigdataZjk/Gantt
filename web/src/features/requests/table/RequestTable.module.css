@@ -1,4 +1,4 @@
-.viewport { position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
+.viewport { --table-header-height: 40px; position: relative; display: flex; flex: 1; min-height: 0; min-width: 0; }
 .wrap {
   flex: 1;
   min-height: 0;
@@ -16,7 +16,7 @@
   z-index: 6;
   display: grid;
   align-items: center;
-  min-height: 40px;
+  min-height: var(--table-header-height);
   background: var(--rsm-data-header);
   border-bottom: 1px solid var(--rsm-border);
 }
@@ -24,7 +24,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  height: 40px;
+  height: var(--table-header-height);
   padding: 0;
   color: var(--rsm-data-header-ink);
   font-size: 12px;
@@ -43,7 +43,7 @@
 .sortIndicator svg { width: 12px; height: 12px; stroke-width: 1.8; }
 .sortIndicator small { font-size: 9px; font-variant-numeric: tabular-nums; }
 .sortButton:is(:hover, [data-sorted="true"]) .sortIndicator { opacity: 1; }
-.resetSorting { position: absolute; right: 16px; bottom: 16px; z-index: 9; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--rsm-border); border-radius: 50%; background: var(--rsm-surface-sticky); color: var(--rsm-accent); box-shadow: var(--rsm-shadow-soft); animation: rsm-fade-in 140ms ease-out both; }
+.resetSorting { position: absolute; right: 16px; top: calc(var(--table-header-height) + 14px); z-index: 9; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--rsm-border); border-radius: 50%; background: var(--rsm-surface-sticky); color: var(--rsm-accent); box-shadow: var(--rsm-shadow-soft); animation: rsm-fade-in 140ms ease-out both; }
 .resetSorting:hover { background: var(--rsm-accent-soft); }
 .resetSorting svg { width: 16px; height: 16px; stroke-width: 1.8; }
 .sortCount { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; min-width: 14px; height: 14px; padding: 0 3px; border: 1px solid var(--rsm-surface-sticky); border-radius: 7px; background: var(--rsm-accent); color: var(--rsm-on-accent); font-size: 9px; font-variant-numeric: tabular-nums; }

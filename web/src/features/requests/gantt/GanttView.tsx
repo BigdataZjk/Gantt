@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type RefObject, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import {
   AlarmClockPlus,
   ArrowBigDown,
@@ -122,7 +122,18 @@ interface LastBlankClick {
   time: number;
 }
 
-const FROZEN_WIDTH = 192;
+interface NameColumnDrag {
+  pointerId: number;
+  startX: number;
+  startWidth: number;
+  nextWidth: number;
+  frame: number;
+}
+
+const DEFAULT_NAME_COLUMN_WIDTH = 192;
+const MIN_NAME_COLUMN_WIDTH = 120;
+const MAX_NAME_COLUMN_SCALE = 1.2;
+const MIN_TIMELINE_WIDTH = 80;
 const PERSON_ROW_HEIGHT = 28;
 const ROW_HEIGHT = { compact: 38, comfortable: 50 } as const;
 type MarkerMode = "icon" | "tick" | "hidden";
@@ -133,8 +144,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const notice = useNotice();
   const calendar = state.calendar;
   const today = todayISO();
-  const [availableWidth, setAvailableWidth] = useState(1200);
   const [viewport, setViewport] = useState({ width: 1200, height: 640 });
+  const [nameColumnContentLimit, setNameColumnContentLimit] = useState(DEFAULT_NAME_COLUMN_WIDTH);
+  const [draggedNameColumnWidth, setDraggedNameColumnWidth] = useState<number | null>(null);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const scrollFrame = useRef(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
@@ -144,6 +156,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const [preview, setPreview] = useState<Preview | null>(null);
   const [sequence, setSequence] = useState<{ plan: SequencePlan; revision: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const nameMeasureRef = useRef<HTMLDivElement>(null);
+  const nameColumnDrag = useRef<NameColumnDrag | null>(null);
   const dragHintRef = useRef<HTMLParagraphElement>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const previewRef = useRef<Preview | null>(null);
@@ -152,6 +166,11 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const suppressClickRef = useRef(0);
 
   const isAdmin = permissions.isAdmin;
+  const maxNameColumnWidth = Math.max(1, Math.min(nameColumnContentLimit, viewport.width - MIN_TIMELINE_WIDTH));
+  const minNameColumnWidth = Math.min(MIN_NAME_COLUMN_WIDTH, Math.max(1, Math.floor(maxNameColumnWidth / MAX_NAME_COLUMN_SCALE)));
+  const clampNameColumnWidth = (value: number) => Math.min(maxNameColumnWidth, Math.max(minNameColumnWidth, Math.round(value)));
+  const nameColumnWidth = clampNameColumnWidth(draggedNameColumnWidth ?? ui.ganttNameColumnWidth ?? DEFAULT_NAME_COLUMN_WIDTH);
+  const availableWidth = Math.max(1, viewport.width - nameColumnWidth);
   const rowHeight = ROW_HEIGHT[density];
   const ganttRowHeight = Math.max(24, rowHeight - 14);
   const preferredDayWidth = ganttRowHeight * 1.125;
@@ -173,7 +192,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [axisStart, normalEnd, normalStart, zoom, minZoom, availableWidth, dayWidth, fitToViewport]);
   const dates = useMemo(() => enumerateDates(axisStart, axisEnd), [axisStart, axisEnd]);
-  const tableWidth = FROZEN_WIDTH + (fitToViewport ? availableWidth : dates.length * dayWidth);
+  const tableWidth = nameColumnWidth + (fitToViewport ? availableWidth : dates.length * dayWidth);
   const showReturnToStart = scroll.left >= Math.max(1, Math.min(30, diffDays(axisStart, today) + 1)) * dayWidth;
   const missingYears = unsupportedYears(calendar as never, [axisStart, axisEnd]);
 
@@ -274,11 +293,30 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   }, [fitDays, onFitDaysChange]);
 
   useLayoutEffect(() => {
+    const measure = nameMeasureRef.current;
+    const label = measure?.querySelector(`.${styles.requestName}`);
+    if (!rows.length || !measure || !label) {
+      setNameColumnContentLimit(DEFAULT_NAME_COLUMN_WIDTH);
+      return;
+    }
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) return;
+    const { fontWeight, fontSize, fontFamily } = getComputedStyle(label);
+    context.font = `${fontWeight} ${fontSize} ${fontFamily}`;
+    let widest = 0;
+    for (const { name } of rows) {
+      const text = name.replace(/[ \t\n\r\f]+/g, " ").replace(/^ | $/g, "");
+      widest = Math.max(widest, context.measureText(text).width);
+    }
+    setNameColumnContentLimit(Math.floor((widest + measure.getBoundingClientRect().width) * MAX_NAME_COLUMN_SCALE));
+  }, [rows]);
+
+  useLayoutEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
     const update = () => {
-      setAvailableWidth(Math.max(1, node.clientWidth - FROZEN_WIDTH));
-      setViewport({ width: node.clientWidth, height: node.clientHeight });
+      const { clientWidth: width, clientHeight: height } = node;
+      setViewport((current) => current.width === width && current.height === height ? current : { width, height });
     };
     update();
     const observer = new ResizeObserver(update);
@@ -312,6 +350,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   useEffect(() => () => {
     if (scrollFrame.current) window.cancelAnimationFrame(scrollFrame.current);
+    if (nameColumnDrag.current) window.cancelAnimationFrame(nameColumnDrag.current.frame);
   }, []);
 
   const clearSelection = () => {
@@ -406,7 +445,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     if (!row) return null;
     const plan = planOf(row, calendar);
     const withinRow = gesture.lastY >= (gesture.rowTop ?? 0) - 2 && gesture.lastY <= (gesture.rowBottom ?? 0) + 2;
-    const withinGrid = gesture.lastX >= (gesture.wrapLeft ?? 0) + FROZEN_WIDTH && gesture.lastX <= (gesture.wrapRight ?? window.innerWidth);
+    const withinGrid = gesture.lastX >= (gesture.wrapLeft ?? 0) + nameColumnWidth && gesture.lastX <= (gesture.wrapRight ?? window.innerWidth);
     if (gesture.kind === "move") {
       const segment = plan.segments[gesture.phaseIndex];
       if (!segment) return null;
@@ -523,7 +562,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       window.removeEventListener("pointercancel", onCancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, calendar, dates, dayWidth, domainColors]);
+  }, [rows, calendar, dates, dayWidth, domainColors, nameColumnWidth]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -545,12 +584,21 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   }, [isAdmin, undo]);
 
   const beginPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (event.button === 0 && target.closest("[data-gantt-column-resize]")) {
+      if (!event.isPrimary || gestureRef.current || nameColumnDrag.current || minNameColumnWidth === maxNameColumnWidth) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      nameColumnDrag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: nameColumnWidth, nextWidth: nameColumnWidth, frame: 0 };
+      setDraggedNameColumnWidth(nameColumnWidth);
+      return;
+    }
+    if (nameColumnDrag.current) return;
     reorder.onPointerDown(event);
     if (!isAdmin) {
       return;
     }
     if (event.button !== 0 && event.button !== 2) return;
-    const target = event.target as HTMLElement;
     const cell = target.closest<HTMLElement>("td[data-date]");
     const rowElement = target.closest<HTMLElement>("tr[data-row]");
     if (!cell || !rowElement) return;
@@ -600,6 +648,44 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     }
     blankRef.current = { rowId, date: origin, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     if (selectedIds.size) clearSelection();
+  };
+
+  const moveNameColumn = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = nameColumnDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const nextWidth = clampNameColumnWidth(drag.startWidth + event.clientX - drag.startX);
+    if (nextWidth === drag.nextWidth) return;
+    drag.nextWidth = nextWidth;
+    if (drag.frame) return;
+    drag.frame = window.requestAnimationFrame(() => {
+      drag.frame = 0;
+      setDraggedNameColumnWidth(drag.nextWidth);
+    });
+  };
+
+  const finishNameColumnResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = nameColumnDrag.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    window.cancelAnimationFrame(drag.frame);
+    nameColumnDrag.current = null;
+    setDraggedNameColumnWidth(null);
+    if (event.type !== "pointerup") return;
+    const nextWidth = clampNameColumnWidth(drag.startWidth + event.clientX - drag.startX);
+    if (nextWidth !== drag.startWidth) patch({ ganttNameColumnWidth: nextWidth });
+  };
+
+  const resizeNameColumnByKey = (event: ReactKeyboardEvent<HTMLSpanElement>) => {
+    if (nameColumnDrag.current) return;
+    let nextWidth = nameColumnWidth;
+    switch (event.key) {
+      case "ArrowLeft": nextWidth -= 8; break;
+      case "ArrowRight": nextWidth += 8; break;
+      case "Home": nextWidth = minNameColumnWidth; break;
+      case "End": nextWidth = maxNameColumnWidth; break;
+      default: return;
+    }
+    event.preventDefault();
+    patch({ ganttNameColumnWidth: clampNameColumnWidth(nextWidth) });
   };
 
   const onContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -701,9 +787,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const zoomFromWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     if (!event.ctrlKey && !event.metaKey) return;
     const wrap = wrapRef.current;
-    if (!wrap || gestureRef.current) return;
+    if (!wrap || gestureRef.current || nameColumnDrag.current) return;
     const before = dayWidth;
-    const offset = Math.max(0, event.clientX - wrap.getBoundingClientRect().left - FROZEN_WIDTH);
+    const offset = Math.max(0, event.clientX - wrap.getBoundingClientRect().left - wrap.clientLeft - nameColumnWidth);
     const anchor = (wrap.scrollLeft + offset) / Math.max(0.001, before);
     const nextZoom = Math.min(1, Math.max(minZoom, zoom * Math.exp(-event.deltaY * 0.0025)));
     if (Math.abs(nextZoom - zoom) < 0.0001) return;
@@ -776,8 +862,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   // ---------- 可见区虚拟化：日期列 + 人员/需求行 ----------
   const headerHeight = 49;
   const bufferDays = 4;
-  const dateStart = Math.max(0, Math.min(dates.length, Math.floor((scroll.left - FROZEN_WIDTH) / Math.max(1, dayWidth)) - bufferDays));
-  const dateEnd = Math.max(dateStart, Math.min(dates.length, Math.ceil((scroll.left + viewport.width - FROZEN_WIDTH) / Math.max(1, dayWidth)) + bufferDays));
+  const dateStart = Math.max(0, Math.min(dates.length, Math.floor(scroll.left / Math.max(1, dayWidth)) - bufferDays));
+  const dateEnd = Math.max(dateStart, Math.min(dates.length, Math.ceil((scroll.left + availableWidth) / Math.max(1, dayWidth)) + bufferDays));
   const visibleDates = useMemo(() => dates.slice(dateStart, dateEnd), [dates, dateStart, dateEnd]);
   const leftHidden = dateStart;
   const rightHidden = dates.length - dateEnd;
@@ -806,7 +892,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const topSpacer = offsets[firstItem] ?? 0;
   const bottomSpacer = Math.max(0, totalHeight - (offsets[lastItem] ?? totalHeight));
   const visibleItems = items.slice(firstItem, lastItem);
-  const renderedColumns = 1 + (leftHidden > 0 ? 1 : 0) + visibleDates.length + (rightHidden > 0 ? 1 : 0);
+  const totalColumns = dates.length + 1;
 
   const showMarkers = markerMode !== "hidden";
   const badgeMap = useMemo(() => new Map((showMarkers ? groups : []).map((group) => [group.developer, overlapBadges(group.rows, visibleDates, calendar)])), [groups, visibleDates, calendar, showMarkers]);
@@ -822,7 +908,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       const bounds = wrap.getBoundingClientRect();
       const start = preview.start ?? preview.dates?.[0];
       const end = preview.end ?? preview.dates?.at(-1);
-      const gridLeft = bounds.left + FROZEN_WIDTH + wrap.clientLeft;
+      const gridLeft = bounds.left + nameColumnWidth + wrap.clientLeft;
       const gridRight = bounds.left + wrap.clientWidth;
       const left = start ? gridLeft + diffDays(axisStart, start) * dayWidth - wrap.scrollLeft : gesture.lastX;
       const right = end ? gridLeft + (diffDays(axisStart, end) + 1) * dayWidth - wrap.scrollLeft : gesture.lastX;
@@ -845,15 +931,25 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       wrap.removeEventListener("scroll", schedulePosition);
       window.removeEventListener("resize", schedulePosition);
     };
-  }, [preview, axisStart, dayWidth]);
+  }, [preview, axisStart, dayWidth, nameColumnWidth]);
 
   return (
     <div className={styles.page}>
       <div className={styles.plotArea} data-scroll-container="gantt-content">
         {missingYears.length ? <p className={styles.calendarHint}>节假日日历未覆盖 {missingYears.join("、")} 年，该范围按普通周末计算。</p> : null}
 
-        <div className={styles.calendarViewport} style={{ minHeight: Math.min(160, headerHeight + (items.length ? totalHeight : 64)) }}>
-          <div ref={wrapRef} className={`${styles.calendarWrap} ${reorder.className}`} data-scroll-container="gantt" onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} onClickCapture={reorder.onClickCapture} onDoubleClickCapture={reorder.onDoubleClickCapture} onScroll={onScroll}>
+        <div className={styles.calendarViewport} data-column-dragging={draggedNameColumnWidth !== null || undefined} style={{
+          minHeight: Math.min(160, headerHeight + (items.length ? totalHeight : 64)),
+          "--name-column-width": `${nameColumnWidth}px`,
+          "--gantt-viewport-height": `${viewport.height}px`,
+        } as CSSProperties}>
+          <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
+            <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.requestName} /></div>
+          </div>
+          <div ref={wrapRef} className={`${styles.calendarWrap} ${reorder.className}`} data-scroll-container="gantt"
+            onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} onPointerMove={moveNameColumn}
+            onPointerUp={finishNameColumnResize} onPointerCancel={finishNameColumnResize} onLostPointerCapture={finishNameColumnResize}
+            onClickCapture={reorder.onClickCapture} onDoubleClickCapture={reorder.onDoubleClickCapture} onScroll={onScroll}>
             <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{ width: tableWidth, ["--day-width" as string]: `${dayWidth}px`, ["--gantt-row-height" as string]: `${ganttRowHeight}px`, ["--person-row-height" as string]: `${PERSON_ROW_HEIGHT}px`, ["--marker-size" as string]: `${Math.max(8, 12 * zoom)}px`, ["--parallel-scale" as string]: zoom } as CSSProperties}>
               <thead>
                 <tr>
@@ -861,6 +957,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     <button type="button" className={styles.groupToggle} aria-label={anyExpanded ? "全部收起" : "全部展开"} aria-expanded={anyExpanded} disabled={!groups.length} data-tooltip={anyExpanded ? "收起当前筛选内的所有人员" : "展开当前筛选内的所有人员"} onClick={() => expandAll(!anyExpanded)}>
                       <span>优先级 / 需求</span><ChevronDown aria-hidden="true" />
                     </button>
+                    <span className={styles.nameResizeHandle} data-gantt-column-resize role="separator" aria-label="调整需求列宽"
+                      aria-orientation="vertical" aria-valuemin={minNameColumnWidth} aria-valuemax={maxNameColumnWidth} aria-valuenow={nameColumnWidth}
+                      tabIndex={minNameColumnWidth < maxNameColumnWidth ? 0 : -1} onKeyDown={resizeNameColumnByKey} />
                   </th>
                   {leftHidden > 0 ? <th className={styles.monthSpacer} aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
                   {visibleMonthGroups.map((month) => {
@@ -895,7 +994,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                 </tr>
               </thead>
               <tbody>
-                {topSpacer > 0 ? <tr aria-hidden="true"><td colSpan={renderedColumns} style={{ height: topSpacer, padding: 0, border: 0 }} /></tr> : null}
+                {topSpacer > 0 ? <tr aria-hidden="true"><td colSpan={totalColumns} style={{ height: topSpacer, padding: 0, border: 0 }} /></tr> : null}
                 {visibleItems.map((item) => {
                   if (item.kind === "group") {
                     const group = item.group;
@@ -908,8 +1007,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                             <span className={styles.personName}>{group.name}{group.deleted ? "（已删除）" : ""}</span>
                             <span className={styles.personCount}>{group.rows.length} 条</span>
                           </button>
+                          <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" />
                         </th>
-                        <td colSpan={Math.max(1, renderedColumns - 1)} aria-hidden="true" />
+                        <td colSpan={dates.length} aria-hidden="true" />
                       </tr>
                     );
                   }
@@ -942,9 +1042,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     setHovered={setHovered}
                   />;
                 })}
-                {bottomSpacer > 0 ? <tr aria-hidden="true"><td colSpan={renderedColumns} style={{ height: bottomSpacer, padding: 0, border: 0 }} /></tr> : null}
+                {bottomSpacer > 0 ? <tr aria-hidden="true"><td colSpan={totalColumns} style={{ height: bottomSpacer, padding: 0, border: 0 }} /></tr> : null}
                 {!items.length ? (
-                  <tr><td className={styles.empty} colSpan={Math.max(2, visibleDates.length + 1)}>没有匹配的需求</td></tr>
+                  <tr><td className={styles.empty} colSpan={totalColumns}>没有匹配的需求</td></tr>
                 ) : null}
               </tbody>
             </table>
@@ -1069,6 +1169,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
           <PriorityTag value={row.priority} />
           <button
             type="button"
+            className={styles.requestName}
             data-name
             data-tooltip={`${row.name}　${state.activeDays}人天`}
             aria-pressed={rowSelected}
@@ -1090,6 +1191,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             {row.name}
           </button>
         </div>
+        <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" />
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
       {visibleDates.map((date) => {

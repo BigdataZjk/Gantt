@@ -31,6 +31,7 @@ export interface UiState {
   archiveVisibleColumns: string[];
   ganttRange: { start: string; end: string };
   ganttZoom: number;
+  ganttNameColumnWidth: number | null;
   ganttRowOrder: Record<string, number[]>;
   poolRowOrder: number[];
   poolSorting: TableSort[];
@@ -89,6 +90,7 @@ function normalize(value: unknown): UiState {
       end: isValidDate(range.end) && (!range.start || range.end >= range.start) ? range.end : "",
     },
     ganttZoom: typeof raw.ganttZoom === "number" && Number.isFinite(raw.ganttZoom) ? Math.min(1, Math.max(0.001, raw.ganttZoom)) : 1,
+    ganttNameColumnWidth: typeof raw.ganttNameColumnWidth === "number" && Number.isFinite(raw.ganttNameColumnWidth) && raw.ganttNameColumnWidth > 0 ? raw.ganttNameColumnWidth : null,
     ganttRowOrder: rowOrder,
     poolRowOrder: Array.isArray(raw.poolRowOrder) ? [...new Set(raw.poolRowOrder.filter((id) => Number.isSafeInteger(id) && id > 0))] : [],
     poolSorting: normalizeTableSort(raw.poolSorting),
