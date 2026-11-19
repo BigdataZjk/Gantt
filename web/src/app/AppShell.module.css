@@ -19,7 +19,7 @@
   z-index: 40;
   display: grid;
   align-items: center;
-  grid-template-columns: auto 108px minmax(0, 1fr) auto;
+  grid-template-columns: auto 108px minmax(0, 1fr);
   gap: 16px;
   min-height: 62px;
   flex: none;
@@ -33,22 +33,12 @@
 .brand > span { font-size: 17px; font-weight: 500; letter-spacing: 0.02em; }
 .brand > small { color: var(--rsm-muted); font-size: 11px; font-weight: 400; }
 .topActions { grid-column: 2; min-width: 0; display: flex; align-items: center; }
-.topEnd { grid-column: 4; display: flex; align-items: center; justify-content: flex-end; gap: 9px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
-.avatarButton { display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: transparent; flex: none; }
-.avatarButton:hover { box-shadow: 0 0 0 2px color-mix(in srgb, var(--rsm-accent) 35%, transparent); }
+.topEnd { grid-column: 3; display: flex; align-items: center; justify-content: flex-end; gap: 9px; flex-wrap: wrap; min-width: 0; max-width: 100%; }
+.loginButton { flex: none; }
+.accountButton { flex: none; max-width: 144px; font-weight: 500; }
+.accountButton > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .shell { flex: 1; display: grid; grid-template-columns: 56px minmax(0, 1fr); min-height: 0; overflow: hidden; }
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; padding: 16px 20px 12px; }
-.guestNotice {
-  grid-column: 3;
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-  color: var(--rsm-muted);
-  font-size: 12px;
-}
-.guestNotice > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.guestNotice > button { flex: none; }
 .loading {
   display: flex;
   flex-direction: column;
@@ -65,20 +55,14 @@
 .spinner { width: 18px; height: 18px; border: 2px solid color-mix(in srgb, var(--rsm-accent) 30%, transparent); border-top-color: var(--rsm-accent); border-radius: 50%; animation: rsm-spin 900ms linear infinite; }
 .fatal { display: grid; place-items: center; height: 100%; height: 100dvh; overflow: auto; padding: 24px; }
 .fatalCard { display: grid; gap: 12px; max-width: 420px; padding: 24px; border: 1px solid var(--rsm-border); border-radius: 16px; background: var(--rsm-panel); box-shadow: var(--rsm-shadow-soft); text-align: center; }
-@media (max-width: 960px) {
-  .topbar { grid-template-columns: auto 108px minmax(0, 1fr); gap: 8px 16px; }
-  .topEnd { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
-}
 @media (max-width: 760px) {
   .brand > small { display: none; }
   .main { padding: 14px 12px 12px; }
 }
 @media (max-width: 620px) {
-  .topbar { grid-template-columns: 108px minmax(0, 1fr); gap: 8px 12px; padding: 10px 12px; }
-  .brand { grid-column: 1; grid-row: 1; }
-  .guestNotice { grid-column: 2; grid-row: 1; font-size: 11px; gap: 6px; }
-  .guestNotice > button { gap: 4px; padding-right: 7px; padding-left: 7px; }
-  .topActions { grid-column: 1; grid-row: 2; }
-  .topEnd { grid-column: 2; grid-row: 2; }
+  .topbar { grid-template-columns: auto minmax(0, 1fr); gap: 8px 12px; padding: 10px 12px; }
+  .topEnd { grid-column: 1 / -1; grid-row: 2; }
+  .loginButton { gap: 4px; }
+  .accountButton { max-width: 96px; }
   .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 }

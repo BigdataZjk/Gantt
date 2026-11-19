@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { stateEvents } from "../api/stateEvents";
 import { STATE_KEY, useAppState } from "../api/hooks";
-import type { State } from "../api/types";
+import { AUTH_CHANGED_KEY } from "../api/stateCache";
+import type { Presence, State } from "../api/types";
 import { CalendarRange } from "lucide-react";
 import { PreferencesProvider } from "./preferences";
 import { UiStateProvider } from "./uiState";
@@ -14,21 +15,30 @@ import styles from "./AppShell.module.css";
 export function Root() {
   const stateQuery = useAppState();
   const client = useQueryClient();
-  const revisionRef = useRef<number>(-1);
+  const [clientId] = useState(() => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const [presence, setPresence] = useState<Presence>({ users: [], guests: 0 });
+  const ready = Boolean(stateQuery.data);
+  const viewer = stateQuery.data?.me?.id;
 
   useEffect(() => {
-    revisionRef.current = stateQuery.data?.revision ?? -1;
-  }, [stateQuery.data?.revision]);
-
-  useEffect(() => {
+    if (!ready) return;
+    const refresh = () => { void client.invalidateQueries({ queryKey: STATE_KEY }); };
     const unsubscribe = stateEvents({
+      clientId,
       revision: () => client.getQueryData<State>(STATE_KEY)?.revision ?? -1,
-      refresh: () => {
-        void client.invalidateQueries({ queryKey: STATE_KEY });
-      },
+      refresh,
+      onPresence: setPresence,
     });
-    return unsubscribe;
-  }, [client]);
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
+    const onAuthChanged = (event: StorageEvent) => { if (event.key === AUTH_CHANGED_KEY) refresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("storage", onAuthChanged);
+    return () => {
+      unsubscribe();
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("storage", onAuthChanged);
+    };
+  }, [client, clientId, ready, viewer]);
 
   if (stateQuery.isPending) {
     return (
@@ -64,7 +74,7 @@ export function Root() {
   return (
     <PreferencesProvider key={userKey} serverPreferences={state.preferences} authenticated={Boolean(state.me)}>
       <UiStateProvider key={userKey} storageKey={userKey}>
-        <AppShell state={state} />
+        <AppShell state={state} presence={presence} />
       </UiStateProvider>
     </PreferencesProvider>
   );

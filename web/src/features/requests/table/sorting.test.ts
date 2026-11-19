@@ -40,6 +40,17 @@ describe("需求列表排序", () => {
     expect(ids(sortRequests(rows, [{ key: "delivery", direction: "desc" }], users))).toEqual([1, 3, 2]);
   });
 
+  it("未标注优先级按最大值排序，并可按次排序字段排同组需求", () => {
+    const rows = [
+      request({ id: 1, name: "B", requesterRank: 0 }),
+      request({ id: 2, name: "A" }),
+      request({ id: 3, requesterRank: 2 }),
+      request({ id: 4, requesterRank: 1 }),
+    ];
+    expect(ids(sortRequests(rows, [{ key: "requesterRank", direction: "asc" }], users))).toEqual([4, 3, 1, 2]);
+    expect(ids(sortRequests(rows, [{ key: "requesterRank", direction: "desc" }, { key: "name", direction: "asc" }], users))).toEqual([2, 1, 3, 4]);
+  });
+
   it("中文和数字自然排序，相同值维持默认次序，忽略无效持久化配置", () => {
     const rows = [request({ id: 1, name: "需求10" }), request({ id: 2, name: "需求2" }), request({ id: 3, name: "需求2" })];
     expect(ids(sortRequests(rows, [{ key: "name", direction: "asc" }], users))).toEqual([2, 3, 1]);

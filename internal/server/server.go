@@ -24,14 +24,16 @@ type Server struct {
 	mux         *http.ServeMux
 	dummyHash   string
 	mu          sync.Mutex
-	subscribers map[chan int64]struct{}
+	subscribers map[*eventSubscriber]struct{}
 	visitors    map[string]visitor
+	online      Presence
 	attempts    map[string]attempt
 	static      http.Handler
 }
 type visitor struct {
-	UserID string
-	Seen   time.Time
+	userID     string
+	seen       time.Time
+	connection *eventSubscriber
 }
 type attempt struct {
 	Count int
@@ -41,7 +43,7 @@ type actorKey struct{}
 
 func New(db *store.Store, assets fs.FS, version string) *Server {
 	dummy, _ := auth.Hash(auth.Token())
-	s := &Server{Store: db, Version: version, mux: http.NewServeMux(), dummyHash: dummy, subscribers: map[chan int64]struct{}{}, visitors: map[string]visitor{}, attempts: map[string]attempt{}}
+	s := &Server{Store: db, Version: version, mux: http.NewServeMux(), dummyHash: dummy, subscribers: map[*eventSubscriber]struct{}{}, visitors: map[string]visitor{}, online: Presence{Users: []string{}}, attempts: map[string]attempt{}}
 	if assets != nil {
 		s.static = http.FileServer(http.FS(assets))
 	}
@@ -51,6 +53,7 @@ func New(db *store.Store, assets fs.FS, version string) *Server {
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", s.health)
 	s.mux.HandleFunc("GET /api/state", s.state)
+	s.mux.HandleFunc("GET /api/agent/snapshot", s.agentSnapshot)
 	s.mux.HandleFunc("POST /api/setup", s.setup)
 	s.mux.HandleFunc("POST /api/login", s.login)
 	s.mux.HandleFunc("POST /api/logout", s.logout)
@@ -65,6 +68,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/avatars/{id}", s.avatar)
 	s.mux.HandleFunc("POST /api/requests", s.createRequest)
 	s.mux.HandleFunc("POST /api/requests/batch", s.batchRequests)
+	s.mux.HandleFunc("PUT /api/requests/gantt-order", s.orderGantt)
+	s.mux.HandleFunc("POST /api/requests/priority", s.rankRequests)
 	s.mux.HandleFunc("PUT /api/requests/{id}", s.updateRequest)
 	s.mux.HandleFunc("DELETE /api/requests/{id}", s.deleteRequest)
 	s.mux.HandleFunc("POST /api/requests/{id}/archive", s.archiveRequest)
@@ -155,7 +160,8 @@ func (s *Server) fail(w http.ResponseWriter, e error) {
 func (s *Server) changed(revision int64) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for ch := range s.subscribers {
+	for sub := range s.subscribers {
+		ch := sub.changes
 		select {
 		case ch <- revision:
 		default:

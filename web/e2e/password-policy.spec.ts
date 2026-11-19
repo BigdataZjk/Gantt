@@ -43,7 +43,7 @@ test("首次设密只拒绝空值并接受单个中文字符", async ({ page }) 
 for (const [label, password] of [["字母", "x"], ["表情", "🙂"], ["空格", " "], ["超过原长度上限", "q".repeat(300)]] as const) {
   test(`登录保留密码原值并支持${label}`, async ({ page }) => {
     const writes = await open(page, "guest");
-    await page.getByRole("button", { name: "登录", exact: true }).click();
+    await page.getByRole("banner").getByRole("button", { name: "未登录", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "登录 RSM", exact: true });
     await dialog.locator("#rsm-login-username").fill("张金科");
     await dialog.locator("#rsm-login-password").fill(password);

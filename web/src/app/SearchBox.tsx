@@ -63,7 +63,7 @@ export function SearchBox({ value, onChange, visible, placeholder = "搜索需�
               input.current?.blur();
             } else {
               setExpanded(true);
-              input.current?.focus();
+              input.current?.focus({ preventScroll: true });
             }
           }}
         >

@@ -142,7 +142,7 @@ test("减少动态效果时两种背景静止，连续切换日夜后仍可登�
     await expect(grid).toHaveAttribute("data-motion", "static");
     await expect(grid.locator("canvas")).toHaveCount(1);
   }
-  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await page.getByRole("banner").getByRole("button", { name: "未登录", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "登录 RSM", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });

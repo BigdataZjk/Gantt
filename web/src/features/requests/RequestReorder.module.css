@@ -17,6 +17,10 @@
 }
 .container [data-reorder-edge="before"] > :is(th, td, [role="cell"])::before { top: 0; }
 .container [data-reorder-edge="after"] > :is(th, td, [role="cell"])::before { bottom: 0; }
+.container [data-reorder-group-target] > :is(th, td) {
+  background-color: color-mix(in srgb, var(--rsm-accent) 13%, var(--rsm-surface-sticky));
+  box-shadow: inset 0 -2px var(--rsm-accent);
+}
 .hint {
   position: fixed;
   top: 0;

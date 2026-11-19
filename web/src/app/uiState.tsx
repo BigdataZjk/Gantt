@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ApiRequest } from "../api/types";
 import { isValidDate } from "../lib/dates";
 import { readStorage, writeStorage } from "../lib/storage";
-import { COLUMN_KEYS, DEFAULT_ARCHIVE_COLUMN_KEYS, DEFAULT_COLUMN_KEYS } from "../lib/format";
+import { ARCHIVE_COLUMN_KEYS, COLUMN_KEYS, DEFAULT_ARCHIVE_COLUMN_KEYS, DEFAULT_COLUMN_KEYS } from "../lib/format";
 import { normalizeTableSort, type TableSort } from "../features/requests/table/sorting";
 
 export type RequirementTab = "gantt" | "pool" | "archive";
@@ -32,7 +32,7 @@ export interface UiState {
   ganttRange: { start: string; end: string };
   ganttZoom: number;
   ganttNameColumnWidth: number | null;
-  ganttRowOrder: Record<string, number[]>;
+  poolNameColumnWidth: number | null;
   poolRowOrder: number[];
   poolSorting: TableSort[];
   archiveSorting: TableSort[];
@@ -54,19 +54,16 @@ function asStringArray(value: unknown, allowed?: readonly string[]): string[] {
 function normalize(value: unknown): UiState {
   const raw = (value && typeof value === "object" ? value : {}) as Partial<UiState>;
   const order = Array.isArray(raw.columnOrder) ? raw.columnOrder.filter((key): key is string => typeof key === "string" && COLUMN_KEYS.includes(key)) : [];
+  const needsRankColumn = !order.includes("requesterRank");
+  if (needsRankColumn) order.unshift("requesterRank");
   const columnOrder = [...new Set([...order, ...COLUMN_KEYS])];
   const visibleColumns = asStringArray(raw.visibleColumns, COLUMN_KEYS);
-  const archiveVisibleColumns = asStringArray(raw.archiveVisibleColumns, COLUMN_KEYS.filter((key) => key !== "status"));
+  if (needsRankColumn && visibleColumns.length && !visibleColumns.includes("requesterRank")) visibleColumns.unshift("requesterRank");
+  const archiveVisibleColumns = asStringArray(raw.archiveVisibleColumns, ARCHIVE_COLUMN_KEYS);
   const range = raw.ganttRange && typeof raw.ganttRange === "object" ? raw.ganttRange : { start: "", end: "" };
   const rawFilters = (raw.filters && typeof raw.filters === "object" ? raw.filters : {}) as Partial<UiFilters>;
   const pageSize = Number(raw.logPagination?.pageSize);
   const page = Number(raw.logPagination?.page);
-  const rowOrder: Record<string, number[]> = {};
-  if (raw.ganttRowOrder && typeof raw.ganttRowOrder === "object") {
-    for (const [person, ids] of Object.entries(raw.ganttRowOrder)) {
-      if (Array.isArray(ids)) rowOrder[person] = ids.filter((id): id is number => typeof id === "number");
-    }
-  }
   return {
     mainView: raw.mainView === "settings" ? "settings" : "requirements",
     sidebarPinned: raw.sidebarPinned === true,
@@ -90,11 +87,11 @@ function normalize(value: unknown): UiState {
       end: isValidDate(range.end) && (!range.start || range.end >= range.start) ? range.end : "",
     },
     ganttZoom: typeof raw.ganttZoom === "number" && Number.isFinite(raw.ganttZoom) ? Math.min(1, Math.max(0.001, raw.ganttZoom)) : 1,
-    ganttNameColumnWidth: typeof raw.ganttNameColumnWidth === "number" && Number.isFinite(raw.ganttNameColumnWidth) && raw.ganttNameColumnWidth > 0 ? raw.ganttNameColumnWidth : null,
-    ganttRowOrder: rowOrder,
+    ganttNameColumnWidth: columnWidth(raw.ganttNameColumnWidth),
+    poolNameColumnWidth: columnWidth(raw.poolNameColumnWidth),
     poolRowOrder: Array.isArray(raw.poolRowOrder) ? [...new Set(raw.poolRowOrder.filter((id) => Number.isSafeInteger(id) && id > 0))] : [],
     poolSorting: normalizeTableSort(raw.poolSorting),
-    archiveSorting: normalizeTableSort(raw.archiveSorting).filter((sort) => sort.key !== "status"),
+    archiveSorting: normalizeTableSort(raw.archiveSorting).filter((sort) => ARCHIVE_COLUMN_KEYS.includes(sort.key)),
     collapsedPeople: asStringArray(raw.collapsedPeople),
     logPagination: {
       page: Number.isInteger(page) && page > 0 ? page : 1,
@@ -102,6 +99,10 @@ function normalize(value: unknown): UiState {
     },
     newDraft: isStoredDraft(raw.newDraft) ? raw.newDraft : null,
   };
+}
+
+function columnWidth(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
 }
 
 function isStoredDraft(value: unknown): value is ApiRequest {

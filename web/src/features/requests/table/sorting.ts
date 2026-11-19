@@ -37,13 +37,14 @@ export function newestRequests(rows: ApiRequest[], archive: boolean): ApiRequest
   });
 }
 
-export function sortRequests(rows: ApiRequest[], sorting: TableSort[], users: User[]): ApiRequest[] {
+export function sortRequests(rows: ApiRequest[], sorting: TableSort[], users: User[], ranksAtEditStart?: ReadonlyMap<number, number> | null): ApiRequest[] {
   if (!sorting.length) return rows;
   const names = new Map(users.map((user) => [user.id, user.username]));
   const valueOf = (row: ApiRequest, key: string): string | number => {
     if (key === "developer") return names.get(row.developer) || "";
     if (key === "delivery") return deliveryOf(row);
     if (key === "days") return Number(row.days) || 0;
+    if (key === "requesterRank") return (ranksAtEditStart?.get(row.id) ?? row.requesterRank) || Number.POSITIVE_INFINITY;
     if (key === "status") return statuses.indexOf(row.status);
     return String(row[key as keyof ApiRequest] ?? "").trim();
   };
@@ -51,10 +52,8 @@ export function sortRequests(rows: ApiRequest[], sorting: TableSort[], users: Us
     for (const { key, direction } of sorting) {
       const x = valueOf(a, key);
       const y = valueOf(b, key);
-      if (x === "" || y === "") {
-        if (x !== y) return x === "" ? 1 : -1;
-        continue;
-      }
+      if (x === y) continue;
+      if (x === "" || y === "") return x === "" ? 1 : -1;
       const diff = typeof x === "number" && typeof y === "number" ? x - y : collator.compare(String(x), String(y));
       if (diff) return direction === "asc" ? diff : -diff;
     }

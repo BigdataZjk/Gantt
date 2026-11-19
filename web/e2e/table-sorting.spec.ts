@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
-import { COLUMN_CATALOG } from "../src/lib/format";
+import { ARCHIVE_COLUMN_KEYS, COLUMN_CATALOG } from "../src/lib/format";
 import { calendar, domains, request, users } from "../src/test/fixtures";
 
 async function openTable(page: Page, archive: boolean, options: { requests?: ApiRequest[]; columns?: string[] } = {}) {
@@ -29,7 +29,7 @@ const ids = (page: Page) => page.locator('[data-scroll-container="table"] [data-
 for (const archive of [false, true]) {
   test(`${archive ? "归档" : "需求池"}对全表排序后按视口展示，右上角重置随滚动固定`, async ({ page }) => {
     const count = 72;
-    const columns = COLUMN_CATALOG.filter(({ key }) => !archive || key !== "status");
+    const columns = COLUMN_CATALOG.filter(({ key }) => !archive || ARCHIVE_COLUMN_KEYS.includes(key));
     const rows = Array.from({ length: count }, (_, index) => {
       const id = index + 1;
       const timestamp = new Date(Date.UTC(2026, 10, 18, 0, 0, id)).toISOString();
@@ -39,7 +39,7 @@ for (const archive of [false, true]) {
       const link = `https://example.com/${rank}`;
       return request({
         id, name: `需求 ${rank}`, archived: archive, archivedAt: archive ? timestamp : "", poolEnteredAt: timestamp,
-        days: rank + 1, domain: firstGroup ? "广告域" : "流量域", requestType: firstGroup ? "常规需求" : "数据需求",
+        days: rank + 1, requesterRank: archive ? undefined : rank + 1, domain: firstGroup ? "广告域" : "流量域", requestType: firstGroup ? "常规需求" : "数据需求",
         developer: firstGroup ? "u2" : "u1", status: firstGroup ? "待开发" : "开发中",
         start: date, delivery: date, requestedAt: date, expected: date, review: date,
         requester: `提需人 ${rank}`, project: `项目 ${rank}`, notes: `备注 ${rank}`, prd: link, wangyue: link, brd: link,

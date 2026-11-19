@@ -21,6 +21,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取需求与甘特图排期快照
+         * @description 一次返回完整需求池、归档、甘特图排期和补位。沿用游客只读权限，无需会话。
+         */
+        get: operations["getAgentSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/login": {
         parameters: {
             query?: never;
@@ -237,6 +257,40 @@ export interface paths {
         put?: never;
         /** 批量顺排 */
         post: operations["postApiRequestsBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/gantt-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** 保存共享甘特图顺序，可同次更换开发人 */
+        put: operations["putGanttOrder"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/requests/priority": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 标注或取消单条需求优先级，或清除整个需求池的优先级 */
+        post: operations["postRequesterRank"];
         delete?: never;
         options?: never;
         head?: never;
@@ -472,7 +526,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** SSE 变更通知，重连后重新读取 state */
+        /** SSE 推送数据版本（change）和实时在线名单（presence） */
         get: operations["getEvents"];
         put?: never;
         post?: never;
@@ -540,6 +594,8 @@ export interface components {
             name: string;
             /** @enum {string} */
             priority: "P0" | "P1" | "P2";
+            /** @description 需求池中需求方标注的优先级序号，由优先级接口维护 */
+            requesterRank?: number;
             /** @enum {string} */
             status: "待评审" | "待开发" | "开发中" | "已完成" | "HOLD";
             prd: string;
@@ -568,6 +624,66 @@ export interface components {
             poolEnteredAt?: string;
             /** @description 服务端记录的最近归档时间，旧记录可能缺失，客户端提交时忽略。 */
             archivedAt?: string;
+        };
+        AgentSnapshot: {
+            /** Format: int64 */
+            revision: number;
+            serverVersion: string;
+            calendar: components["schemas"]["Calendar"];
+            requests: components["schemas"]["AgentRequest"][];
+            ganttRowOrder?: components["schemas"]["GanttRowOrder"];
+            support: components["schemas"]["AgentSupport"][];
+        };
+        AgentRequest: {
+            request: components["schemas"]["Request"];
+            /** @description 开发人姓名，未分配或无法解析时为空。 */
+            developerName: string;
+            schedule: components["schemas"]["AgentSchedule"];
+        };
+        AgentSchedule: {
+            /** @description 甘特图中的排期段，包含由单段开始和交付日期生成的线段。 */
+            segments: components["schemas"]["Segment"][];
+            gaps: components["schemas"]["AgentScheduleGap"][];
+            /** @description 按日期升序排列的有效开发日，含调休及加班，扣除休假。待估占位也返回日期。 */
+            scheduledDates: string[];
+            /** @description 有效开发日数量。 */
+            scheduledDays: number;
+            /** @description 此排期是待估人天的占位。 */
+            placeholder: boolean;
+        };
+        AgentScheduleGap: {
+            /** @description 间隔所在的上一段排期索引，从 0 开始。 */
+            afterIndex: number;
+            start: string;
+            end: string;
+            workdays: number;
+            /** @description 手动标记 HOLD 且间隔内有工作日。 */
+            hold: boolean;
+        };
+        AgentSupport: {
+            /**
+             * Format: int64
+             * @description 补位所在的甘特图需求行。
+             */
+            ganttRowRequestId: number;
+            /**
+             * Format: int64
+             * @description 实际被补位的需求 ID。
+             */
+            targetRequestId: number;
+            /** @description 目标需求名称，目标已删除时为空。 */
+            targetRequestName: string;
+            /** @description 补位人的账号 ID，取补位所在行的开发人。 */
+            supporterId: string;
+            supporterName: string;
+            /** @description 保存的起始日期，含当天。 */
+            start: string;
+            /** @description 保存的结束日期，含当天。 */
+            end: string;
+            /** @description 按补位所在行的日历、休假和加班计算出的有效日期，按日期升序排列。 */
+            scheduledDates: string[];
+            /** @description 有效补位日数量。 */
+            scheduledDays: number;
         };
         User: {
             id: string;
@@ -703,6 +819,7 @@ export interface components {
             /** Format: int64 */
             revision: number;
             requests: components["schemas"]["Request"][];
+            ganttRowOrder?: components["schemas"]["GanttRowOrder"];
             domains: components["schemas"]["Domain"][];
             users: components["schemas"]["User"][];
             me: components["schemas"]["User"] | null;
@@ -713,6 +830,36 @@ export interface components {
             calendar: components["schemas"]["Calendar"];
             setupRequired: boolean;
             serverVersion: string;
+        };
+        /** @description 各开发人分组已保存的甘特顺序，空字符串键表示未分配组 */
+        GanttRowOrder: {
+            [key: string]: number[];
+        };
+        GanttOrderInput: {
+            /** Format: int64 */
+            baseRevision: number;
+            orders: {
+                developer: string;
+                /** @description 对应分组的全部未归档需求 ID */
+                requestIds: number[];
+            }[];
+            /** @description 跨组拖动时同时更新开发人，需要管理员权限 */
+            move?: {
+                /** Format: int64 */
+                requestId: number;
+                developer: string;
+            };
+        };
+        RequesterRankInput: {
+            /** Format: int64 */
+            baseRevision: number;
+            /** @enum {string} */
+            action: "toggle" | "clear";
+            /**
+             * Format: int64
+             * @description toggle 操作对应的需求 ID，clear 操作省略
+             */
+            requestId?: number;
         };
         Mutation: {
             /** Format: int64 */
@@ -843,6 +990,33 @@ export interface operations {
             };
             /** @description 版本冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAgentSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 同一数据版本的需求和排期 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSnapshot"];
+                };
+            };
+            /** @description 无法读取快照 */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1589,6 +1763,124 @@ export interface operations {
             };
         };
     };
+    putGanttOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GanttOrderInput"];
+            };
+        };
+        responses: {
+            /** @description 更新后的共享数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["State"];
+                };
+            };
+            /** @description 分组顺序或开发人无效 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 需求不存在或已归档 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 数据版本冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    postRequesterRank: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequesterRankInput"];
+            };
+        };
+        responses: {
+            /** @description 更新后的共享数据 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["State"];
+                };
+            };
+            /** @description 优先级操作无效 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 需求不存在或已归档 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 数据版本冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     postApiRequestsIdArchive: {
         parameters: {
             query?: never;
@@ -2306,7 +2598,10 @@ export interface operations {
     };
     getEvents: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 当前浏览器页面的连接标识，用于统计在线成员和游客 */
+                clientId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

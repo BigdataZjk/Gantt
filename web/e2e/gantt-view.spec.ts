@@ -122,7 +122,7 @@ test("日期预设支持键盘展开和选择，焦点边框完整位于按钮�
   await expect(presets).toHaveCSS("opacity", "0");
 });
 
-test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求计算", async ({ page }) => {
+test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染的需求及 HOLD", async ({ page }) => {
   const name = "验证列宽和时间轴联动的较长需求名称".repeat(3);
   const wrap = await openGantt(page, "light", "compact", false, {
     autoRange: true,
@@ -199,6 +199,17 @@ test("需求列拖拽实时调整时间轴，上限按未渲染的最长需求�
   const minWidth = await separator.getAttribute("aria-valuemin");
   await expect(separator).toHaveAttribute("aria-valuenow", minWidth!);
   expect(await iconFits()).toBe(true);
+  await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 90));
+
+  const fitWidth = String(Math.ceil(contentWidth));
+  await separator.dblclick();
+  await expect(separator).toHaveAttribute("aria-valuenow", fitWidth);
+  expect((await cell.boundingBox())!.width).toBe(Number(fitWidth));
+  await separator.press("End");
+  await expect(separator).toHaveAttribute("aria-valuenow", String(maxWidth));
+  await wrap.locator("tbody [data-gantt-column-resize]").first().dblclick();
+  await expect(separator).toHaveAttribute("aria-valuenow", fitWidth);
+  await expect(firstRow).toBeVisible();
   await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 90));
 });
 

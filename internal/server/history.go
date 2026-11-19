@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -154,70 +155,123 @@ func (s *Server) presence(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	if len(in.ID) < 8 || len(in.ID) > 100 {
+	if !validClientID(in.ID) {
 		s.fail(w, store.Bad("访问标识无效"))
 		return
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	now := time.Now()
-	for id, v := range s.visitors {
-		if now.Sub(v.Seen) > 65*time.Second {
-			delete(s.visitors, id)
-		}
-	}
-	if len(s.visitors) >= 10000 {
+	s.updatePresenceLocked()
+	current, exists := s.visitors[in.ID]
+	if !exists && len(s.visitors) >= 10000 {
+		s.mu.Unlock()
 		send(w, 429, map[string]string{"error": "在线访问数量过多", "code": "rate_limited"})
 		return
 	}
-	s.visitors[in.ID] = visitor{actor(r).ID, now}
-	us := []string{}
-	seen := map[string]bool{}
-	guests := 0
-	for _, v := range s.visitors {
-		if v.UserID == "" {
-			guests++
-		} else if !seen[v.UserID] {
-			us = append(us, v.UserID)
-			seen[v.UserID] = true
+	if current.connection == nil {
+		s.visitors[in.ID] = visitor{userID: actor(r).ID, seen: time.Now()}
+		s.updatePresenceLocked()
+	}
+	online := s.online
+	s.mu.Unlock()
+	send(w, 200, online)
+}
+
+func validClientID(id string) bool { return len(id) >= 8 && len(id) <= 100 }
+
+type eventSubscriber struct {
+	changes  chan int64
+	presence chan struct{}
+}
+
+func (s *Server) updatePresenceLocked() {
+	online := Presence{Users: []string{}}
+	seen := make(map[string]bool)
+	now := time.Now()
+	for id, v := range s.visitors {
+		if v.connection == nil && now.Sub(v.seen) > 65*time.Second {
+			delete(s.visitors, id)
+			continue
+		}
+		if v.userID == "" {
+			online.Guests++
+		} else if !seen[v.userID] {
+			online.Users = append(online.Users, v.userID)
+			seen[v.userID] = true
 		}
 	}
-	sort.Strings(us)
-	send(w, 200, map[string]any{"users": us, "guests": guests})
+	sort.Strings(online.Users)
+	if online.Guests == s.online.Guests && slices.Equal(online.Users, s.online.Users) {
+		return
+	}
+	s.online = online
+	for sub := range s.subscribers {
+		select {
+		case sub.presence <- struct{}{}:
+		default:
+		}
+	}
 }
+
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	if _, ok := w.(http.Flusher); !ok {
 		s.fail(w, store.Bad("不支持事件流"))
 		return
 	}
-	ch := make(chan int64, 1)
+	id := r.URL.Query().Get("clientId")
+	if id != "" && !validClientID(id) {
+		s.fail(w, store.Bad("访问标识无效"))
+		return
+	}
+	sub := &eventSubscriber{changes: make(chan int64, 1), presence: make(chan struct{}, 1)}
 	s.mu.Lock()
-	if len(s.subscribers) > 500 {
+	if len(s.subscribers) >= 500 {
 		s.mu.Unlock()
 		send(w, 429, map[string]string{"error": "事件连接过多", "code": "rate_limited"})
 		return
 	}
-	s.subscribers[ch] = struct{}{}
+	if id != "" {
+		s.visitors[id] = visitor{userID: actor(r).ID, connection: sub}
+	}
+	s.updatePresenceLocked()
+	s.subscribers[sub] = struct{}{}
 	s.mu.Unlock()
-	defer func() { s.mu.Lock(); delete(s.subscribers, ch); s.mu.Unlock() }()
+	defer func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		delete(s.subscribers, sub)
+		if s.visitors[id].connection == sub {
+			delete(s.visitors, id)
+			s.updatePresenceLocked()
+		}
+	}()
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("X-Accel-Buffering", "no")
 	rc := http.NewResponseController(w)
-	emit := func(revision int64) bool {
+	emit := func(event string, value any) bool {
 		_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Second))
-		b, _ := json.Marshal(map[string]int64{"revision": revision})
-		if _, e := fmt.Fprintf(w, "event: change\ndata: %s\n\n", b); e != nil {
+		b, _ := json.Marshal(value)
+		if _, e := fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, b); e != nil {
 			return false
 		}
 		return rc.Flush() == nil
+	}
+	emitPresence := func() bool {
+		s.mu.Lock()
+		online := s.online
+		s.mu.Unlock()
+		return emit("presence", online)
 	}
 	var rev int64
 	if e := s.Store.DB.QueryRowContext(r.Context(), "select revision from metadata where id=1").Scan(&rev); e != nil {
 		return
 	}
-	if !emit(rev) {
+	if !emit("change", map[string]int64{"revision": rev}) || !emitPresence() {
 		return
+	}
+	var token string
+	if c, err := r.Cookie("rsm_session"); err == nil && actor(r).ID != "" {
+		token = c.Value
 	}
 	ticker := time.NewTicker(20 * time.Second)
 	defer ticker.Stop()
@@ -225,11 +279,28 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-r.Context().Done():
 			return
-		case revision := <-ch:
-			if !emit(revision) {
+		case revision := <-sub.changes:
+			if !emit("change", map[string]int64{"revision": revision}) {
+				return
+			}
+		case <-sub.presence:
+			if !emitPresence() {
 				return
 			}
 		case <-ticker.C:
+			if token != "" {
+				if _, err := s.Store.Session(r.Context(), token); err != nil {
+					token = ""
+					s.mu.Lock()
+					if s.visitors[id].connection == sub {
+						s.visitors[id] = visitor{connection: sub}
+					}
+					s.mu.Unlock()
+				}
+			}
+			s.mu.Lock()
+			s.updatePresenceLocked()
+			s.mu.Unlock()
 			_ = rc.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if _, e := fmt.Fprint(w, ": heartbeat\n\n"); e != nil {
 				return

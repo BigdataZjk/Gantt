@@ -16,7 +16,7 @@ const rows = [
 
 async function open(page: Page, options: { theme?: "light" | "dark"; guest?: boolean; rows?: ApiRequest[]; order?: number[] } = {}) {
   const original = await (await page.request.get("/api/state")).json() as State;
-  const state: State = { ...original, me: options.guest ? null : users[0], setupRequired: false, users, domains, calendar, requests: structuredClone(options.rows ?? rows), preferences: { ...original.preferences, theme: options.theme ?? "light", density: "compact" } };
+  const state: State = { ...original, me: options.guest ? null : users[0], setupRequired: false, users, domains, calendar, requests: structuredClone(options.rows ?? rows), ganttRowOrder: options.order ? { u1: options.order } : {}, preferences: { ...original.preferences, theme: options.theme ?? "light", density: "compact" } };
   const writes: ApiRequest[][] = [];
   let failure = 0;
   await page.route((url) => url.pathname.startsWith("/api/"), (route) => {
@@ -37,10 +37,10 @@ async function open(page: Page, options: { theme?: "light" | "dark"; guest?: boo
     }
     return route.abort();
   });
-  await page.addInitScript(({ user, theme, order }) => {
+  await page.addInitScript(({ user, theme }) => {
     localStorage.setItem("rsm.theme", theme);
-    localStorage.setItem(`rsm.ui.v2:${user}`, JSON.stringify({ ganttRange: { start: "2026-11-09", end: "2026-12-10" }, ganttRowOrder: order ? { u1: order } : {} }));
-  }, { user: options.guest ? "guest" : "u1", theme: options.theme ?? "light", order: options.order });
+    localStorage.setItem(`rsm.ui.v2:${user}`, JSON.stringify({ ganttRange: { start: "2026-11-09", end: "2026-12-10" } }));
+  }, { user: options.guest ? "guest" : "u1", theme: options.theme ?? "light" });
   await page.goto("/");
   await expect(page.getByRole("tab", { name: "甘特图", exact: true })).toHaveAttribute("aria-selected", "true");
   return { state, writes, fail: (status: number) => { failure = status; } };
@@ -184,7 +184,7 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("Shift 按当前个人顺序和筛选连选，隐藏及收起需求不进入选择", async ({ page }) => {
+test("Shift 按共享顺序和当前筛选连选，隐藏及收起需求不进入选择", async ({ page }) => {
   await open(page, { order: [3, 2, 1, 4] });
   await selectRange(page, 3, 1);
   await expect.poll(() => selected(page)).toEqual([3, 2, 1]);

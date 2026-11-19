@@ -18,6 +18,7 @@ type Request struct {
 	Revision        int64              `json:"revision"`
 	Name            string             `json:"name"`
 	Priority        string             `json:"priority"`
+	RequesterRank   int                `json:"requesterRank,omitempty"`
 	Status          string             `json:"status"`
 	PRD             string             `json:"prd"`
 	Requester       string             `json:"requester"`
@@ -56,9 +57,10 @@ type Domain struct {
 }
 
 type Data struct {
-	Requests []Request `json:"requests"`
-	Domains  []Domain  `json:"domains"`
-	NextID   int64     `json:"nextId"`
+	Requests      []Request          `json:"requests"`
+	Domains       []Domain           `json:"domains"`
+	NextID        int64              `json:"nextId"`
+	GanttRowOrder map[string][]int64 `json:"ganttRowOrder,omitempty"`
 }
 
 func Empty() Data {

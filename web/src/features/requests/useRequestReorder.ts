@@ -3,14 +3,19 @@ import type { ApiRequest } from "../../api/types";
 import type { DropEdge } from "./rowOrder";
 import styles from "./RequestReorder.module.css";
 
+export type RequestDrop =
+  | { kind: "row"; row: ApiRequest; edge: DropEdge }
+  | { kind: "group"; developer: string; name: string };
+
 interface Options {
   containerRef: RefObject<HTMLDivElement | null>;
   rows: ApiRequest[];
   enabled?: boolean;
   headerHeight: number;
-  blockedReason?: (source: ApiRequest, target: ApiRequest) => string;
-  onReorder: (source: number, target: number, edge: DropEdge) => void;
+  resolveDrop?: (source: ApiRequest, target: RequestDrop) => RequestDrop | string;
+  onReorder: (source: ApiRequest, target: RequestDrop) => void;
   onStart?: () => void;
+  onEnd?: () => void;
 }
 
 interface Drag {
@@ -21,8 +26,7 @@ interface Drag {
   downX: number;
   downY: number;
   active: boolean;
-  target: number | null;
-  edge: DropEdge;
+  target: RequestDrop | null;
 }
 
 export function useRequestReorder(options: Options) {
@@ -36,13 +40,15 @@ export function useRequestReorder(options: Options) {
 
   useEffect(() => {
     const clearMarks = () => {
-      latest.current.containerRef.current?.querySelectorAll("[data-reorder-source], [data-reorder-edge]").forEach((node) => {
+      latest.current.containerRef.current?.querySelectorAll("[data-reorder-source], [data-reorder-edge], [data-reorder-group-target]").forEach((node) => {
         node.removeAttribute("data-reorder-source");
         node.removeAttribute("data-reorder-edge");
+        node.removeAttribute("data-reorder-group-target");
       });
     };
     const cleanup = () => {
-      if (drag.current?.active) suppressUntil.current = performance.now() + 350;
+      const active = drag.current?.active;
+      if (active) suppressUntil.current = performance.now() + 350;
       drag.current = null;
       cancelAnimationFrame(frame.current);
       frame.current = 0;
@@ -50,32 +56,47 @@ export function useRequestReorder(options: Options) {
       hint.current = null;
       clearMarks();
       latest.current.containerRef.current?.removeAttribute("data-reordering");
+      if (active) latest.current.onEnd?.();
     };
     cleanupRef.current = cleanup;
     const update = () => {
       frame.current = 0;
       const current = drag.current;
-      const { containerRef, rows, headerHeight, blockedReason } = latest.current;
+      const { containerRef, rows, headerHeight, resolveDrop } = latest.current;
       const container = containerRef.current;
       const source = rows.find((row) => row.id === current?.id);
       if (!current?.active || !container || !source) { cleanup(); return; }
       const bounds = container.getBoundingClientRect();
       const inBounds = current.x >= bounds.left && current.x < bounds.right && current.y >= bounds.top + headerHeight && current.y < bounds.bottom;
-      const targetElement = inBounds ? document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>("[data-row]") : null;
-      const target = targetElement && container.contains(targetElement) ? rows.find((row) => row.id === Number(targetElement.dataset.row)) : undefined;
-      const reason = target ? blockedReason?.(source, target) ?? "" : "";
+      const targetElement = inBounds ? document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>("[data-row], [data-reorder-group]") : null;
       clearMarks();
       container.querySelector(`[data-row="${source.id}"]`)?.setAttribute("data-reorder-source", "true");
       current.target = null;
-      let label = reason;
+      let label = "";
       let suffix = "";
-      if (target && targetElement && target.id !== source.id && !reason) {
-        const rect = targetElement.getBoundingClientRect();
-        current.target = target.id;
-        current.edge = current.y < rect.top + rect.height / 2 ? "before" : "after";
-        targetElement.dataset.reorderEdge = current.edge;
-        label = `在「${target.name}`;
-        suffix = current.edge === "before" ? "」前" : "」后";
+      if (targetElement && container.contains(targetElement)) {
+        const { row, reorderGroup, reorderGroupName } = targetElement.dataset;
+        const request = rows.find((candidate) => candidate.id === Number(row));
+        let target: RequestDrop | undefined;
+        if (request && request.id !== source.id) {
+          const rect = targetElement.getBoundingClientRect();
+          target = { kind: "row", row: request, edge: current.y < rect.top + rect.height / 2 ? "before" : "after" };
+        } else if (reorderGroup !== undefined && reorderGroupName !== undefined) {
+          target = { kind: "group", developer: reorderGroup, name: reorderGroupName };
+        }
+        const result = target && (resolveDrop ? resolveDrop(source, target) : target);
+        if (typeof result === "string") label = result;
+        else if (result?.kind === "row") {
+          current.target = result;
+          targetElement.dataset.reorderEdge = result.edge;
+          label = `在「${result.row.name}`;
+          suffix = result.edge === "before" ? "」前" : "」后";
+        } else if (result) {
+          current.target = result;
+          targetElement.dataset.reorderGroupTarget = "true";
+          label = `移至「${result.name}`;
+          suffix = "」分组";
+        }
       }
       const bubble = hint.current;
       if (bubble && label) {
@@ -137,9 +158,9 @@ export function useRequestReorder(options: Options) {
         cancelAnimationFrame(frame.current);
         update();
       }
-      const target = current.target;
+      const source = latest.current.rows.find((row) => row.id === current.id);
       cleanup();
-      if (current.active && target !== null) latest.current.onReorder(current.id, target, current.edge);
+      if (current.active && source && current.target) latest.current.onReorder(source, current.target);
     };
     const cancel = (event: PointerEvent) => { if (event.pointerId === drag.current?.pointerId) cleanup(); };
     const key = (event: KeyboardEvent) => {
@@ -182,7 +203,7 @@ export function useRequestReorder(options: Options) {
     const row = handle?.closest<HTMLElement>("[data-row]");
     if (!row || !latest.current.containerRef.current?.contains(row)) return;
     cleanupRef.current();
-    drag.current = { id: Number(row.dataset.row), pointerId: event.pointerId, x: event.clientX, y: event.clientY, downX: event.clientX, downY: event.clientY, active: false, target: null, edge: "before" };
+    drag.current = { id: Number(row.dataset.row), pointerId: event.pointerId, x: event.clientX, y: event.clientY, downX: event.clientX, downY: event.clientY, active: false, target: null };
   }, []);
 
   const suppressClick = useCallback((event: MouseEvent<HTMLDivElement>) => {

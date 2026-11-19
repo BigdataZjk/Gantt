@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RSM API
-  version: 0.1.4
+  version: 0.1.5
 paths:
   /api/state:
     get:
@@ -22,6 +22,21 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+  /api/agent/snapshot:
+    get:
+      operationId: getAgentSnapshot
+      summary: 获取需求与甘特图排期快照
+      description: 一次返回完整需求池、归档、甘特图排期和补位。沿用游客只读权限，无需会话。
+      security: []
+      responses:
+        '200':
+          description: 同一数据版本的需求和排期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentSnapshot'
+        '500':
+          description: 无法读取快照
   /api/login:
     post:
       operationId: postApiLogin
@@ -406,6 +421,60 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/BatchMutation'
+  /api/requests/gantt-order:
+    put:
+      operationId: putGanttOrder
+      summary: 保存共享甘特图顺序，可同次更换开发人
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GanttOrderInput'
+      responses:
+        '200':
+          description: 更新后的共享数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 分组顺序或开发人无效
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '404':
+          description: 需求不存在或已归档
+        '409':
+          description: 数据版本冲突
+  /api/requests/priority:
+    post:
+      operationId: postRequesterRank
+      summary: 标注或取消单条需求优先级，或清除整个需求池的优先级
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequesterRankInput'
+      responses:
+        '200':
+          description: 更新后的共享数据
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 优先级操作无效
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足
+        '404':
+          description: 需求不存在或已归档
+        '409':
+          description: 数据版本冲突
   /api/requests/{id}/archive:
     post:
       operationId: postApiRequestsIdArchive
@@ -782,7 +851,15 @@ paths:
   /api/events:
     get:
       operationId: getEvents
-      summary: SSE 变更通知，重连后重新读取 state
+      summary: SSE 推送数据版本（change）和实时在线名单（presence）
+      parameters:
+      - name: clientId
+        in: query
+        description: 当前浏览器页面的连接标识，用于统计在线成员和游客
+        schema:
+          type: string
+          minLength: 8
+          maxLength: 100
       responses:
         '200':
           description: 事件流
@@ -906,6 +983,10 @@ components:
           - P0
           - P1
           - P2
+        requesterRank:
+          type: integer
+          minimum: 1
+          description: 需求池中需求方标注的优先级序号，由优先级接口维护
         status:
           type: string
           enum:
@@ -972,6 +1053,117 @@ components:
         archivedAt:
           type: string
           description: 服务端记录的最近归档时间，旧记录可能缺失，客户端提交时忽略。
+      additionalProperties: false
+    AgentSnapshot:
+      type: object
+      required: [revision, serverVersion, calendar, requests, support]
+      properties:
+        revision:
+          type: integer
+          format: int64
+        serverVersion:
+          type: string
+        calendar:
+          $ref: '#/components/schemas/Calendar'
+        requests:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentRequest'
+        ganttRowOrder:
+          $ref: '#/components/schemas/GanttRowOrder'
+        support:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentSupport'
+      additionalProperties: false
+    AgentRequest:
+      type: object
+      required: [request, developerName, schedule]
+      properties:
+        request:
+          $ref: '#/components/schemas/Request'
+        developerName:
+          type: string
+          description: 开发人姓名，未分配或无法解析时为空。
+        schedule:
+          $ref: '#/components/schemas/AgentSchedule'
+      additionalProperties: false
+    AgentSchedule:
+      type: object
+      required: [segments, gaps, scheduledDates, scheduledDays, placeholder]
+      properties:
+        segments:
+          type: array
+          description: 甘特图中的排期段，包含由单段开始和交付日期生成的线段。
+          items:
+            $ref: '#/components/schemas/Segment'
+        gaps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentScheduleGap'
+        scheduledDates:
+          type: array
+          description: 按日期升序排列的有效开发日，含调休及加班，扣除休假。待估占位也返回日期。
+          items:
+            type: string
+        scheduledDays:
+          type: integer
+          description: 有效开发日数量。
+        placeholder:
+          type: boolean
+          description: 此排期是待估人天的占位。
+      additionalProperties: false
+    AgentScheduleGap:
+      type: object
+      required: [afterIndex, start, end, workdays, hold]
+      properties:
+        afterIndex:
+          type: integer
+          description: 间隔所在的上一段排期索引，从 0 开始。
+        start:
+          type: string
+        end:
+          type: string
+        workdays:
+          type: integer
+        hold:
+          type: boolean
+          description: 手动标记 HOLD 且间隔内有工作日。
+      additionalProperties: false
+    AgentSupport:
+      type: object
+      required: [ganttRowRequestId, targetRequestId, targetRequestName, supporterId, supporterName, start, end, scheduledDates, scheduledDays]
+      properties:
+        ganttRowRequestId:
+          type: integer
+          format: int64
+          description: 补位所在的甘特图需求行。
+        targetRequestId:
+          type: integer
+          format: int64
+          description: 实际被补位的需求 ID。
+        targetRequestName:
+          type: string
+          description: 目标需求名称，目标已删除时为空。
+        supporterId:
+          type: string
+          description: 补位人的账号 ID，取补位所在行的开发人。
+        supporterName:
+          type: string
+        start:
+          type: string
+          description: 保存的起始日期，含当天。
+        end:
+          type: string
+          description: 保存的结束日期，含当天。
+        scheduledDates:
+          type: array
+          description: 按补位所在行的日历、休假和加班计算出的有效日期，按日期升序排列。
+          items:
+            type: string
+        scheduledDays:
+          type: integer
+          description: 有效补位日数量。
       additionalProperties: false
     User:
       type: object
@@ -1311,6 +1503,8 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Request'
+        ganttRowOrder:
+          $ref: '#/components/schemas/GanttRowOrder'
         domains:
           type: array
           items:
@@ -1341,6 +1535,64 @@ components:
           type: boolean
         serverVersion:
           type: string
+      additionalProperties: false
+    GanttRowOrder:
+      type: object
+      description: 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
+      additionalProperties:
+        type: array
+        items:
+          type: integer
+          format: int64
+    GanttOrderInput:
+      type: object
+      required: [baseRevision, orders]
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        orders:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [developer, requestIds]
+            properties:
+              developer:
+                type: string
+              requestIds:
+                type: array
+                description: 对应分组的全部未归档需求 ID
+                items:
+                  type: integer
+                  format: int64
+            additionalProperties: false
+        move:
+          type: object
+          description: 跨组拖动时同时更新开发人，需要管理员权限
+          required: [requestId, developer]
+          properties:
+            requestId:
+              type: integer
+              format: int64
+            developer:
+              type: string
+          additionalProperties: false
+      additionalProperties: false
+    RequesterRankInput:
+      type: object
+      required: [baseRevision, action]
+      properties:
+        baseRevision:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum: [toggle, clear]
+        requestId:
+          type: integer
+          format: int64
+          description: toggle 操作对应的需求 ID，clear 操作省略
       additionalProperties: false
     Mutation:
       type: object

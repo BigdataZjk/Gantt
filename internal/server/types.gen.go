@@ -162,6 +162,24 @@ func (e RequestStatus) Valid() bool {
 	}
 }
 
+// Defines values for RequesterRankInputAction.
+const (
+	Clear  RequesterRankInputAction = "clear"
+	Toggle RequesterRankInputAction = "toggle"
+)
+
+// Valid indicates whether the value is a known member of the RequesterRankInputAction enum.
+func (e RequesterRankInputAction) Valid() bool {
+	switch e {
+	case Clear:
+		return true
+	case Toggle:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	Admin        UserRole = "admin"
@@ -184,6 +202,83 @@ func (e UserRole) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AgentRequest defines model for AgentRequest.
+type AgentRequest struct {
+	// DeveloperName 开发人姓名，未分配或无法解析时为空。
+	DeveloperName string        `json:"developerName"`
+	Request       Request       `json:"request"`
+	Schedule      AgentSchedule `json:"schedule"`
+}
+
+// AgentSchedule defines model for AgentSchedule.
+type AgentSchedule struct {
+	Gaps []AgentScheduleGap `json:"gaps"`
+
+	// Placeholder 此排期是待估人天的占位。
+	Placeholder bool `json:"placeholder"`
+
+	// ScheduledDates 按日期升序排列的有效开发日，含调休及加班，扣除休假。待估占位也返回日期。
+	ScheduledDates []string `json:"scheduledDates"`
+
+	// ScheduledDays 有效开发日数量。
+	ScheduledDays int `json:"scheduledDays"`
+
+	// Segments 甘特图中的排期段，包含由单段开始和交付日期生成的线段。
+	Segments []Segment `json:"segments"`
+}
+
+// AgentScheduleGap defines model for AgentScheduleGap.
+type AgentScheduleGap struct {
+	// AfterIndex 间隔所在的上一段排期索引，从 0 开始。
+	AfterIndex int    `json:"afterIndex"`
+	End        string `json:"end"`
+
+	// Hold 手动标记 HOLD 且间隔内有工作日。
+	Hold     bool   `json:"hold"`
+	Start    string `json:"start"`
+	Workdays int    `json:"workdays"`
+}
+
+// AgentSnapshot defines model for AgentSnapshot.
+type AgentSnapshot struct {
+	Calendar Calendar `json:"calendar"`
+
+	// GanttRowOrder 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
+	GanttRowOrder *GanttRowOrder `json:"ganttRowOrder,omitempty"`
+	Requests      []AgentRequest `json:"requests"`
+	Revision      int64          `json:"revision"`
+	ServerVersion string         `json:"serverVersion"`
+	Support       []AgentSupport `json:"support"`
+}
+
+// AgentSupport defines model for AgentSupport.
+type AgentSupport struct {
+	// End 保存的结束日期，含当天。
+	End string `json:"end"`
+
+	// GanttRowRequestId 补位所在的甘特图需求行。
+	GanttRowRequestId int64 `json:"ganttRowRequestId"`
+
+	// ScheduledDates 按补位所在行的日历、休假和加班计算出的有效日期，按日期升序排列。
+	ScheduledDates []string `json:"scheduledDates"`
+
+	// ScheduledDays 有效补位日数量。
+	ScheduledDays int `json:"scheduledDays"`
+
+	// Start 保存的起始日期，含当天。
+	Start string `json:"start"`
+
+	// SupporterId 补位人的账号 ID，取补位所在行的开发人。
+	SupporterId   string `json:"supporterId"`
+	SupporterName string `json:"supporterName"`
+
+	// TargetRequestId 实际被补位的需求 ID。
+	TargetRequestId int64 `json:"targetRequestId"`
+
+	// TargetRequestName 目标需求名称，目标已删除时为空。
+	TargetRequestName string `json:"targetRequestName"`
 }
 
 // ArchiveInput defines model for ArchiveInput.
@@ -229,6 +324,26 @@ type DomainInput struct {
 	Color        string `json:"color"`
 	Name         string `json:"name"`
 }
+
+// GanttOrderInput defines model for GanttOrderInput.
+type GanttOrderInput struct {
+	BaseRevision int64 `json:"baseRevision"`
+
+	// Move 跨组拖动时同时更新开发人，需要管理员权限
+	Move *struct {
+		Developer string `json:"developer"`
+		RequestId int64  `json:"requestId"`
+	} `json:"move,omitempty"`
+	Orders []struct {
+		Developer string `json:"developer"`
+
+		// RequestIds 对应分组的全部未归档需求 ID
+		RequestIds []int64 `json:"requestIds"`
+	} `json:"orders"`
+}
+
+// GanttRowOrder 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
+type GanttRowOrder map[string][]int64
 
 // HolidayDay defines model for HolidayDay.
 type HolidayDay struct {
@@ -414,11 +529,14 @@ type Request struct {
 	RequestType   RequestRequestType `json:"requestType"`
 	RequestedAt   string             `json:"requestedAt"`
 	Requester     string             `json:"requester"`
-	Review        string             `json:"review"`
-	Revision      int64              `json:"revision"`
-	Segments      []Segment          `json:"segments"`
-	Start         string             `json:"start"`
-	Status        RequestStatus      `json:"status"`
+
+	// RequesterRank 需求池中需求方标注的优先级序号，由优先级接口维护
+	RequesterRank *int          `json:"requesterRank,omitempty"`
+	Review        string        `json:"review"`
+	Revision      int64         `json:"revision"`
+	Segments      []Segment     `json:"segments"`
+	Start         string        `json:"start"`
+	Status        RequestStatus `json:"status"`
 
 	// SupportSegments 甘特图所在开发人行的补位日期及单向需求引用。更新时省略即保留，空数组清除。
 	SupportSegments *[]SupportSegment `json:"supportSegments,omitempty"`
@@ -434,6 +552,18 @@ type RequestRequestType string
 
 // RequestStatus defines model for Request.Status.
 type RequestStatus string
+
+// RequesterRankInput defines model for RequesterRankInput.
+type RequesterRankInput struct {
+	Action       RequesterRankInputAction `json:"action"`
+	BaseRevision int64                    `json:"baseRevision"`
+
+	// RequestId toggle 操作对应的需求 ID，clear 操作省略
+	RequestId *int64 `json:"requestId,omitempty"`
+}
+
+// RequesterRankInputAction defines model for RequesterRankInput.Action.
+type RequesterRankInputAction string
 
 // RevisionInput defines model for RevisionInput.
 type RevisionInput struct {
@@ -454,18 +584,21 @@ type SetupInput struct {
 
 // State defines model for State.
 type State struct {
-	Calendar      Calendar    `json:"calendar"`
-	Domains       []Domain    `json:"domains"`
-	LogPolicy     *LogPolicy  `json:"logPolicy,omitempty"`
-	Logs          []Log       `json:"logs"`
-	Me            *User       `json:"me"`
-	Preferences   Preferences `json:"preferences"`
-	Requests      []Request   `json:"requests"`
-	Revision      int64       `json:"revision"`
-	ServerVersion string      `json:"serverVersion"`
-	SetupRequired bool        `json:"setupRequired"`
-	Users         []User      `json:"users"`
-	Versions      []Version   `json:"versions"`
+	Calendar Calendar `json:"calendar"`
+	Domains  []Domain `json:"domains"`
+
+	// GanttRowOrder 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
+	GanttRowOrder *GanttRowOrder `json:"ganttRowOrder,omitempty"`
+	LogPolicy     *LogPolicy     `json:"logPolicy,omitempty"`
+	Logs          []Log          `json:"logs"`
+	Me            *User          `json:"me"`
+	Preferences   Preferences    `json:"preferences"`
+	Requests      []Request      `json:"requests"`
+	Revision      int64          `json:"revision"`
+	ServerVersion string         `json:"serverVersion"`
+	SetupRequired bool           `json:"setupRequired"`
+	Users         []User         `json:"users"`
+	Versions      []Version      `json:"versions"`
 }
 
 // SupportSegment defines model for SupportSegment.
@@ -531,6 +664,12 @@ type PostApiCalendarRefreshJSONBody struct {
 	Year         int   `json:"year"`
 }
 
+// GetEventsParams defines parameters for GetEvents.
+type GetEventsParams struct {
+	// ClientId 当前浏览器页面的连接标识，用于统计在线成员和游客
+	ClientId *string `form:"clientId,omitempty" json:"clientId,omitempty"`
+}
+
 // PostApiAuthPasswordJSONRequestBody defines body for PostApiAuthPassword for application/json ContentType.
 type PostApiAuthPasswordJSONRequestBody = PasswordInput
 
@@ -578,6 +717,12 @@ type PostApiRequestsJSONRequestBody = Mutation
 
 // PostApiRequestsBatchJSONRequestBody defines body for PostApiRequestsBatch for application/json ContentType.
 type PostApiRequestsBatchJSONRequestBody = BatchMutation
+
+// PutGanttOrderJSONRequestBody defines body for PutGanttOrder for application/json ContentType.
+type PutGanttOrderJSONRequestBody = GanttOrderInput
+
+// PostRequesterRankJSONRequestBody defines body for PostRequesterRank for application/json ContentType.
+type PostRequesterRankJSONRequestBody = RequesterRankInput
 
 // DeleteApiRequestsIdJSONRequestBody defines body for DeleteApiRequestsId for application/json ContentType.
 type DeleteApiRequestsIdJSONRequestBody = RevisionInput

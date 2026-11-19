@@ -2,16 +2,14 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarRange, LogIn } from "lucide-react";
 import { api, ApiError } from "../api/client";
-import { usePresence } from "../api/hooks";
 import { createStateWriter } from "../api/stateCache";
-import type { State, User } from "../api/types";
+import type { Presence, State, User } from "../api/types";
 import { usePreferences } from "./preferences";
 import { useUiState } from "./uiState";
 import { ThemeToggle } from "./ThemeToggle";
 import { PresenceStack } from "./PresenceStack";
 import { SearchBox } from "./SearchBox";
 import { Sidebar } from "./Sidebar";
-import { Avatar } from "../ui/Avatar";
 import { Button } from "../ui/Button";
 import { CyberButton } from "../ui/CyberButton";
 import { RainBackground } from "../ui/RainBackground";
@@ -21,7 +19,6 @@ import { LoginDialog, PasswordDialog, type PasswordMode } from "../features/auth
 import { RequestsPage, type EditorRequest } from "../features/requests/RequestsPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { useGanttUndo } from "../features/requests/gantt/useGanttUndo";
-import { roleName } from "../lib/format";
 import styles from "./AppShell.module.css";
 
 export interface Permissions {
@@ -36,12 +33,11 @@ export interface CredentialAction {
   user?: User | null;
 }
 
-export function AppShell({ state }: { state: State }) {
+export function AppShell({ state, presence }: { state: State; presence: Presence }) {
   const { ui, patch, patchFilters } = useUiState();
   const { theme } = usePreferences();
   const notice = useNotice();
   const client = useQueryClient();
-  const presence = usePresence(true);
   const [loginOpen, setLoginOpen] = useState(false);
   const [credential, setCredential] = useState<CredentialAction | null>(null);
   const [editor, setEditor] = useState<EditorRequest | null>(null);
@@ -96,15 +92,6 @@ export function AppShell({ state }: { state: State }) {
             </CyberButton>
           ) : null}
         </div>
-        {guest ? (
-          <div className={styles.guestNotice} role="status">
-            <span title="当前为游客只读访问，登录后可编辑需求。">当前为游客只读访问，登录后可编辑需求。</span>
-            <Button size="sm" onClick={() => setLoginOpen(true)}>
-              <LogIn aria-hidden="true" />
-              登录
-            </Button>
-          </div>
-        ) : null}
         <div className={styles.topEnd}>
           <SearchBox
             value={ui.filters.query}
@@ -112,9 +99,17 @@ export function AppShell({ state }: { state: State }) {
             visible={ui.mainView === "requirements"}
           />
           <PresenceStack presence={presence} users={state.users} />
-          <button type="button" className={styles.avatarButton} onClick={openProfile} data-tooltip={guest ? "游客 · 只读，点击登录" : me.username} aria-label={guest ? "游客，点击登录" : `${me.username}，${roleName(me.role)}`}>
-            <Avatar name={me?.username ?? "游客"} avatar={me?.avatar} />
-          </button>
+          <Button
+            variant={guest ? "default" : "ghost"}
+            size="sm"
+            className={guest ? styles.loginButton : styles.accountButton}
+            onClick={openProfile}
+            aria-haspopup={guest ? "dialog" : undefined}
+            data-tooltip={me?.username}
+          >
+            {guest ? <LogIn aria-hidden="true" /> : null}
+            <span>{me?.username ?? "未登录"}</span>
+          </Button>
           <ThemeToggle />
         </div>
       </header>

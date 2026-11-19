@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import type { ApiRequest, State } from "../src/api/types";
+import type { ApiRequest, GanttOrderInput, State } from "../src/api/types";
 import { calendar, domains, request, users } from "../src/test/fixtures";
 
 const requests = [
@@ -17,12 +17,29 @@ const requests = [
 async function preview(page: Page, options: { guest?: boolean; theme?: "light" | "dark"; rows?: ApiRequest[] } = {}) {
   const original = await (await page.request.get("/api/state")).json() as State;
   const state: State = { ...original, me: options.guest ? null : users[0], setupRequired: false, users, domains, calendar, requests: structuredClone(options.rows ?? requests), preferences: { ...original.preferences, theme: options.theme ?? "light" } };
+  delete state.ganttRowOrder;
   const mutations: { method: string; id: number }[] = [];
+  const orderWrites: GanttOrderInput[] = [];
   await page.route("**/api/state", (route) => route.fulfill({ json: state }));
   await page.route("**/api/presence", (route) => route.fulfill({ json: { users: [], guests: 0 } }));
   await page.route("**/api/requests/**", async (route) => {
     const method = route.request().method();
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/requests/gantt-order" && method === "PUT") {
+      const order = route.request().postDataJSON() as GanttOrderInput;
+      orderWrites.push(order);
+      const moved = state.requests.find((row) => row.id === order.move?.requestId);
+      if (moved && order.move) {
+        const oldOrder = state.ganttRowOrder?.[moved.developer];
+        if (oldOrder) state.ganttRowOrder![moved.developer] = oldOrder.filter((id) => id !== moved.id);
+        moved.developer = order.move.developer;
+        moved.revision += 1;
+      }
+      state.ganttRowOrder ??= {};
+      for (const group of order.orders) state.ganttRowOrder[group.developer] = group.requestIds;
+      state.revision += 1;
+      return route.fulfill({ json: state });
+    }
     const id = Number(path.split("/")[3]);
     mutations.push({ method, id });
     if (method === "DELETE") state.requests = state.requests.filter((row) => row.id !== id);
@@ -46,7 +63,7 @@ async function preview(page: Page, options: { guest?: boolean; theme?: "light" |
   }, { user: options.guest ? "guest" : "u1", theme: options.theme ?? "light" });
   await page.goto("/");
   await expect(page.getByRole("tab", { name: "甘特图", exact: true })).toBeVisible();
-  return { state, mutations };
+  return { state, mutations, orderWrites };
 }
 
 const nameOf = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
@@ -73,17 +90,57 @@ test("需求池与甘特图完整包含未排期、未分配和日期轴外需�
   await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
 });
 
+test("需求池按点击顺序标注优先级，排序开启时连续标注行位置稳定", async ({ page }) => {
+  const { state } = await preview(page);
+  const clicks: number[] = [];
+  await page.route("**/api/requests/priority", async (route) => {
+    const { requestId } = route.request().postDataJSON();
+    clicks.push(requestId);
+    state.requests.find((row) => row.id === requestId)!.requesterRank = clicks.length;
+    state.revision += 1;
+    await route.fulfill({ json: state });
+  });
+  const tab = page.getByRole("tab", { name: "需求池", exact: true });
+  await tab.click();
+  const priority = page.getByRole("columnheader", { name: "优先级", exact: true }).getByRole("button");
+  const rank = (id: number) => page.locator(`[data-row="${id}"] [data-key="requesterRank"]`);
+  await priority.click();
+  await priority.click();
+  const initialOrder = await rowIds(page);
+
+  await nameOf(page, "未排期甲").click();
+  await expect(rank(3)).toHaveText("1");
+  expect(await rowIds(page)).toEqual(initialOrder);
+  await nameOf(page, "未分配乙").click();
+  await rank(5).getByRole("button").click();
+  await expect(rank(7)).toHaveText("2");
+  await expect(rank(5)).toHaveText("3");
+  expect(clicks).toEqual([3, 7, 5]);
+  expect(await rowIds(page)).toEqual(initialOrder);
+
+  await tab.hover();
+  await expect.poll(() => rowIds(page)).toEqual([8, 6, 4, 2, 1, 5, 7, 3]);
+  await priority.click();
+  await expect.poll(() => rowIds(page)).toEqual([3, 7, 5, 8, 6, 4, 2, 1]);
+  await expect(rank(3)).toHaveText("1");
+  await expect(rank(7)).toHaveText("2");
+  await expect(rank(5)).toHaveText("3");
+  expect(clicks).toEqual([3, 7, 5]);
+});
+
 for (const tab of ["甘特图", "需求池"] as const) {
-  test(`${tab}右键可编辑归档删除，双击不编辑，两个视图同步移除`, async ({ page }) => {
+  test(`${tab}双击编辑、右键编辑归档删除，两个视图同步移除`, async ({ page }) => {
     const { state, mutations } = await preview(page);
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const name = nameOf(page, "未排期甲");
-    await name.dblclick();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    const editor = page.getByRole("dialog", { name: "编辑需求", exact: true });
+    await name.dblclick({ delay: tab === "需求池" ? 280 : 0 });
+    await expect(editor).toBeVisible();
+    await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("未排期甲");
+    await editor.getByRole("button", { name: "收起面板", exact: true }).click();
     await name.click({ button: "right" });
     await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除"]);
     await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
-    const editor = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "编辑需求", exact: true }) });
     await expect(editor).toBeVisible();
     await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("未排期甲");
     await editor.getByRole("button", { name: "收起面板", exact: true }).click();
@@ -112,7 +169,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
   });
 
   test(`${tab}名称拖动排序、刷新保留与 Escape 取消，不修改业务数据`, async ({ page }, testInfo) => {
-    const { state, mutations } = await preview(page, { theme: tab === "甘特图" ? "light" : "dark" });
+    const { state, mutations, orderWrites } = await preview(page, { theme: tab === "甘特图" ? "light" : "dark" });
     const before = structuredClone(state.requests);
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const edge = tab === "甘特图" ? "before" : "after";
@@ -153,13 +210,14 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await expect.poll(() => rowIds(page)).toEqual(expected);
     expect(state.requests).toEqual(before);
     expect(mutations).toEqual([]);
+    expect(orderWrites.map((item) => item.orders)).toEqual(tab === "甘特图" ? [[{ developer: "u1", requestIds: [1, 2, 4, 3] }]] : []);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   });
 }
 
 test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排序", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 800, height: 900 });
-  const { state, mutations } = await preview(page, {
+  const { state, mutations, orderWrites } = await preview(page, {
     rows: requests.map((row) => row.id === 4 || row.id === 9 ? { ...row, status: "HOLD" } : row),
   });
   const before = structuredClone(state.requests);
@@ -208,16 +266,14 @@ test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排�
   await expect(page.locator("[data-request-hold]")).toHaveCount(0);
   expect(state.requests).toEqual(before);
   expect(mutations).toEqual([]);
+  expect(orderWrites.map((item) => item.orders)).toEqual([[{ developer: "u1", requestIds: [1, 2, 4, 3] }]]);
 });
 
-test("甘特拖排行保留开发人及未排期末尾规则，多选右键仍有需求操作", async ({ page }) => {
-  const { mutations } = await preview(page);
+test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右键仍有需求操作", async ({ page }) => {
+  const { state, mutations, orderWrites } = await preview(page);
   await dragTo(page, nameOf(page, "未排期甲"), nameOf(page, "已排期甲"), "before", false);
   await expect(page.locator('[data-slot="request-reorder-hint"]')).toContainText("未排期需求保持在分组末尾");
   await expect(page.locator("[data-reorder-edge]")).toHaveCount(0);
-  await page.mouse.up();
-  await dragTo(page, nameOf(page, "已排期甲"), nameOf(page, "其他人员需求"), "before", false);
-  await expect(page.locator('[data-slot="request-reorder-hint"]')).toContainText("请在同一开发人分组内排序");
   await page.mouse.up();
   await expect.poll(() => rowIds(page)).toEqual([1, 2, 3, 4, 5, 8, 6, 7]);
   await dragTo(page, nameOf(page, "未分配乙"), nameOf(page, "未分配甲"), "before");
@@ -227,7 +283,16 @@ test("甘特拖排行保留开发人及未排期末尾规则，多选右键仍�
   await nameOf(page, "已排期甲").click({ button: "right" });
   await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
   await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
-  await expect(page.getByRole("dialog").getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
+  await dialog.getByRole("button", { name: "收起面板", exact: true }).click();
+  await dragTo(page, nameOf(page, "已排期甲"), nameOf(page, "其他人员需求"), "after");
+  await expect.poll(() => rowIds(page)).toEqual([2, 3, 4, 5, 1, 8, 7, 6]);
+  expect(state.requests.find((row) => row.id === 1)?.developer).toBe("u2");
+  expect(orderWrites.map(({ orders, move }) => ({ orders, move }))).toEqual([
+    { orders: [{ developer: "", requestIds: [7, 6] }], move: undefined },
+    { orders: [{ developer: "u2", requestIds: [5, 1, 8] }], move: { requestId: 1, developer: "u2" } },
+  ]);
   expect(mutations).toEqual([]);
 });
 
@@ -347,6 +412,46 @@ test("长列表名称拖动可沿边缘滚动到虚拟化行", async ({ page }) 
   await page.mouse.up();
   await expect(page.locator('[data-slot="request-reorder-hint"]')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("rsm.ui.v2:u1") ?? "{}").poolRowOrder?.indexOf(70) ?? 0)).toBeGreaterThan(15);
+  expect(mutations).toEqual([]);
+});
+
+test("需求池可双击表头或行分隔线适应最长名称，包含视口外需求", async ({ page }) => {
+  const name = "用于检查需求池整列适应的很长需求名称".repeat(3);
+  const rows = Array.from({ length: 70 }, (_, index) => request({ id: index + 1, name: index ? `需求 ${index}` : name }));
+  const { mutations } = await preview(page, { rows });
+  await page.getByRole("tab", { name: "需求池", exact: true }).click();
+  const wrap = page.getByRole("table", { name: "需求列表", exact: true });
+  const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
+  const rowEdge = wrap.locator('[data-row="70"] [data-pool-column-resize]');
+  await expect(nameOf(page, name)).toHaveCount(0);
+  await separator.press("Home");
+  await separator.dblclick();
+  const fitted = Number(await separator.getAttribute("aria-valuenow"));
+  expect(fitted).toBeGreaterThan(500);
+  expect(fitted).toBeLessThan(Number(await separator.getAttribute("aria-valuemax")));
+
+  await separator.press("End");
+  await rowEdge.dblclick();
+  await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
+  await expect(page.getByRole("button", { name: "重置排序", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.reload();
+  await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
+
+  await wrap.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+  const label = nameOf(page, name);
+  await expect(label).toBeVisible();
+  expect(await label.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  const { gap, padding } = await label.evaluate((element) => {
+    const cell = element.closest('[data-key="name"]')!;
+    const text = document.createRange();
+    text.selectNodeContents(element);
+    return {
+      gap: cell.getBoundingClientRect().right - text.getBoundingClientRect().right,
+      padding: parseFloat(getComputedStyle(cell).paddingRight),
+    };
+  });
+  expect(Math.abs(gap - padding)).toBeLessThanOrEqual(1);
   expect(mutations).toEqual([]);
 });
 

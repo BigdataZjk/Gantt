@@ -2,7 +2,6 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light" });
-  await page.route("**/api/presence", (route) => route.fulfill({ json: { users: [], guests: 0 } }));
   await page.goto("/");
 });
 

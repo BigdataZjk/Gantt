@@ -35,8 +35,8 @@ export interface FieldCatalogEntry {
   label: string;
 }
 
-/** 需求池字段目录。优先级固定内联在需求名前，不作为可显隐列。 */
 export const COLUMN_CATALOG: FieldCatalogEntry[] = [
+  { key: "requesterRank", label: "优先级" },
   { key: "name", label: "需求名称" },
   { key: "domain", label: "业务域" },
   { key: "requestType", label: "需求类型" },
@@ -57,8 +57,9 @@ export const COLUMN_CATALOG: FieldCatalogEntry[] = [
 ];
 
 export const COLUMN_KEYS = COLUMN_CATALOG.map((entry) => entry.key);
-export const DEFAULT_COLUMN_KEYS = COLUMN_CATALOG.slice(0, 12).map((entry) => entry.key);
-export const DEFAULT_ARCHIVE_COLUMN_KEYS = DEFAULT_COLUMN_KEYS.filter((key) => key !== "status" && key !== "days");
+export const ARCHIVE_COLUMN_KEYS = COLUMN_KEYS.filter((key) => key !== "status" && key !== "requesterRank");
+export const DEFAULT_COLUMN_KEYS = COLUMN_KEYS.slice(0, 13);
+export const DEFAULT_ARCHIVE_COLUMN_KEYS = DEFAULT_COLUMN_KEYS.filter((key) => ARCHIVE_COLUMN_KEYS.includes(key) && key !== "days");
 
 export function formatDays(days: number): string {
   return days === 0 ? "0 · 待估人天" : String(days);

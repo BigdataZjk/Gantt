@@ -21,7 +21,7 @@
   max-width: none;
   height: 100%;
   min-height: 0;
-  padding: 0 calc(var(--search-size) + 6px) 0 32px;
+  padding: 0 min(calc(var(--search-size) + 6px), 40%) 0 min(32px, 40%);
   border: 0;
   border-radius: inherit;
   background: transparent;
@@ -41,5 +41,6 @@
 .toggle[data-has-query="true"] { color: var(--rsm-accent); }
 @media (max-width: 620px) {
   .slot { --search-size: 28px; }
+  .slot[data-expanded="true"] { flex: 0 0 100%; order: 1; }
   .slot[data-expanded="true"] .capsule { width: min(70vw, 300px); }
 }

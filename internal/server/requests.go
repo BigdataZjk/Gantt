@@ -61,6 +61,7 @@ func (s *Server) createRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		item.ID = d.NextID
 		item.Revision = 1
+		item.RequesterRank = 0
 		item.PoolEnteredAt = time.Now().UTC().Format(time.RFC3339Nano)
 		item.ArchivedAt = ""
 		d.NextID++
@@ -126,7 +127,11 @@ func (s *Server) updateRequest(w http.ResponseWriter, r *http.Request) {
 			return store.Bad(e.Error())
 		}
 		item.Revision = old.Revision + 1
+		item.RequesterRank = old.RequesterRank
 		item.PoolEnteredAt, item.ArchivedAt = old.PoolEnteredAt, old.ArchivedAt
+		if item.Developer != old.Developer {
+			removeGanttOrder(d, old)
+		}
 		d.Requests[index] = item
 		return nil
 	})
@@ -155,6 +160,8 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		if d.Requests[index].Archived {
 			return store.Bad("归档需求只能恢复到需求池")
 		}
+		removeGanttOrder(d, d.Requests[index])
+		unrankRequest(d, index)
 		d.Requests = append(d.Requests[:index], d.Requests[index+1:]...)
 		return nil
 	})
@@ -193,6 +200,8 @@ func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests[index].Archived = in.Archived
 		stamp := time.Now().UTC().Format(time.RFC3339Nano)
 		if in.Archived {
+			removeGanttOrder(d, d.Requests[index])
+			unrankRequest(d, index)
 			d.Requests[index].ArchivedAt = stamp
 		} else {
 			d.Requests[index].PoolEnteredAt = stamp
@@ -246,7 +255,11 @@ func (s *Server) batchRequests(w http.ResponseWriter, r *http.Request) {
 				return store.Bad(e.Error())
 			}
 			item.Revision++
+			item.RequesterRank = old.RequesterRank
 			item.PoolEnteredAt, item.ArchivedAt = old.PoolEnteredAt, old.ArchivedAt
+			if item.Developer != old.Developer {
+				removeGanttOrder(d, old)
+			}
 			d.Requests[index] = item
 		}
 		return nil

@@ -7,7 +7,7 @@ import styles from "./PresenceStack.module.css";
 export function PresenceStack({ presence, users }: { presence: Presence; users: User[] }) {
   const members = presence.users
     .map((id) => users.find((user) => user.id === id))
-    .filter((user): user is User => Boolean(user && !user.deleted));
+    .filter((user): user is User => Boolean(user && !user.disabled && !user.deleted));
   const guests = Math.max(0, Math.floor(Number(presence.guests) || 0));
   const limit = guests > 0 ? 4 : 5;
   const visible = members.slice(0, limit);

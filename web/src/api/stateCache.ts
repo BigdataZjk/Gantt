@@ -1,7 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { State } from "./types";
+import { writeStorage } from "../lib/storage";
 
 export const STATE_KEY = ["app-state"] as const;
+export const AUTH_CHANGED_KEY = "rsm.auth-changed";
 const sessions = new WeakMap<QueryClient, number>();
 
 export function createStateWriter(client: QueryClient, newSession = false) {
@@ -19,6 +21,7 @@ export function createStateWriter(client: QueryClient, newSession = false) {
       if (sessions.get(client) !== nextSession) return false;
     }
     client.setQueryData(STATE_KEY, state);
+    if (newSession) writeStorage(AUTH_CHANGED_KEY, Date.now());
     return true;
   };
 }

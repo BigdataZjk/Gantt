@@ -27,7 +27,7 @@ async function logout(page: Page) {
   await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("tab", { name: "个性化" }).click();
   await page.getByRole("button", { name: "退出登录" }).click();
-  await expect(page.getByText("当前为游客只读访问，登录后可编辑需求。")).toBeVisible();
+  await expect(page.getByRole("banner").getByRole("button", { name: "未登录", exact: true })).toBeVisible();
 }
 
 async function apiState(page: Page) {

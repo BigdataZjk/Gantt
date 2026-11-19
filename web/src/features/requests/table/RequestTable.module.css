@@ -34,6 +34,8 @@
   text-overflow: ellipsis;
 }
 .headerName { position: sticky; left: 0; z-index: 8; background: var(--rsm-data-header); box-shadow: 1px 0 0 var(--rsm-border); }
+.headerName .sortButton { padding-right: 13px; }
+.headerCell[aria-label="优先级"] .sortButton { justify-content: center; }
 .sortButton { display: flex; align-items: center; gap: 5px; width: 100%; height: 100%; padding: 0 8px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
 .sortButton > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sortButton:hover { background: color-mix(in srgb, var(--rsm-accent) 7%, transparent); }
@@ -61,26 +63,38 @@
   content-visibility: auto;
 }
 .row:hover { background: color-mix(in srgb, var(--rsm-accent) 8%, transparent); }
+.cell, .nameMeasure { padding: 0 12px; }
 .cell {
   display: flex;
   align-items: center;
   min-width: 0;
   height: 100%;
-  padding: 0 12px;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .cell > span, .cell > a { overflow: hidden; text-overflow: ellipsis; }
-.nameCell {
+.cell[data-key="name"] {
   position: sticky;
   left: 0;
   z-index: 2;
   background: var(--rsm-surface-sticky);
   box-shadow: 1px 0 0 var(--rsm-border);
 }
-.row:hover .nameCell { background: color-mix(in srgb, var(--rsm-accent) 8%, var(--rsm-surface-sticky)); }
+.row:hover .cell[data-key="name"] { background: color-mix(in srgb, var(--rsm-accent) 8%, var(--rsm-surface-sticky)); }
+.nameMeasure { position: absolute; top: 0; left: 0; width: max-content; visibility: hidden; pointer-events: none; }
+.nameResizeHandle { composes: resizeHandle from "../NameColumn.module.css"; }
+.viewport[data-column-dragging] { user-select: none; cursor: col-resize; }
+.viewport:is([data-column-dragging], :has(.nameResizeHandle:is(:hover, :focus-visible))) .nameResizeHandle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 2px;
+  background: color-mix(in srgb, var(--rsm-accent) 60%, transparent);
+}
 .nameContent { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; }
 .nameButton {
   flex: 1;
@@ -97,6 +111,21 @@
 }
 .nameButton:hover:not(:disabled) { color: var(--rsm-accent); text-decoration: underline; }
 .nameButton:disabled { opacity: 1; cursor: pointer; }
+.cell[data-key="requesterRank"] { justify-content: center; padding: 0; }
+.rankButton { display: grid; place-items: center; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; }
+.rankButton:hover { background: color-mix(in srgb, var(--rsm-accent) 8%, transparent); }
+.rankButton:focus-visible { outline-offset: -3px; }
+.rankBadge { display: inline-grid; min-width: 24px; height: 22px; padding: 0 5px; place-items: center; border: 1px solid transparent; border-radius: 6px; color: var(--rsm-muted); font-variant-numeric: tabular-nums; }
+.rankBadge[data-rank] { color: var(--rsm-text); }
+.rankBadge[data-rank="1"] { --rank-color: #cb941c; }
+.rankBadge[data-rank="2"] { --rank-color: #8a9fb7; }
+.rankBadge[data-rank="3"] { --rank-color: #c37b57; }
+.rankBadge:is([data-rank="1"], [data-rank="2"], [data-rank="3"]) {
+  border-color: color-mix(in srgb, var(--rank-color) 34%, transparent);
+  background: color-mix(in srgb, var(--rank-color) 16%, transparent);
+  color: color-mix(in srgb, var(--rank-color) 48%, var(--rsm-text));
+  font-weight: 750;
+}
 .project { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
 .dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--rsm-accent); }
 .date { font-variant-numeric: tabular-nums; color: var(--rsm-text); }

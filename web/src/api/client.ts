@@ -1,4 +1,4 @@
-import type { ApiRequest, Calendar, Domain, LogCleanupPreview, LogCleanupResponse, LogManagement, LogPolicy, Preferences, Presence, State, UserPatch } from "./types";
+import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogManagement, LogPolicy, Preferences, State, UserPatch } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -71,6 +71,8 @@ export const api = {
   updateRequest: (baseRevision: number, request: ApiRequest): Promise<State> => send<State>(`/api/requests/${encodeURIComponent(String(request.id))}`, "PUT", { baseRevision, request }),
   deleteRequest: (baseRevision: number, id: number): Promise<State> => send<State>(`/api/requests/${id}`, "DELETE", { baseRevision }),
   batchRequests: (baseRevision: number, requests: ApiRequest[]): Promise<State> => send<State>("/api/requests/batch", "POST", { baseRevision, requests }),
+  orderGantt: (baseRevision: number, orders: GanttOrderInput["orders"], move?: GanttOrderInput["move"]): Promise<State> => send<State>("/api/requests/gantt-order", "PUT", { baseRevision, orders, move }),
+  rankRequests: (baseRevision: number, requestId?: number): Promise<State> => send<State>("/api/requests/priority", "POST", { baseRevision, action: requestId === undefined ? "clear" : "toggle", requestId }),
   archiveRequest: (baseRevision: number, id: number, archived: boolean): Promise<State> => send<State>(`/api/requests/${id}/archive`, "POST", { baseRevision, archived }),
 
   createDomain: (baseRevision: number, name: string, color: string): Promise<State> => send<State>("/api/domains", "POST", { baseRevision, name, color }),
@@ -87,7 +89,6 @@ export const api = {
   previewLogCleanup: (scope: LogCleanupPreview["scope"], days: number): Promise<LogCleanupPreview> => send<LogCleanupPreview>("/api/logs/cleanup/preview", "POST", { scope, days }),
   cleanupLogs: (baseRevision: number, preview: LogCleanupPreview): Promise<LogCleanupResponse> => send<LogCleanupResponse>("/api/logs/cleanup", "POST", { baseRevision, scope: preview.scope, days: preview.days, before: preview.before, token: preview.token }),
 
-  presence: (clientId: string): Promise<Presence> => send<Presence>("/api/presence", "POST", { clientId }),
 };
 
-export type { ApiRequest, Calendar, Domain, Preferences, Presence, State };
+export type { ApiRequest, Calendar, Domain, Preferences, State };

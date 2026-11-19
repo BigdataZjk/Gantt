@@ -46,6 +46,7 @@ type Snapshot struct {
 	Calendar      schedule.Calendar    `json:"calendar"`
 	Revision      int64                `json:"revision"`
 	Requests      []requests.Request   `json:"requests"`
+	GanttRowOrder map[string][]int64   `json:"ganttRowOrder,omitempty"`
 	Domains       []requests.Domain    `json:"domains"`
 	Users         []auth.User          `json:"users"`
 	Me            *auth.User           `json:"me"`
@@ -203,7 +204,7 @@ func (s *Store) Snapshot(ctx context.Context, actorID string) (Snapshot, error) 
 	if e != nil {
 		return Snapshot{}, e
 	}
-	out := Snapshot{Revision: rev, Requests: d.Requests, Domains: d.Domains, Users: []auth.User{}, Preferences: settings.Default(), Logs: []history.Entry{}, Versions: []history.Version{}}
+	out := Snapshot{Revision: rev, Requests: d.Requests, GanttRowOrder: d.GanttRowOrder, Domains: d.Domains, Users: []auth.User{}, Preferences: settings.Default(), Logs: []history.Entry{}, Versions: []history.Version{}}
 	out.Users, e = Users(ctx, tx)
 	if e != nil {
 		return out, e

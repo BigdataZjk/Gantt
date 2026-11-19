@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type RefObject, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Dispatch, type SetStateAction, type RefObject, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
 import {
   AlarmClockPlus,
   ArrowBigDown,
@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import type { ApiRequest, Calendar, State, SupportSegment } from "../../../api/types";
+import { api } from "../../../api/client";
+import { useMutationRunner } from "../../../api/hooks";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
 import { addDays, diffDays, enumerateDates, isWorkday, todayISO } from "../../../lib/dates";
@@ -58,6 +60,7 @@ import type { RequestPermissions } from "../types";
 import { requestMenuItems } from "../requestMenu";
 import { reorderVisibleIds } from "../rowOrder";
 import { useRequestReorder } from "../useRequestReorder";
+import { useNameColumnResize } from "../useNameColumnResize";
 import { unsupportedYears } from "../../../schedule";
 import { SequencePreview } from "./SequencePreview";
 import { SupportPicker } from "./SupportPicker";
@@ -132,18 +135,7 @@ interface LastBlankClick {
   time: number;
 }
 
-interface NameColumnDrag {
-  pointerId: number;
-  startX: number;
-  startWidth: number;
-  nextWidth: number;
-  frame: number;
-}
-
 const DEFAULT_NAME_COLUMN_WIDTH = 192;
-const MIN_NAME_COLUMN_WIDTH = 120;
-const MAX_NAME_COLUMN_SCALE = 1.2;
-const MIN_TIMELINE_WIDTH = 80;
 const PERSON_ROW_HEIGHT = 28;
 const SUPPORT_LANE_GAP = 2;
 const ROW_HEIGHT = { compact: 38, comfortable: 50 } as const;
@@ -153,11 +145,11 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
   const notice = useNotice();
+  const runner = useMutationRunner();
   const calendar = state.calendar;
   const today = todayISO();
   const [viewport, setViewport] = useState({ width: 1200, height: 640 });
-  const [nameColumnContentLimit, setNameColumnContentLimit] = useState(DEFAULT_NAME_COLUMN_WIDTH);
-  const [draggedNameColumnWidth, setDraggedNameColumnWidth] = useState<number | null>(null);
+  const [reorderingRows, setReorderingRows] = useState(false);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const scrollFrame = useRef(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
@@ -169,7 +161,6 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const [sequence, setSequence] = useState<{ plan: SequencePlan; revision: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const nameMeasureRef = useRef<HTMLDivElement>(null);
-  const nameColumnDrag = useRef<NameColumnDrag | null>(null);
   const dragHintRef = useRef<HTMLParagraphElement>(null);
   const gestureRef = useRef<Gesture | null>(null);
   const previewRef = useRef<Preview | null>(null);
@@ -178,10 +169,12 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const suppressClickRef = useRef(0);
 
   const isAdmin = permissions.isAdmin;
-  const maxNameColumnWidth = Math.max(1, Math.min(nameColumnContentLimit, viewport.width - MIN_TIMELINE_WIDTH));
-  const minNameColumnWidth = Math.min(MIN_NAME_COLUMN_WIDTH, Math.max(1, Math.floor(maxNameColumnWidth / MAX_NAME_COLUMN_SCALE)));
-  const clampNameColumnWidth = (value: number) => Math.min(maxNameColumnWidth, Math.max(minNameColumnWidth, Math.round(value)));
-  const nameColumnWidth = clampNameColumnWidth(draggedNameColumnWidth ?? ui.ganttNameColumnWidth ?? DEFAULT_NAME_COLUMN_WIDTH);
+  const nameResize = useNameColumnResize({
+    rows, viewportWidth: viewport.width, defaultWidth: DEFAULT_NAME_COLUMN_WIDTH,
+    savedWidth: ui.ganttNameColumnWidth, measureRef: nameMeasureRef,
+    onSave: (width) => patch({ ganttNameColumnWidth: width }),
+  });
+  const nameColumnWidth = nameResize.width;
   const availableWidth = Math.max(1, viewport.width - nameColumnWidth);
   const rowHeight = ROW_HEIGHT[density];
   const ganttRowHeight = Math.max(24, rowHeight - 14);
@@ -218,7 +211,16 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     return map;
   }, [rows, domainColor, state.domains]);
 
-  const groups = useMemo(() => groupRequests(rows, state.users, calendar, ui.ganttRowOrder).filter((group) => group.rows.length > 0), [rows, state.users, calendar, ui.ganttRowOrder]);
+  const allGroups = useMemo(() => groupRequests(state.requests.filter((row) => !row.archived), state.users, calendar, state.ganttRowOrder ?? {}), [state.requests, state.users, calendar, state.ganttRowOrder]);
+  const groups = useMemo(() => {
+    const visible = new Set(rows.map((row) => row.id));
+    return allGroups.map((group) => ({ ...group, rows: group.rows.filter((row) => visible.has(row.id)) })).filter((group) => group.rows.length > 0);
+  }, [allGroups, rows]);
+  const developers = useMemo(() => new Set(state.users.filter((user) => !user.disabled && !user.deleted).map((user) => user.id)), [state.users]);
+  const dropOnlyGroups = reorderingRows && isAdmin
+    ? allGroups.filter((group) => developers.has(group.developer) && !groups.some((visible) => visible.developer === group.developer))
+      .map((group) => ({ ...group, rows: [] }))
+    : [];
   const anyExpanded = groups.some((group) => !ui.collapsedPeople.includes(group.developer));
   const requestNames = useMemo(() => new Map(state.requests.map((row) => [row.id, row.name])), [state.requests]);
 
@@ -244,21 +246,40 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const reorder = useRequestReorder({
     containerRef: wrapRef,
     rows,
+    enabled: permissions.canEdit,
     headerHeight: 49,
-    onStart: () => { setMenu(null); setHovered(null); setSelectedIds(new Set()); setAnchorId(null); },
-    blockedReason: (source, target) => {
-      if (source.developer !== target.developer) return "请在同一开发人分组内排序";
-      if (Boolean(resolved.get(source.id)?.plan.segments.length) !== Boolean(resolved.get(target.id)?.plan.segments.length)) return "未排期需求保持在分组末尾";
-      return "";
+    onStart: () => { setReorderingRows(true); setMenu(null); setHovered(null); setSelectedIds(new Set()); setAnchorId(null); },
+    onEnd: () => setReorderingRows(false),
+    resolveDrop: (source, target) => {
+      const developer = target.kind === "row" ? target.row.developer : target.developer;
+      const moving = source.developer !== developer;
+      if (moving) {
+        if (!isAdmin) return "更换开发人需要管理员权限";
+        if (developer && !developers.has(developer)) return "请选择可用的开发人";
+        if (!developer && source.supportSegments?.length) return "此需求有补位安排，需保留开发人";
+      }
+      if (target.kind === "group") return moving ? target : "";
+      if (Boolean(resolved.get(source.id)?.plan.segments.length) === Boolean(resolved.get(target.row.id)?.plan.segments.length)) return target;
+      if (!moving) return "未排期需求保持在分组末尾";
+      return { kind: "group", developer, name: allGroups.find((group) => group.developer === developer)?.name || "未分配" };
     },
-    onReorder: (source, target, edge) => {
-      const row = rows.find((candidate) => candidate.id === source);
-      if (!row) return;
-      const group = groups.find((candidate) => candidate.developer === row.developer);
-      const all = groupRequests(state.requests.filter((candidate) => !candidate.archived), state.users, calendar, ui.ganttRowOrder).find((candidate) => candidate.developer === row.developer);
-      if (!group || !all) return;
-      const order = reorderVisibleIds(all.rows.map((candidate) => candidate.id), group.rows.map((candidate) => candidate.id), source, target, edge);
-      if (order) patch({ ganttRowOrder: { ...ui.ganttRowOrder, [row.developer]: order } });
+    onReorder: (source, target) => {
+      const developer = target.kind === "row" ? target.row.developer : target.developer;
+      const group = allGroups.find((candidate) => candidate.developer === developer);
+      if (!group) return;
+      const ids = group.rows.map((row) => row.id);
+      if (source.developer === developer) {
+        if (target.kind !== "row") return;
+        const visible = groups.find((candidate) => candidate.developer === developer)?.rows ?? [];
+        const requestIds = reorderVisibleIds(ids, visible.map((row) => row.id), source.id, target.row.id, target.edge);
+        if (requestIds) void runner(() => api.orderGantt(state.revision, [{ developer, requestIds }]));
+        return;
+      }
+      const position = target.kind === "row" ? ids.indexOf(target.row.id) + Number(target.edge === "after") : ids.length;
+      ids.splice(position, 0, source.id);
+      void runner(() => api.orderGantt(state.revision, [{ developer, requestIds: ids }], { requestId: source.id, developer })).then((saved) => {
+        if (saved) notice.notify(developer ? `需求已移至 ${group.name} 的分组` : "需求已移至未分配分组");
+      });
     },
   });
 
@@ -309,29 +330,6 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   }, [fitDays, onFitDaysChange]);
 
   useLayoutEffect(() => {
-    const measure = nameMeasureRef.current;
-    const content = measure?.querySelector(`.${styles.nameContent}`);
-    const label = content?.querySelector(`.${styles.requestName}`);
-    if (!rows.length || !measure || !content || !label) {
-      setNameColumnContentLimit(DEFAULT_NAME_COLUMN_WIDTH);
-      return;
-    }
-    const context = document.createElement("canvas").getContext("2d");
-    if (!context) return;
-    const { fontWeight, fontSize, fontFamily } = getComputedStyle(label);
-    context.font = `${fontWeight} ${fontSize} ${fontFamily}`;
-    const contentStyle = getComputedStyle(content);
-    const holdWidth = parseFloat(contentStyle.getPropertyValue("--request-hold-icon-size")) + parseFloat(contentStyle.columnGap);
-    let widest = 0;
-    for (const { name, status } of rows) {
-      const text = name.replace(/[ \t\n\r\f]+/g, " ").replace(/^ | $/g, "");
-      const width = context.measureText(text).width + (status === "HOLD" ? holdWidth : 0);
-      widest = Math.max(widest, width);
-    }
-    setNameColumnContentLimit(Math.floor((widest + measure.getBoundingClientRect().width) * MAX_NAME_COLUMN_SCALE));
-  }, [rows]);
-
-  useLayoutEffect(() => {
     const node = wrapRef.current;
     if (!node) return;
     const update = () => {
@@ -370,7 +368,6 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   useEffect(() => () => {
     if (scrollFrame.current) window.cancelAnimationFrame(scrollFrame.current);
-    if (nameColumnDrag.current) window.cancelAnimationFrame(nameColumnDrag.current.frame);
   }, []);
 
   const clearSelection = () => {
@@ -634,14 +631,10 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const beginPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     if (event.button === 0 && target.closest("[data-gantt-column-resize]")) {
-      if (!event.isPrimary || gestureRef.current || nameColumnDrag.current || minNameColumnWidth === maxNameColumnWidth) return;
-      event.preventDefault();
-      event.currentTarget.setPointerCapture(event.pointerId);
-      nameColumnDrag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: nameColumnWidth, nextWidth: nameColumnWidth, frame: 0 };
-      setDraggedNameColumnWidth(nameColumnWidth);
+      if (!gestureRef.current) nameResize.begin(event);
       return;
     }
-    if (nameColumnDrag.current) return;
+    if (nameResize.dragging) return;
     reorder.onPointerDown(event);
     if (!isAdmin) {
       return;
@@ -698,44 +691,6 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     }
     blankRef.current = { rowId, date: origin, pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     if (selectedIds.size) clearSelection();
-  };
-
-  const moveNameColumn = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = nameColumnDrag.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const nextWidth = clampNameColumnWidth(drag.startWidth + event.clientX - drag.startX);
-    if (nextWidth === drag.nextWidth) return;
-    drag.nextWidth = nextWidth;
-    if (drag.frame) return;
-    drag.frame = window.requestAnimationFrame(() => {
-      drag.frame = 0;
-      setDraggedNameColumnWidth(drag.nextWidth);
-    });
-  };
-
-  const finishNameColumnResize = (event: ReactPointerEvent<HTMLDivElement>) => {
-    const drag = nameColumnDrag.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    window.cancelAnimationFrame(drag.frame);
-    nameColumnDrag.current = null;
-    setDraggedNameColumnWidth(null);
-    if (event.type !== "pointerup") return;
-    const nextWidth = clampNameColumnWidth(drag.startWidth + event.clientX - drag.startX);
-    if (nextWidth !== drag.startWidth) patch({ ganttNameColumnWidth: nextWidth });
-  };
-
-  const resizeNameColumnByKey = (event: ReactKeyboardEvent<HTMLSpanElement>) => {
-    if (nameColumnDrag.current) return;
-    let nextWidth = nameColumnWidth;
-    switch (event.key) {
-      case "ArrowLeft": nextWidth -= 8; break;
-      case "ArrowRight": nextWidth += 8; break;
-      case "Home": nextWidth = minNameColumnWidth; break;
-      case "End": nextWidth = maxNameColumnWidth; break;
-      default: return;
-    }
-    event.preventDefault();
-    patch({ ganttNameColumnWidth: clampNameColumnWidth(nextWidth) });
   };
 
   const onContextMenu = (event: ReactMouseEvent<HTMLDivElement>) => {
@@ -803,26 +758,20 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     await applyUpdate(next, planOf(next, calendar).segments.length ? "已删除此段排期" : "已清空排期日期，预估人天保留");
   };
 
-  const applySortByAdmission = () => {
+  const applySortByAdmission = async () => {
     if (!isAdmin || selectedIds.size < 2) return;
-    let changed = false;
-    const nextOrder = { ...ui.ganttRowOrder };
     const people = new Set(selectedList.map((row) => row.developer));
-    for (const person of people) {
-      const group = groups.find((candidate) => candidate.developer === person);
-      if (!group) continue;
-      const order = admissionSortOrderForRows(group.rows, [...selectedIds], calendar);
-      if (order) {
-        nextOrder[person] = order;
-        changed = true;
-      }
-    }
-    if (!changed) {
+    const orders = allGroups.flatMap(({ developer, rows: groupRows }) => {
+      if (!people.has(developer)) return [];
+      const requestIds = admissionSortOrderForRows(groupRows, [...selectedIds], calendar);
+      return requestIds ? [{ developer, requestIds }] : [];
+    });
+    if (!orders.length) {
       notice.notify("已选需求已按准入日期排列");
       return;
     }
-    patch({ ganttRowOrder: nextOrder });
-    notice.notify("已按准入日期升序排列，排期日期未改变");
+    const saved = await runner(() => api.orderGantt(state.revision, orders));
+    if (saved) notice.notify("已按准入日期升序排列");
   };
 
   const openSequence = () => {
@@ -854,7 +803,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const zoomFromWheel = (event: ReactWheelEvent<HTMLDivElement>) => {
     if (!event.ctrlKey && !event.metaKey) return;
     const wrap = wrapRef.current;
-    if (!wrap || gestureRef.current || nameColumnDrag.current) return;
+    if (!wrap || gestureRef.current || nameResize.dragging) return;
     const before = dayWidth;
     const offset = Math.max(0, event.clientX - wrap.getBoundingClientRect().left - wrap.clientLeft - nameColumnWidth);
     const anchor = (wrap.scrollLeft + offset) / Math.max(0.001, before);
@@ -952,7 +901,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   type VirtualItem = { kind: "group"; group: (typeof groups)[number] } | { kind: "request"; row: ApiRequest; group: (typeof groups)[number] };
   const items: VirtualItem[] = [];
-  for (const group of groups) {
+  for (const group of [...groups, ...dropOnlyGroups]) {
     items.push({ kind: "group", group });
     if (!ui.collapsedPeople.includes(group.developer)) {
       for (const row of group.rows) items.push({ kind: "request", row, group });
@@ -1022,17 +971,16 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       <div className={styles.plotArea} data-scroll-container="gantt-content">
         {missingYears.length ? <p className={styles.calendarHint}>节假日日历未覆盖 {missingYears.join("、")} 年，该范围按普通周末计算。</p> : null}
 
-        <div className={styles.calendarViewport} data-column-dragging={draggedNameColumnWidth !== null || undefined} style={{
+        <div className={styles.calendarViewport} data-column-dragging={nameResize.dragging || undefined} style={{
           minHeight: Math.min(160, headerHeight + (items.length ? totalHeight : 64)),
           "--name-column-width": `${nameColumnWidth}px`,
           "--gantt-viewport-height": `${viewport.height}px`,
         } as CSSProperties}>
           <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
-            <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.requestName} /></div>
+            <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.requestName} data-name-measure-label /></div>
           </div>
           <div ref={wrapRef} className={`${styles.calendarWrap} ${reorder.className}`} data-scroll-container="gantt"
-            onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} onPointerMove={moveNameColumn}
-            onPointerUp={finishNameColumnResize} onPointerCancel={finishNameColumnResize} onLostPointerCapture={finishNameColumnResize}
+            onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} {...nameResize.pointerHandlers}
             onClickCapture={reorder.onClickCapture} onDoubleClickCapture={reorder.onDoubleClickCapture} onScroll={onScroll}>
             <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{
               width: tableWidth,
@@ -1049,9 +997,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     <button type="button" className={styles.groupToggle} aria-label={anyExpanded ? "全部收起" : "全部展开"} aria-expanded={anyExpanded} disabled={!groups.length} data-tooltip={anyExpanded ? "收起当前筛选内的所有人员" : "展开当前筛选内的所有人员"} onClick={() => expandAll(!anyExpanded)}>
                       <span>优先级 / 需求</span><ChevronDown aria-hidden="true" />
                     </button>
-                    <span className={styles.nameResizeHandle} data-gantt-column-resize role="separator" aria-label="调整需求列宽"
-                      aria-orientation="vertical" aria-valuemin={minNameColumnWidth} aria-valuemax={maxNameColumnWidth} aria-valuenow={nameColumnWidth}
-                      tabIndex={minNameColumnWidth < maxNameColumnWidth ? 0 : -1} onKeyDown={resizeNameColumnByKey} />
+                    <span className={styles.nameResizeHandle} data-gantt-column-resize {...nameResize.separatorProps} />
                   </th>
                   {leftHidden > 0 ? <th className={styles.monthSpacer} aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
                   {visibleMonthGroups.map((month) => {
@@ -1092,14 +1038,16 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     const group = item.group;
                     const collapsed = ui.collapsedPeople.includes(group.developer);
                     return (
-                      <tr key={`group-${group.developer || "__unassigned"}`} className={styles.personRow} onClick={() => toggleGroup(group.developer)}>
+                      <tr key={`group-${group.developer || "__unassigned"}`} className={styles.personRow}
+                        data-reorder-group={group.developer} data-reorder-group-name={group.developer ? group.name : "未分配"}
+                        onClick={() => { if (group.rows.length) toggleGroup(group.developer); }}>
                         <th scope="rowgroup">
                           <button type="button" className={styles.personToggle} aria-expanded={!collapsed} aria-label={`${collapsed ? "展开" : "收起"}${group.name}的 ${group.rows.length} 条需求`} data-tooltip={`${group.name}${group.deleted ? "（已删除）" : ""} · ${group.rows.length} 条需求`}>
                             <ChevronDown className={styles.personChevron} aria-hidden="true" />
                             <span className={styles.personName}>{group.name}{group.deleted ? "（已删除）" : ""}</span>
                             <span className={styles.personCount}>{group.rows.length} 条</span>
                           </button>
-                          <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" />
+                          <span className={styles.nameResizeHandle} data-gantt-column-resize aria-hidden="true" {...nameResize.handleProps} />
                         </th>
                         <td colSpan={dates.length} aria-hidden="true" />
                       </tr>
@@ -1314,7 +1262,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             aria-pressed={rowSelected}
             aria-haspopup="menu"
             onClick={(event) => { if (performance.now() < suppressClickRef.current) return; selectRow(row.id, event); }}
-            onDoubleClick={() => { if (!canEdit) onOpen(row.id); }}
+            onDoubleClick={() => onOpen(row.id)}
             onKeyDown={(event) => {
               if (isContextMenuKey(event)) {
                 event.preventDefault();

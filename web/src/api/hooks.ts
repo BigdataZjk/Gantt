@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "./client";
-import type { Presence, State } from "./types";
+import type { State } from "./types";
 import { createStateWriter, STATE_KEY } from "./stateCache";
 import { useNotice } from "../ui/Notice";
 
@@ -61,56 +61,4 @@ export function useMutationRunner() {
 export function useRefreshState() {
   const client = useQueryClient();
   return useCallback(() => client.invalidateQueries({ queryKey: STATE_KEY }), [client]);
-}
-
-function readClientId(): string {
-  const key = "rsm-client-id";
-  try {
-    const stored = window.sessionStorage.getItem(key);
-    if (stored) return stored;
-    const generated = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
-    window.sessionStorage.setItem(key, generated);
-    return generated;
-  } catch {
-    return Math.random().toString(36).slice(2);
-  }
-}
-
-export function usePresence(enabled: boolean): Presence {
-  const queryClient = useQueryClient();
-  const [presence, setPresence] = useState<Presence>({ users: [], guests: 0 });
-  const clientId = useRef<string>("");
-  if (!clientId.current) clientId.current = readClientId();
-
-  useEffect(() => {
-    if (!enabled) {
-      setPresence({ users: [], guests: 0 });
-      return;
-    }
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const next = await api.presence(clientId.current);
-        if (!cancelled) setPresence(next);
-      } catch {
-        if (!cancelled) setPresence({ users: [], guests: 0 });
-      }
-    };
-    void tick();
-    const timer = window.setInterval(tick, 20_000);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        void tick();
-        void queryClient.invalidateQueries({ queryKey: STATE_KEY });
-      }
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [enabled, queryClient]);
-
-  return presence;
 }

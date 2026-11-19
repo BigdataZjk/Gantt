@@ -1,19 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, ListX, RotateCcw } from "lucide-react";
+import { api } from "../../../api/client";
+import { useMutationRunner } from "../../../api/hooks";
 import type { ApiRequest, State } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
-import { formatDays } from "../../../lib/format";
+import { ARCHIVE_COLUMN_KEYS, COLUMN_CATALOG, formatDays } from "../../../lib/format";
 import { dateLabel } from "../../../lib/dates";
 import { DomainTag, PriorityTag, RequestTypeTag, StatusTag } from "../../../ui/Tag";
 import { ContextMenu, contextMenuPoint, isContextMenuKey } from "../../../ui/ContextMenu";
+import { useNotice } from "../../../ui/Notice";
 import type { RequestPermissions } from "../types";
 import { deliveryOf } from "../filtering";
 import { requestMenuItems } from "../requestMenu";
 import { reorderVisibleIds, sortBySavedOrder } from "../rowOrder";
 import { useRequestReorder } from "../useRequestReorder";
+import { useNameColumnResize } from "../useNameColumnResize";
 import { newestRequests, sortRequests, toggleTableSort, type TableSort } from "./sorting";
 import styles from "./RequestTable.module.css";
 
@@ -33,11 +37,13 @@ interface Props {
 
 interface MenuState {
   row: ApiRequest;
+  priority?: boolean;
   x: number;
   y: number;
 }
 
 const WIDTHS: Record<string, number> = {
+  requesterRank: 76,
   name: 230,
   domain: 104,
   requestType: 96,
@@ -57,45 +63,84 @@ const WIDTHS: Record<string, number> = {
   notes: 220,
 };
 
-const HEADERS: Record<string, string> = {
-  name: "需求名称",
-  domain: "业务域",
-  requestType: "需求类型",
-  developer: "开发人",
-  status: "状态",
-  start: "准入日期",
-  delivery: "交付日期",
-  days: "开发人天",
-  requester: "提需人",
-  requestedAt: "提需日期",
-  project: "项目",
-  prd: "PRD 链接",
-  wangyue: "望岳链接",
-  brd: "BRD 链接",
-  expected: "预期交付",
-  review: "评审时间",
-  notes: "备注",
-};
+const HEADERS = Object.fromEntries(COLUMN_CATALOG.map(({ key, label }) => [key, label]));
+const NAME_CLICK_DELAY_MS = 500;
 
 export function RequestTable({ state, permissions, rows: incomingRows, totalCount, draftHint, archive, onOpen, onOpenDetails, onDelete, onArchive, onRestore }: Props) {
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
+  const runner = useMutationRunner();
+  const notice = useNotice();
   const [menu, setMenu] = useState<MenuState | null>(null);
+  const [ranksAtEditStart, setRanksAtEditStart] = useState<ReadonlyMap<number, number> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const rowHeight = density === "compact" ? 38 : 50;
+  const nameMeasureRef = useRef<HTMLDivElement>(null);
+  const rankQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingNameRank = useRef<{ id: number; timer: number } | null>(null);
+  const [viewportWidth, setViewportWidth] = useState(1200);
+  const canEdit = permissions.canEdit;
+  const canRank = canEdit && !archive;
   const sorting = archive ? ui.archiveSorting : ui.poolSorting;
+  const hasRanks = state.requests.some((row) => !row.archived && row.requesterRank);
+  const nameResize = useNameColumnResize({
+    rows: incomingRows, viewportWidth, defaultWidth: WIDTHS.name!, savedWidth: ui.poolNameColumnWidth,
+    measureRef: nameMeasureRef, onSave: (width) => patch({ poolNameColumnWidth: width }),
+  });
+  const cancelNameRank = useCallback(() => {
+    const pending = pendingNameRank.current;
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    pendingNameRank.current = null;
+    return pending.id;
+  }, []);
+  const enqueueRank = (id?: number) => {
+    rankQueue.current = rankQueue.current.then(async () => {
+      const saved = await runner((base) => api.rankRequests(base, id));
+      if (saved && id === undefined) notice.notify("已清除需求池优先级");
+    });
+  };
+  const changeRank = (id?: number, waitForDoubleClick = false) => {
+    if (id === undefined) setRanksAtEditStart(null);
+    else if (sorting.some(({ key }) => key === "requesterRank")) {
+      setRanksAtEditStart((ranks) => ranks ?? new Map(state.requests.map((row) => [row.id, row.requesterRank ?? 0])));
+    }
+    const previous = cancelNameRank();
+    if (previous !== undefined) enqueueRank(previous);
+    if (id === undefined || !waitForDoubleClick) {
+      enqueueRank(id);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      pendingNameRank.current = null;
+      enqueueRank(id);
+    }, NAME_CLICK_DELAY_MS);
+    pendingNameRank.current = { id, timer };
+  };
+  useEffect(() => () => { cancelNameRank(); }, [canRank, cancelNameRank]);
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const measure = () => setViewportWidth(element.clientWidth);
+    const observer = new ResizeObserver(measure);
+    measure();
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  const rowHeight = density === "compact" ? 38 : 50;
   const rows = useMemo(() => {
     const newest = newestRequests(incomingRows, archive);
     const ordered = archive ? newest : sortBySavedOrder(newest, ui.poolRowOrder, true);
-    return sortRequests(ordered, sorting, state.users);
-  }, [archive, incomingRows, ui.poolRowOrder, sorting, state.users]);
+    return sortRequests(ordered, sorting, state.users, ranksAtEditStart);
+  }, [archive, incomingRows, ui.poolRowOrder, sorting, state.users, ranksAtEditStart]);
   const setSorting = (next: TableSort[]) => {
+    setRanksAtEditStart(null);
     patch(archive ? { archiveSorting: next } : { poolSorting: next, ...(!next.length ? { poolRowOrder: [] } : {}) });
     setMenu(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   };
   useEffect(() => {
     setMenu(null);
+    setRanksAtEditStart(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [archive]);
   const reorder = useRequestReorder({
@@ -104,24 +149,26 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
     enabled: !archive && !sorting.length,
     headerHeight: 40,
     onStart: () => setMenu(null),
-    onReorder: (source, target, edge) => {
+    onReorder: (source, target) => {
+      if (target.kind !== "row") return;
       const all = sortBySavedOrder(newestRequests(state.requests.filter((row) => !row.archived), false), ui.poolRowOrder, true).map((row) => row.id);
-      const order = reorderVisibleIds(all, rows.map((row) => row.id), source, target, edge);
+      const order = reorderVisibleIds(all, rows.map((row) => row.id), source.id, target.row.id, target.edge);
       if (order) patch({ poolRowOrder: order });
     },
   });
 
   const visible = archive ? ui.archiveVisibleColumns : ui.visibleColumns;
-  const keys = ui.columnOrder.filter((key) => visible.includes(key) && (!archive || key !== "status"));
+  const keys = useMemo(() => ui.columnOrder.filter((key) => visible.includes(key) && (!archive || ARCHIVE_COLUMN_KEYS.includes(key))), [ui.columnOrder, visible, archive]);
+  const nameWidth = archive ? WIDTHS.name : nameResize.width;
   const columns = useMemo<ColumnDef<ApiRequest>[]>(
     () =>
       keys.map((key) => ({
         id: key,
         header: HEADERS[key] ?? key,
         accessorFn: (row) => row[key as keyof ApiRequest],
-        size: WIDTHS[key] ?? 110,
+        size: key === "name" ? nameWidth : WIDTHS[key] ?? 110,
       })),
-    [keys],
+    [keys, nameWidth],
   );
 
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel() });
@@ -131,16 +178,33 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
     estimateSize: () => rowHeight,
     overscan: 10,
   });
-  const template = keys.map((key) => `${WIDTHS[key] ?? 110}px`).join(" ") + (keys.length ? "" : "1fr");
-  const totalWidth = keys.reduce((sum, key) => sum + (WIDTHS[key] ?? 110), 0);
-
-  const canEdit = permissions.canEdit;
+  const sizes = columns.map((column) => column.size ?? 110);
+  const template = sizes.map((size) => `${size}px`).join(" ") || "1fr";
+  const totalWidth = sizes.reduce((sum, size) => sum + size, 0);
 
   const cellContent = (row: ApiRequest, key: string) => {
     switch (key) {
+      case "requesterRank": {
+        const rank = row.requesterRank || 0;
+        const badge = <span className={styles.rankBadge} data-rank={rank || undefined}>{rank || "–"}</span>;
+        return canRank ? (
+          <button type="button" className={styles.rankButton} aria-pressed={rank > 0}
+            aria-label={rank ? `取消「${row.name}」优先级 ${rank}` : `标注「${row.name}」优先级`}
+            onClick={() => changeRank(row.id)}
+            onKeyDown={(event) => {
+              if (!hasRanks || !isContextMenuKey(event)) return;
+              event.preventDefault();
+              event.stopPropagation();
+              const rect = event.currentTarget.getBoundingClientRect();
+              setMenu({ row, priority: true, x: rect.left, y: rect.bottom });
+            }}>
+            {badge}
+          </button>
+        ) : badge;
+      }
       case "name":
         return (
-          <div className={styles.nameContent} data-request-name onContextMenu={(event) => {
+          <div className={styles.nameContent} onContextMenu={(event) => {
             event.preventDefault();
             event.stopPropagation();
             event.currentTarget.querySelector("button")?.focus({ preventScroll: true });
@@ -150,7 +214,19 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
             <button
               type="button"
               className={styles.nameButton}
-              onDoubleClick={() => { if (archive || !canEdit) onOpenDetails(row.id); }}
+              aria-pressed={canRank ? Boolean(row.requesterRank) : undefined}
+              aria-description={canRank ? "单击标注或取消优先级，双击编辑" : undefined}
+              onMouseDown={canRank ? (event) => {
+                if (event.detail === 2 && pendingNameRank.current?.id === row.id) cancelNameRank();
+              } : undefined}
+              onClick={canRank ? (event) => {
+                if (event.detail <= 1) changeRank(row.id, event.detail === 1);
+              } : undefined}
+              onDoubleClick={() => {
+                if (pendingNameRank.current?.id === row.id) cancelNameRank();
+                if (archive) onOpenDetails(row.id);
+                else onOpen(row.id);
+              }}
               onKeyDown={(event) => {
                 if (isContextMenuKey(event)) {
                   event.preventDefault();
@@ -207,7 +283,9 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   };
 
   const menuRow = menu ? rows.find((row) => row.id === menu.row.id) : undefined;
-  const menuItems = menuRow
+  const menuItems = menu?.priority
+    ? canRank && hasRanks ? [{ key: "clearPriority", label: "清除优先级", icon: ListX, onSelect: () => changeRank() }] : []
+    : menuRow
     ? archive && canEdit
       ? [{ key: "restore", label: "恢复到需求池", icon: RotateCcw, onSelect: () => onRestore(menuRow) }]
       : requestMenuItems(menuRow, { canEdit: canEdit && !archive, onOpen: archive ? onOpenDetails : onOpen, onDelete, onArchive })
@@ -215,8 +293,16 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
 
   return (
     <>
-      <div className={styles.viewport}>
-        <div ref={scrollRef} {...reorder} className={`${styles.wrap} ${archive ? "" : reorder.className}`} data-scroll-container="table" role="table" aria-label={archive ? "归档需求列表" : "需求列表"} aria-rowcount={rows.length + 1}>
+      <div className={styles.viewport} data-column-dragging={nameResize.dragging || undefined}>
+        {!archive ? <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
+          <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.nameButton} data-name-measure-label /></div>
+        </div> : null}
+        <div ref={scrollRef} {...reorder} {...nameResize.pointerHandlers} onPointerDown={(event) => {
+          if ((event.target as Element).closest("[data-pool-column-resize]")) nameResize.begin(event);
+          else if (!nameResize.dragging) reorder.onPointerDown(event);
+        }} onMouseLeave={() => setRanksAtEditStart(null)} onBlur={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setRanksAtEditStart(null);
+        }} className={`${styles.wrap} ${archive ? "" : reorder.className}`} data-scroll-container="table" role="table" aria-label={archive ? "归档需求列表" : "需求列表"} aria-rowcount={rows.length + 1}>
           <div className={styles.table} style={{ width: Math.max(totalWidth, 100) }}>
             <div className={styles.header} style={{ gridTemplateColumns: template }} role="row">
               {keys.map((key) => {
@@ -224,11 +310,12 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
                 const sort = sorting[index];
                 const Icon = sort ? sort.direction === "asc" ? ArrowUp : ArrowDown : ArrowUpDown;
                 return (
-                  <div key={key} role="columnheader" aria-label={HEADERS[key] ?? key} aria-sort={index === 0 ? sort?.direction === "asc" ? "ascending" : "descending" : undefined} className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`} style={key === "name" ? { width: WIDTHS.name } : undefined}>
+                  <div key={key} role="columnheader" aria-label={HEADERS[key] ?? key} aria-sort={index === 0 ? sort?.direction === "asc" ? "ascending" : "descending" : undefined} className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`}>
                     <button type="button" className={styles.sortButton} data-sorted={Boolean(sort)} aria-label={`${HEADERS[key]}，${sort ? `第 ${index + 1} 排序，${sort.direction === "asc" ? "升序" : "降序"}，` : ""}点击${sort?.direction === "asc" ? "降序" : "升序"}`} data-tooltip={sort ? `第 ${index + 1} 排序 · ${sort.direction === "asc" ? "升序" : "降序"}，点击切换` : "点击升序，可依次叠加其他字段"} onClick={() => setSorting(toggleTableSort(sorting, key))}>
                       <span>{HEADERS[key] ?? key}</span>
                       <span className={styles.sortIndicator}><Icon aria-hidden="true" />{sort && sorting.length > 1 ? <small>{index + 1}</small> : null}</span>
                     </button>
+                    {!archive && key === "name" ? <span className={styles.nameResizeHandle} data-pool-column-resize {...nameResize.separatorProps} /> : null}
                   </div>
                 );
               })}
@@ -245,11 +332,17 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
                     style={{ height: virtualRow.size, transform: `translateY(${virtualRow.start}px)`, gridTemplateColumns: template }}
                     data-row={row.id}
                   >
-                    {table.getRowModel().rows[virtualRow.index]?.getVisibleCells().map((cell) => (
-                      <div key={cell.id} role="cell" className={`${styles.cell} ${cell.column.id === "name" ? styles.nameCell : ""}`} data-key={cell.column.id}>
-                        {cellContent(row, cell.column.id)}
-                      </div>
-                    ))}
+                    {table.getRowModel().rows[virtualRow.index]?.getVisibleCells().map((cell) => {
+                      const key = cell.column.id;
+                      return <div key={cell.id} role="cell" className={styles.cell} data-key={key} data-request-name={key === "name" || undefined} onContextMenu={key === "requesterRank" && canRank && hasRanks ? (event) => {
+                        event.preventDefault();
+                        event.currentTarget.querySelector("button")?.focus({ preventScroll: true });
+                        setMenu({ row, priority: true, ...contextMenuPoint(event) });
+                      } : undefined}>
+                        {cellContent(row, key)}
+                        {!archive && key === "name" ? <span className={styles.nameResizeHandle} data-pool-column-resize aria-hidden="true" {...nameResize.handleProps} /> : null}
+                      </div>;
+                    })}
                   </div>
                 );
               })}
@@ -264,13 +357,13 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
         <span><CalendarDays aria-hidden="true" />日期：{new Date().getFullYear()} 年</span>
       </div>
       <ContextMenu
-        open={Boolean(menuRow)}
+        open={Boolean(menuRow && menuItems.length)}
         x={menu?.x ?? 0}
         y={menu?.y ?? 0}
         onClose={() => setMenu(null)}
-        header={menuRow ? { title: menuRow.name } : undefined}
+        header={menu?.priority ? undefined : menuRow ? { title: menuRow.name } : undefined}
         items={menuItems}
-        ariaLabel="需求操作"
+        ariaLabel={menu?.priority ? "优先级操作" : "需求操作"}
         scrollContainer={scrollRef.current}
       />
     </>

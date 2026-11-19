@@ -17,6 +17,7 @@ export type LogCleanupRun = components["schemas"]["LogCleanupRun"];
 export type Version = components["schemas"]["Version"];
 export type Calendar = components["schemas"]["Calendar"];
 export type Presence = components["schemas"]["Presence"];
+export type GanttOrderInput = components["schemas"]["GanttOrderInput"];
 export type Priority = ApiRequest["priority"];
 export type Status = ApiRequest["status"];
 export type RequestType = ApiRequest["requestType"];

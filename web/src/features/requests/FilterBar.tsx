@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Columns3, SlidersHorizontal } from "lucide-react";
 import type { State } from "../../api/types";
 import { useUiState } from "../../app/uiState";
-import { COLUMN_CATALOG } from "../../lib/format";
+import { ARCHIVE_COLUMN_KEYS, COLUMN_CATALOG } from "../../lib/format";
 import { addDays, isValidDate, todayISO } from "../../lib/dates";
 import { Checkbox } from "../../ui/Checkbox";
 import { DomainTag, PriorityTag, RequestTypeTag, StatusTag } from "../../ui/Tag";
@@ -67,7 +67,7 @@ export function FilterBar({ state, scopeRows, tab, ganttFitDays, navigation }: F
   const dateCount = Number(Boolean(filters.start)) + Number(Boolean(filters.end));
 
   const archive = tab === "archive";
-  const order = (orderDraft ?? ui.columnOrder).filter((key) => !archive || key !== "status");
+  const order = (orderDraft ?? ui.columnOrder).filter((key) => !archive || ARCHIVE_COLUMN_KEYS.includes(key));
   const visible = new Set(archive ? ui.archiveVisibleColumns : ui.visibleColumns);
 
   const commitOrder = (nextOrder: string[]) => {
