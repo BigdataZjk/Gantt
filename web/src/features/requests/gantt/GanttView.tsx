@@ -8,12 +8,13 @@ import {
   CalendarOff,
   ChevronDown,
   CirclePause,
+  HandHelping,
   Hourglass,
   ListOrdered,
   RotateCcw,
   X,
 } from "lucide-react";
-import type { ApiRequest, Calendar, State } from "../../../api/types";
+import type { ApiRequest, Calendar, State, SupportSegment } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
 import { addDays, diffDays, enumerateDates, isWorkday, todayISO } from "../../../lib/dates";
@@ -25,7 +26,9 @@ import { useNotice } from "../../../ui/Notice";
 import { PriorityTag } from "../../../ui/Tag";
 import {
   admissionSortOrderForRows,
+  adjustSupportSegment,
   buildSequencePlan,
+  canAddSupport,
   currentLivePhase,
   dateHeaders,
   dayResolver,
@@ -41,6 +44,8 @@ import {
   resizeSegmentDates,
   segmentFillBounds,
   supplementRequest,
+  supportFillBounds,
+  supportIndexAt,
   type DayInfo,
   type OverlapBadge,
   type Plan as GanttPlan,
@@ -54,6 +59,7 @@ import { reorderVisibleIds } from "../rowOrder";
 import { useRequestReorder } from "../useRequestReorder";
 import { unsupportedYears } from "../../../schedule";
 import { SequencePreview } from "./SequencePreview";
+import { SupportPicker } from "./SupportPicker";
 import previewStyles from "./SequencePreview.module.css";
 import styles from "./GanttView.module.css";
 
@@ -71,7 +77,7 @@ interface Props {
 }
 
 type MenuState =
-  | { type: "day"; rowId: number; date: string; phaseIndex: number; x: number; y: number }
+  | { type: "day"; rowId: number; date: string; x: number; y: number }
   | { type: "request"; rowId: number; x: number; y: number }
   | null;
 
@@ -82,6 +88,7 @@ interface Preview {
   start?: string;
   end?: string;
   dates?: string[];
+  support?: SupportSegment;
   valid: boolean;
   reason: string;
 }
@@ -100,6 +107,8 @@ interface Gesture {
   active: boolean;
   edge?: "start" | "end";
   originDate?: string;
+  supportIndex?: number;
+  rowRevision?: number;
   rowTop?: number;
   rowBottom?: number;
   wrapLeft?: number;
@@ -154,6 +163,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const [hovered, setHovered] = useState<{ rowId: number; phaseIndex: number } | null>(null);
   const [menu, setMenu] = useState<MenuState>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  const [supportDraft, setSupportDraft] = useState<{ rowId: number; date: string; developer: string } | null>(null);
   const [sequence, setSequence] = useState<{ plan: SequencePlan; revision: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const nameMeasureRef = useRef<HTMLDivElement>(null);
@@ -208,6 +218,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   const groups = useMemo(() => groupRequests(rows, state.users, calendar, ui.ganttRowOrder).filter((group) => group.rows.length > 0), [rows, state.users, calendar, ui.ganttRowOrder]);
   const anyExpanded = groups.some((group) => !ui.collapsedPeople.includes(group.developer));
+  const requestNames = useMemo(() => new Map(state.requests.map((row) => [row.id, row.name])), [state.requests]);
 
   const resolved = useMemo(() => {
     const map = new Map<number, ResolvedRow>();
@@ -217,6 +228,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
         plan,
         resolve: dayResolver(row, calendar),
         fillBounds: segmentFillBounds(row, calendar),
+        supportBounds: supportFillBounds(row, calendar),
         delivery: plan.delivery,
         activeDays: requestActiveDays(row, calendar),
         live: currentLivePhase(row, today, calendar),
@@ -386,13 +398,12 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     setSelectedIds(next);
   }, [isAdmin, rows, selectedIds, anchorId, allVisibleIds]);
 
-  const openDayMenuFor = (rowId: number, date: string, x: number, y: number) => {
+  const openDayMenuFor = useCallback((rowId: number, date: string, x: number, y: number) => {
     if (!isAdmin) return;
     const row = rows.find((candidate) => candidate.id === rowId && !candidate.archived);
     if (!row) return;
-    const info = dayResolver(row, calendar)(date);
-    setMenu({ type: "day", rowId, date, phaseIndex: info.phaseIndex, x, y });
-  };
+    setMenu({ type: "day", rowId, date, x, y });
+  }, [isAdmin, rows]);
 
   const openNameMenu = useCallback((rowId: number, x: number, y: number) => {
     if (!selectedIds.has(rowId)) {
@@ -427,6 +438,18 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       if (current.reason) notice.error(current.reason);
       return;
     }
+    if (current.support && gesture.supportIndex !== undefined) {
+      const original = row.supportSegments?.[gesture.supportIndex];
+      if (!original || row.revision !== gesture.rowRevision) {
+        notice.error("补位安排已更新，请重试");
+        return;
+      }
+      if (original.start === current.support.start && original.end === current.support.end) return;
+      const supportSegments = row.supportSegments!.map((segment, index) => index === gesture.supportIndex ? current.support! : segment)
+        .sort((a, b) => a.start.localeCompare(b.start));
+      await applyUpdate({ ...row, supportSegments }, "补位日期已更新");
+      return;
+    }
     let next: ApiRequest | null = null;
     if (current.kind === "move" && current.start) {
       next = moveSegmentDates(row, gesture.phaseIndex, current.start, calendar);
@@ -447,9 +470,26 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const computePreview = (gesture: Gesture, delta: number): Preview | null => {
     const row = rows.find((candidate) => candidate.id === gesture.rowId);
     if (!row) return null;
-    const plan = planOf(row, calendar);
     const withinRow = gesture.lastY >= (gesture.rowTop ?? 0) - 2 && gesture.lastY <= (gesture.rowBottom ?? 0) + 2;
     const withinGrid = gesture.lastX >= (gesture.wrapLeft ?? 0) + nameColumnWidth && gesture.lastX <= (gesture.wrapRight ?? window.innerWidth);
+    if (gesture.supportIndex !== undefined) {
+      const original = row.supportSegments?.[gesture.supportIndex];
+      if (!original || gesture.rowRevision !== row.revision) return null;
+      const adjusted = adjustSupportSegment(row, gesture.supportIndex, delta, calendar, gesture.edge);
+      const support = adjusted ?? original;
+      const reason = !withinRow ? "只能在当前行内调整补位" : !withinGrid ? "请在日期轴内调整" : !adjusted ? "补位需安排在可工作的日期，且不能与其他补位重叠" : "";
+      return {
+        kind: gesture.kind,
+        rowId: row.id,
+        phaseIndex: -1,
+        start: support.start,
+        end: support.end,
+        support,
+        valid: !reason,
+        reason,
+      };
+    }
+    const plan = planOf(row, calendar);
     if (gesture.kind === "move") {
       const segment = plan.segments[gesture.phaseIndex];
       if (!segment) return null;
@@ -566,7 +606,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       window.removeEventListener("pointercancel", onCancel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, calendar, dates, dayWidth, domainColors, nameColumnWidth]);
+  }, [rows, calendar, dates, dayWidth, domainColors, nameColumnWidth, openDayMenuFor]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -628,18 +668,20 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       wrapRight: wrapRect?.right,
     };
     const bar = target.closest<HTMLElement>("[data-bar]");
+    const support = target.closest<HTMLElement>("[data-support-bar]");
+    const supportIndex = support ? Number(support.dataset.supportIndex) : undefined;
     const resize = target.closest<HTMLElement>("[data-resize]");
-    if (event.button === 2 && bar) {
+    if (event.button === 2 && (bar || support)) {
       event.preventDefault();
-      startGesture({ ...baseGesture, kind: "move", phaseIndex: Number(bar.dataset.phase), originDate: cell.dataset.date });
+      startGesture({ ...baseGesture, kind: "move", phaseIndex: bar ? Number(bar.dataset.phase) : -1, originDate: cell.dataset.date, supportIndex, rowRevision: row.revision });
       return;
     }
     if (event.button === 0 && resize) {
       event.preventDefault();
-      startGesture({ ...baseGesture, kind: "resize", phaseIndex: Number(resize.dataset.phase), edge: resize.dataset.edge === "start" ? "start" : "end" });
+      startGesture({ ...baseGesture, kind: "resize", phaseIndex: support ? -1 : Number(resize.dataset.phase), edge: resize.dataset.edge === "start" ? "start" : "end", supportIndex, rowRevision: row.revision });
       return;
     }
-    if (event.button !== 0 || bar) return;
+    if (event.button !== 0 || bar || support) return;
     if (!isAdmin) return;
     const origin = cell.dataset.date ?? "";
     const last = lastBlankRef.current;
@@ -733,6 +775,23 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     if (mark === "clear-overtime") overtime.delete(date);
     const next: ApiRequest = { ...row, vacation: [...vacation].sort(), overtime: [...overtime].sort() };
     await applyUpdate(next, "当天标记已保存");
+  };
+
+  const applySupport = async (requestId: number) => {
+    if (!isAdmin || !supportDraft) return false;
+    const { rowId, date, developer } = supportDraft;
+    const row = rows.find((candidate) => candidate.id === rowId && !candidate.archived);
+    if (!row || row.developer !== developer || !canAddSupport(row, date, calendar)) {
+      notice.error("当天安排已变化，请重新选择补位日期");
+      return false;
+    }
+    if (!state.requests.some((candidate) => candidate.id === requestId && candidate.id !== rowId && !candidate.archived)) {
+      notice.error("请选择需求池中的未归档需求");
+      return false;
+    }
+    const supportSegments = [...(row.supportSegments ?? []), { requestId, start: date, end: date }]
+      .sort((a, b) => a.start.localeCompare(b.start));
+    return applyUpdate({ ...row, supportSegments }, "补位已安排");
   };
 
   const applyRemoveSegment = async (row: ApiRequest, phaseIndex: number) => {
@@ -848,17 +907,30 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     if (!row) return { items: [] };
     const working = isWorkday(menu.date, calendar);
     const info = dayResolver(row, calendar)(menu.date);
+    const supportIndex = supportIndexAt(row, menu.date);
+    const support = row.supportSegments?.[supportIndex];
     const items: ContextMenuItem[] = [];
     if (working) {
       items.push({ key: "leave", label: info.dayType === "leave" ? "取消休假" : "休假", icon: CalendarOff, onSelect: () => void applyDayMark(row, menu.date, info.dayType === "leave" ? "clear-leave" : "leave") });
     } else {
       items.push({ key: "overtime", label: info.overtime ? "取消加班" : "加班", icon: AlarmClockPlus, onSelect: () => void applyDayMark(row, menu.date, info.overtime ? "clear-overtime" : "overtime") });
     }
-    if (menu.phaseIndex >= 0) {
-      items.push({ key: "delete", label: "删除此段排期", icon: X, danger: true, separatorBefore: true, onSelect: () => void applyRemoveSegment(row, menu.phaseIndex) });
+    if (support) {
+      items.push({ key: "support", label: "取消补位", icon: HandHelping, onSelect: () => {
+        const supportSegments = row.supportSegments!.filter((_, index) => index !== supportIndex);
+        void applyUpdate({ ...row, supportSegments }, "已取消补位");
+      } });
+    } else if (canAddSupport(row, menu.date, calendar)) {
+      items.push({ key: "support", label: "补位", icon: HandHelping, onSelect: () => setSupportDraft({ rowId: row.id, date: menu.date, developer: row.developer }) });
+    }
+    if (info.phaseIndex >= 0) {
+      items.push({ key: "delete", label: "删除此段排期", icon: X, danger: true, separatorBefore: true, onSelect: () => void applyRemoveSegment(row, info.phaseIndex) });
     }
     return {
-      header: { title: row.name, caption: `${row.developer ? state.users.find((user) => user.id === row.developer)?.username ?? "-" : "-"}　${menu.date} · ${working ? "工作日" : "休息日"}` },
+      header: {
+        title: support ? `补位 · ${requestNames.get(support.requestId) ?? `需求 #${support.requestId}`}` : row.name,
+        caption: `${state.users.find((user) => user.id === row.developer)?.username ?? "-"}　${menu.date} · ${working ? "工作日" : info.overtime ? "加班日" : "休息日"}`,
+      },
       items,
     };
   };
@@ -1025,6 +1097,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     row={row}
                     groupEnd={item.group.rows.at(-1)?.id === row.id}
                     data={data}
+                    requestNames={requestNames}
                     calendar={calendar}
                     visibleDates={visibleDates}
                     leftHidden={leftHidden}
@@ -1043,6 +1116,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     selectRow={selectRow}
                     onOpen={onOpen}
                     onNameMenu={openNameMenu}
+                    onDayMenu={openDayMenuFor}
                     setHovered={setHovered}
                   />;
                 })}
@@ -1066,11 +1140,12 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
       <div className={styles.legend} aria-label="甘特图图例" data-testid="gantt-legend">
         <span className={styles.summary} aria-label="需求数量">{rows.length === totalCount ? `${totalCount} 条需求` : `显示 ${rows.length} / 共 ${totalCount} 条需求`}</span>
-        <span data-tooltip="尚未预估开发人天，暂按 3 个工作日占位"><Hourglass aria-hidden="true" />待估人天</span>
-        <span data-tooltip="需求名右侧表示 HOLD 状态，时间轴中表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
+        <span data-legend-icon="estimated" data-tooltip="尚未预估开发人天，暂按 3 个工作日占位"><Hourglass aria-hidden="true" />待估人天</span>
+        <span data-legend-icon="hold" data-tooltip="需求名右侧表示 HOLD 状态，时间轴中表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
         <span data-tooltip="同一开发人的连续交叠区域只显示一组箭头，需求保持原色"><span className={styles.parallelSymbol}><ArrowBigUp className={styles.arrowUp} preserveAspectRatio="none" aria-hidden="true" /><ArrowBigDown className={styles.arrowDown} preserveAspectRatio="none" aria-hidden="true" /></span>需求并行</span>
-        <span data-tooltip="非工作日手动安排开发"><AlarmClockPlus aria-hidden="true" />加班</span>
-        <span data-tooltip="个人主动请假，区别于法定节假日和周末"><CalendarOff aria-hidden="true" />休假</span>
+        <span data-legend-icon="support" data-tooltip="协助需求的排期，悬停线段可查看需求名"><HandHelping aria-hidden="true" />补位</span>
+        <span data-legend-icon="overtime" data-tooltip="非工作日手动安排开发"><AlarmClockPlus aria-hidden="true" />加班</span>
+        <span data-legend-icon="leave" data-tooltip="个人主动请假，区别于法定节假日和周末"><CalendarOff aria-hidden="true" />休假</span>
         {isAdmin ? <span className={styles.selectionHint} data-tooltip="单击起始需求，再按住 Shift 单击末尾需求；右键选中需求可预览顺排，点击其他位置取消选择。">Shift 连选 · 右键顺排{selectedIds.size ? <strong role="status">已选 {selectedIds.size} 项</strong> : null}</span> : null}
         {draftHint ? <span className={styles.draftHint}>有未提交草稿</span> : null}
       </div>
@@ -1084,6 +1159,15 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       </p>
 
       <ContextMenu open={Boolean(menu && rows.some((row) => row.id === menu.rowId))} x={menu?.x ?? 0} y={menu?.y ?? 0} onClose={() => setMenu(null)} header={menuItems().header} items={menuItems().items} ariaLabel={menu?.type === "request" ? "需求操作" : "编辑当天安排"} scrollContainer={wrapRef.current} />
+
+      {isAdmin && supportDraft ? <SupportPicker
+        date={supportDraft.date}
+        developer={supportDraft.developer}
+        rows={state.requests.filter((row) => !row.archived && row.id !== supportDraft.rowId)}
+        users={state.users}
+        onClose={() => setSupportDraft(null)}
+        onPick={applySupport}
+      /> : null}
 
       <Drawer
         open={sequenceOpen}
@@ -1115,6 +1199,7 @@ interface ResolvedRow {
   plan: GanttPlan;
   resolve: (date: string) => DayInfo;
   fillBounds: ReturnType<typeof segmentFillBounds>;
+  supportBounds: ReturnType<typeof supportFillBounds>;
   delivery: string;
   activeDays: number;
   live: number;
@@ -1127,6 +1212,7 @@ interface GanttRowProps {
   row: ApiRequest;
   groupEnd: boolean;
   data: ResolvedRow;
+  requestNames: ReadonlyMap<number, string>;
   calendar: Calendar;
   visibleDates: string[];
   leftHidden: number;
@@ -1145,13 +1231,14 @@ interface GanttRowProps {
   selectRow: (id: number, event?: ReactMouseEvent) => void;
   onOpen: (id: number) => void;
   onNameMenu: (id: number, x: number, y: number) => void;
+  onDayMenu: (id: number, date: string, x: number, y: number) => void;
   setHovered: Dispatch<SetStateAction<{ rowId: number; phaseIndex: number } | null>>;
 }
 
 const GanttRequestRow = memo(function GanttRequestRow({
-  row, groupEnd, data: state, calendar, visibleDates, leftHidden, rightHidden, dayWidth, markerMode,
+  row, groupEnd, data: state, requestNames, calendar, visibleDates, leftHidden, rightHidden, dayWidth, markerMode,
   color, groupBadges, preview, hoveredPhase, rowSelected, isAdmin, canEdit,
-  today, suppressClickRef, selectRow, onOpen, onNameMenu, setHovered,
+  today, suppressClickRef, selectRow, onOpen, onNameMenu, onDayMenu, setHovered,
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
   const isOnHold = row.status === "HOLD";
@@ -1188,9 +1275,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
       "--live-particle-offset": `${(row.id % 19) * 7 - phaseOffset}px`,
     } as CSSProperties;
   }, [visibleDays, visibleDates, live, liveStart, markerMode, dayWidth, leftHidden, row.id]);
-  const previewCell = (_rowId: number, date: string): "valid" | "invalid" | null => {
-    if (!preview) return null;
-    const included = preview.kind === "add" ? preview.dates?.includes(date) : preview.start && preview.end && date >= preview.start && date <= preview.end;
+  const previewCell = (date: string, working: boolean): "valid" | "invalid" | null => {
+    if (!preview || (preview.support && !working)) return null;
+    const included = preview.dates ? preview.dates.includes(date) : preview.start && preview.end && date >= preview.start && date <= preview.end;
     return included ? preview.valid ? "valid" : "invalid" : null;
   };
   return (
@@ -1235,25 +1322,34 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const segment = plan.segments[phase];
         const fill = state.fillBounds[phase];
         const filled = Boolean(fill && date >= fill.start && date <= fill.end);
-        const cellPreview = previewCell(row.id, date);
         const showDelivery = (rowSelected || (isHovered && hovered?.phaseIndex === phase)) && date === delivery && phase >= 0;
         const bar = phase >= 0;
+        const working = isWorkday(date, calendar);
+        const available = info.dayType !== "leave" && (working || info.overtime);
+        const supportIndex = supportIndexAt(row, date);
+        const support = available ? row.supportSegments?.[supportIndex] : undefined;
+        const cellPreview = previewCell(date, available);
+        const supportBounds = state.supportBounds?.[supportIndex];
+        const supportStart = date === supportBounds?.start;
+        const supportEnd = date === supportBounds?.end;
+        const supportLabel = support ? `补位 · ${requestNames.get(support.requestId) ?? `需求 #${support.requestId}（已删除）`}` : "";
         const classes = [
           styles.square,
-          !isWorkday(date, calendar) ? styles.rest : "",
+          !working ? styles.rest : "",
           date === today ? styles.current : "",
           info.dayType === "leave" ? styles.leaveDay : "",
           cellPreview === "valid" ? styles.dropValid : cellPreview === "invalid" ? styles.dropInvalid : "",
           cellPreview && date === preview?.start ? styles.previewStart : "",
           cellPreview && date === preview?.end ? styles.previewEnd : "",
           cellPreview === "valid" && preview?.kind === "add" ? styles.addPreview : "",
+          cellPreview === "valid" && preview?.support ? styles.supportPreview : "",
         ].filter(Boolean).join(" ");
         const badge = groupBadges.get(`${row.id}|${date}`);
         const hold = holds.get(date);
         const sharesHoldCenter = hold?.centerOffset === 0;
         const standaloneMarkerMode = sharesHoldCenter && markerMode === "icon" ? "tick" : markerMode;
         return (
-          <td key={date} className={classes} data-date={date} data-tooltip={hold ? "手动标记的 HOLD 暂停间隔" : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}`}>
+          <td key={date} className={classes} data-date={date} data-support-overlap={bar && support ? "" : undefined} data-tooltip={hold ? "手动标记的 HOLD 暂停间隔" : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}`}>
             {hold ? (
               <span className={styles.holdFill} data-hold-connector aria-hidden="true">
                 {hold.centerOffset !== null ? (
@@ -1289,8 +1385,33 @@ const GanttRequestRow = memo(function GanttRequestRow({
               </div>
             ) : info.dayType === "leave" ? (
               <span className={styles.markOnly} data-hold-center={sharesHoldCenter ? "" : undefined}><CellMarker kind="leave" mode={standaloneMarkerMode} /></span>
-            ) : info.dayType === "overtime" ? (
+            ) : info.dayType === "overtime" && !support ? (
               <span className={styles.markOnly} data-hold-center={sharesHoldCenter ? "" : undefined}><CellMarker kind="overtime" mode={standaloneMarkerMode} /></span>
+            ) : null}
+            {support ? (
+              <div
+                className={`${styles.barPiece} ${styles.supportPiece} ${supportStart ? styles.barStart : ""} ${supportEnd ? styles.barEnd : ""}`}
+                data-support-bar
+                data-support-index={supportIndex}
+                data-compact={bar || hold ? "" : undefined}
+                data-tooltip={supportLabel}
+                role={isAdmin ? "button" : undefined}
+                tabIndex={supportStart ? 0 : undefined}
+                aria-label={`${supportLabel}，${date}`}
+                aria-haspopup={isAdmin ? "menu" : undefined}
+                onKeyDown={isAdmin ? (event) => {
+                  if (!isContextMenuKey(event) && event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  onDayMenu(row.id, date, rect.left, rect.bottom);
+                } : undefined}
+              >
+                {supportStart ? <CellMarker kind="support" mode={markerMode} /> : null}
+                {!bar && info.overtime ? <CellMarker kind="overtime" mode={supportStart && dayWidth < 27 && markerMode === "icon" ? "tick" : markerMode} /> : null}
+                {isAdmin && supportStart ? <span className={styles.barHandle} data-resize data-edge="start" aria-hidden="true" /> : null}
+                {isAdmin && supportEnd ? <span className={styles.barHandle} data-resize data-edge="end" aria-hidden="true" /> : null}
+              </div>
             ) : null}
             {badge ? (
               <span className={styles.parallelExchange} data-parallel data-marker="parallel" data-marker-mode={markerMode} style={{ left: `calc(50% + ${badge.offset / 24 * dayWidth}px)` }} aria-hidden="true">
@@ -1311,7 +1432,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
   );
 });
 
-const MARKER_ICONS = { hold: CirclePause, leave: CalendarOff, overtime: AlarmClockPlus, estimated: Hourglass };
+const MARKER_ICONS = { hold: CirclePause, leave: CalendarOff, overtime: AlarmClockPlus, estimated: Hourglass, support: HandHelping };
 
 function CellMarker({ kind, mode }: { kind: keyof typeof MARKER_ICONS; mode: MarkerMode }) {
   if (mode === "hidden") return null;

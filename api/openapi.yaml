@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: RSM API
-  version: 0.1.3
+  version: 0.1.4
 paths:
   /api/state:
     get:
@@ -849,6 +849,21 @@ components:
           type: boolean
           default: false
       additionalProperties: false
+    SupportSegment:
+      type: object
+      required:
+      - requestId
+      - start
+      - end
+      properties:
+        requestId:
+          type: integer
+          format: int64
+        start:
+          type: string
+        end:
+          type: string
+      additionalProperties: false
     Request:
       type: object
       required:
@@ -944,6 +959,11 @@ components:
           type: array
           items:
             type: string
+        supportSegments:
+          type: array
+          description: 甘特图所在开发人行的补位日期及单向需求引用。更新时省略即保留，空数组清除。
+          items:
+            $ref: '#/components/schemas/SupportSegment'
         archived:
           type: boolean
         poolEnteredAt:

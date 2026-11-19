@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -13,32 +14,39 @@ import (
 )
 
 type Request struct {
-	ID            int64              `json:"id"`
-	Revision      int64              `json:"revision"`
-	Name          string             `json:"name"`
-	Priority      string             `json:"priority"`
-	Status        string             `json:"status"`
-	PRD           string             `json:"prd"`
-	Requester     string             `json:"requester"`
-	RequestedAt   string             `json:"requestedAt"`
-	Domain        string             `json:"domain"`
-	RequestType   string             `json:"requestType"`
-	Wangyue       string             `json:"wangyue"`
-	Developer     string             `json:"developer"`
-	Days          float64            `json:"days"`
-	Start         string             `json:"start"`
-	Delivery      string             `json:"delivery"`
-	Project       string             `json:"project"`
-	BRD           string             `json:"brd"`
-	Review        string             `json:"review"`
-	Expected      string             `json:"expected"`
-	Notes         string             `json:"notes"`
-	Segments      []schedule.Segment `json:"segments"`
-	Vacation      []string           `json:"vacation"`
-	Overtime      []string           `json:"overtime"`
-	Archived      bool               `json:"archived"`
-	PoolEnteredAt string             `json:"poolEnteredAt,omitempty"`
-	ArchivedAt    string             `json:"archivedAt,omitempty"`
+	ID              int64              `json:"id"`
+	Revision        int64              `json:"revision"`
+	Name            string             `json:"name"`
+	Priority        string             `json:"priority"`
+	Status          string             `json:"status"`
+	PRD             string             `json:"prd"`
+	Requester       string             `json:"requester"`
+	RequestedAt     string             `json:"requestedAt"`
+	Domain          string             `json:"domain"`
+	RequestType     string             `json:"requestType"`
+	Wangyue         string             `json:"wangyue"`
+	Developer       string             `json:"developer"`
+	Days            float64            `json:"days"`
+	Start           string             `json:"start"`
+	Delivery        string             `json:"delivery"`
+	Project         string             `json:"project"`
+	BRD             string             `json:"brd"`
+	Review          string             `json:"review"`
+	Expected        string             `json:"expected"`
+	Notes           string             `json:"notes"`
+	Segments        []schedule.Segment `json:"segments"`
+	Vacation        []string           `json:"vacation"`
+	Overtime        []string           `json:"overtime"`
+	SupportSegments []SupportSegment   `json:"supportSegments,omitempty"`
+	Archived        bool               `json:"archived"`
+	PoolEnteredAt   string             `json:"poolEnteredAt,omitempty"`
+	ArchivedAt      string             `json:"archivedAt,omitempty"`
+}
+
+type SupportSegment struct {
+	RequestID int64  `json:"requestId"`
+	Start     string `json:"start"`
+	End       string `json:"end"`
 }
 
 type Domain struct {
@@ -75,6 +83,9 @@ func Validate(r *Request, d Data, developers map[string]bool, c schedule.Calenda
 }
 
 func ValidateUpdate(r *Request, old Request, d Data, developers map[string]bool, c schedule.Calendar) error {
+	if r.SupportSegments == nil {
+		r.SupportSegments = old.SupportSegments
+	}
 	return validate(r, &old, d, developers, c)
 }
 
@@ -138,6 +149,9 @@ func validate(r *Request, old *Request, d Data, developers map[string]bool, c sc
 	if err != nil {
 		return fmt.Errorf("排期无效：%w", err)
 	}
+	if err = validateSupportSegments(r, old, d, plan, c); err != nil {
+		return err
+	}
 	if preserve {
 		plan.Days = old.Days
 	} else if r.Days > 0 && plan.Start != "" && (len(plan.Vacation) > 0 || len(plan.Overtime) > 0) {
@@ -160,6 +174,52 @@ func validate(r *Request, old *Request, d Data, developers map[string]bool, c sc
 	}
 	if r.Overtime == nil {
 		r.Overtime = []string{}
+	}
+	return nil
+}
+
+func validateSupportSegments(r *Request, old *Request, d Data, plan schedule.Plan, c schedule.Calendar) error {
+	if len(r.SupportSegments) == 0 {
+		return nil
+	}
+	if r.Developer == "" || len(r.SupportSegments) > 128 {
+		return errors.New("补位需要指定开发人，且每行最多 128 段")
+	}
+	active := make(map[int64]bool)
+	for _, row := range d.Requests {
+		active[row.ID] = !row.Archived
+	}
+	retained := make(map[int64]int)
+	previous := make(map[SupportSegment]bool)
+	if old != nil {
+		for _, segment := range old.SupportSegments {
+			retained[segment.RequestID]++
+			previous[segment] = true
+		}
+	}
+	working := func(day string) bool {
+		return !slices.Contains(plan.Vacation, day) && (schedule.IsWorkday(day, c) || slices.Contains(plan.Overtime, day))
+	}
+	for i, segment := range r.SupportSegments {
+		retained[segment.RequestID]--
+		if segment.RequestID == r.ID || segment.RequestID <= 0 || (!active[segment.RequestID] && retained[segment.RequestID] < 0) {
+			return errors.New("请选择需求池中的另一条未归档需求作为补位目标")
+		}
+		if i > 0 && segment.Start <= r.SupportSegments[i-1].End {
+			return errors.New("补位线段必须按日期排列且不能重叠")
+		}
+		// 日历或当天标记变化可以暂时停用已有线段里的日期，保留其原始区间。
+		if previous[segment] {
+			continue
+		}
+		if !working(segment.Start) || !working(segment.End) {
+			return errors.New("补位只能从工作日或已标记加班的日期开始和结束")
+		}
+		if _, err := schedule.Normalize(schedule.Plan{
+			Start: segment.Start, Delivery: segment.End, Vacation: plan.Vacation, Overtime: plan.Overtime,
+		}, c); err != nil {
+			return fmt.Errorf("补位日期无效：%w", err)
+		}
 	}
 	return nil
 }
@@ -190,6 +250,9 @@ func oneOf(s string, values ...string) bool {
 }
 
 func SameSchedule(a, b Request) bool {
+	if !slices.Equal(a.SupportSegments, b.SupportSegments) {
+		return false
+	}
 	type fields struct {
 		Domain, RequestType, Wangyue, Developer, Start, Delivery string
 		Days                                                     float64

@@ -419,8 +419,11 @@ type Request struct {
 	Segments      []Segment          `json:"segments"`
 	Start         string             `json:"start"`
 	Status        RequestStatus      `json:"status"`
-	Vacation      []string           `json:"vacation"`
-	Wangyue       string             `json:"wangyue"`
+
+	// SupportSegments 甘特图所在开发人行的补位日期及单向需求引用。更新时省略即保留，空数组清除。
+	SupportSegments *[]SupportSegment `json:"supportSegments,omitempty"`
+	Vacation        []string          `json:"vacation"`
+	Wangyue         string            `json:"wangyue"`
 }
 
 // RequestPriority defines model for Request.Priority.
@@ -463,6 +466,13 @@ type State struct {
 	SetupRequired bool        `json:"setupRequired"`
 	Users         []User      `json:"users"`
 	Versions      []Version   `json:"versions"`
+}
+
+// SupportSegment defines model for SupportSegment.
+type SupportSegment struct {
+	End       string `json:"end"`
+	RequestId int64  `json:"requestId"`
+	Start     string `json:"start"`
 }
 
 // User defines model for User.

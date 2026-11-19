@@ -1,4 +1,16 @@
-.page { display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: hidden; }
+.page {
+  --gantt-support-fill: #58668f;
+  --gantt-support-ink: #f5f6ff;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+:global([data-theme="dark"]) .page {
+  --gantt-support-fill: #43537e;
+  --gantt-support-ink: #edf0ff;
+}
 .plotArea { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
 .calendarHint { flex: none; margin-bottom: 10px; font-size: 12px; color: var(--rsm-muted); }
 .calendarViewport { position: relative; display: flex; flex: 0 1 auto; min-height: 0; }
@@ -140,6 +152,7 @@
 .square.addPreview::after { content: ""; position: absolute; inset: 0 1px; z-index: 1; border-radius: 3px; background: color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 35%, var(--rsm-panel)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 70%, transparent); animation: rsm-add-breathe 1.5s ease-in-out infinite alternate; pointer-events: none; }
 .square.dropValid::after, .square.dropInvalid::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: var(--task-fill, var(--rsm-accent)); opacity: 0.65; }
 .square.dropInvalid::after { background: var(--rsm-p0); opacity: 0.65; }
+.square.supportPreview::after { inset-block: 3px; background: var(--gantt-support-fill); }
 .square.previewStart::after { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
 .square.previewEnd::after { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
 .barPiece {
@@ -164,6 +177,25 @@
 .barPiece.estimated { background: var(--task-estimated-fill); color: var(--task-fill, var(--rsm-accent)); }
 .barPiece.estimated.inactive { background: color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 25%, var(--rsm-panel)); }
 .barPiece.unfilled { background: transparent; color: var(--task-fill, var(--rsm-accent)); }
+.barPiece.supportPiece {
+  position: absolute;
+  inset: 3px 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  gap: 2px;
+  background: var(--gantt-support-fill);
+  color: var(--gantt-support-ink);
+  box-shadow: inset 0 1px rgb(255 255 255 / 14%);
+}
+.barPiece.supportPiece[data-compact] { --marker-size: 9px; inset-block: auto 1px; height: 10px; }
+.supportPiece[data-compact] .barHandle { inset-block: 0; }
+.square[data-support-overlap] > [data-bar] {
+  position: absolute;
+  top: 0;
+  height: calc(var(--gantt-row-height) - 11px);
+  min-height: 0;
+}
 .barStart { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
 .barEnd { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
 .dayGrid::after { content: ""; position: absolute; inset: 0; z-index: 2; border: solid var(--day-edge, color-mix(in srgb, var(--task-ink, #fff) 42%, transparent)); border-width: 1px 1px 1px 0; border-radius: inherit; pointer-events: none; }
@@ -264,6 +296,20 @@
 .arrowDown { color: var(--rsm-arrow-down); animation: rsm-parallel-fall 1.2s ease-in-out infinite alternate; }
 .deliveryGuide { position: absolute; right: 0; top: 0; bottom: 0; width: 0; border-left: 1px dashed color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 60%, var(--rsm-muted)); opacity: 0.7; z-index: 1; pointer-events: none; }
 .legend { composes: footer from "../RequestsPage.module.css"; }
+.legend > [data-legend-icon] > svg {
+  width: 21px;
+  height: 21px;
+  padding: 3px;
+  border-radius: 5px;
+  color: var(--legend-icon-color);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  stroke-width: 1.9;
+}
+.legend > [data-legend-icon="estimated"] { --legend-icon-color: var(--rsm-p2); }
+.legend > [data-legend-icon="hold"] { --legend-icon-color: var(--rsm-warning); }
+.legend > [data-legend-icon="support"] { --legend-icon-color: var(--rsm-purple); }
+.legend > [data-legend-icon="overtime"] { --legend-icon-color: var(--rsm-p0); }
+.legend > [data-legend-icon="leave"] { --legend-icon-color: light-dark(#0e7775, #78d5ca); }
 .summary { composes: summary from "../RequestsPage.module.css"; }
 .draftHint { color: var(--rsm-p1); }
 .dragStatus {

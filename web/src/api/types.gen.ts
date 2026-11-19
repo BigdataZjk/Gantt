@@ -526,6 +526,12 @@ export interface components {
             /** @default false */
             holdBefore: boolean;
         };
+        SupportSegment: {
+            /** Format: int64 */
+            requestId: number;
+            start: string;
+            end: string;
+        };
         Request: {
             /** Format: int64 */
             id: number;
@@ -555,6 +561,8 @@ export interface components {
             segments: components["schemas"]["Segment"][];
             vacation: string[];
             overtime: string[];
+            /** @description 甘特图所在开发人行的补位日期及单向需求引用。更新时省略即保留，空数组清除。 */
+            supportSegments?: components["schemas"]["SupportSegment"][];
             archived: boolean;
             /** @description 服务端记录的最近进池时间，旧记录可能缺失，客户端提交时忽略。 */
             poolEnteredAt?: string;

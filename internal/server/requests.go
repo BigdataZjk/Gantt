@@ -108,6 +108,9 @@ func (s *Server) updateRequest(w http.ResponseWriter, r *http.Request) {
 		if item.Revision != old.Revision {
 			return store.ErrConflict
 		}
+		if item.SupportSegments == nil {
+			item.SupportSegments = old.SupportSegments
+		}
 		if !u.Admin() && !requests.SameSchedule(old, item) {
 			return store.ErrForbidden
 		}

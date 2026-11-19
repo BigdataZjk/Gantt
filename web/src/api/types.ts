@@ -2,6 +2,7 @@ import type { components } from "./types.gen";
 
 export type State = components["schemas"]["State"];
 export type ApiRequest = components["schemas"]["Request"];
+export type SupportSegment = components["schemas"]["SupportSegment"];
 export type Segment = components["schemas"]["Segment"];
 export type User = components["schemas"]["User"];
 export type Role = User["role"];

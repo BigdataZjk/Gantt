@@ -40,6 +40,17 @@ describe("个人甘特撤回", () => {
     expect(restoreUndoStep(step, [after], { ...calendar, source: "刷新来源" })).toHaveLength(1);
   });
 
+  it("普通排期撤回省略补位字段，撤回首次补位时显式清空", () => {
+    const ordinaryStep = makeUndoStep([before], [after], calendar);
+    const [ordinaryRestore] = restoreUndoStep(ordinaryStep, [after], calendar);
+    expect(JSON.parse(JSON.stringify(ordinaryRestore))).not.toHaveProperty("supportSegments");
+
+    const supported = { ...before, supportSegments: [{ requestId: 2, start: "2026-11-19", end: "2026-11-19" }] };
+    const supportStep = makeUndoStep([before], [supported], calendar);
+    const [supportRestore] = restoreUndoStep(supportStep, [supported], calendar);
+    expect(supportRestore?.supportSegments).toEqual([]);
+  });
+
   it("恢复后编辑分段及标记不会污染历史快照", () => {
     const marked = { ...before, vacation: ["2026-11-16"], overtime: ["2026-11-21"] };
     const step = makeUndoStep([marked], [after], calendar);

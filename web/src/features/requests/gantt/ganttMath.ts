@@ -1,6 +1,6 @@
-import type { ApiRequest, Calendar, Segment, User } from "../../../api/types";
-import { addDays, countDays, diffDays, finishDate, isWorkday, isValidDate, todayISO } from "../../../lib/dates";
-import { movePlan, type Plan as SchedulePlan } from "../../../schedule";
+import type { ApiRequest, Calendar, Segment, SupportSegment, User } from "../../../api/types";
+import { addDays, countDays, diffDays, finishDate, isWorkday, isValidDate, parseDate, todayISO } from "../../../lib/dates";
+import { MAX_PLAN_YEARS, MAX_SUPPORTED_DATE, MIN_SUPPORTED_DATE, movePlan, type Plan as SchedulePlan } from "../../../schedule";
 
 export interface GanttSegment extends Segment {
   index: number;
@@ -54,17 +54,74 @@ export function requestActiveDays(request: ApiRequest, calendar: Calendar): numb
 }
 
 export function segmentFillBounds(request: ApiRequest, calendar: Calendar): ({ start: string; end: string } | null)[] {
+  const active = workdayAvailability(request, calendar);
+  return planOf(request, calendar).segments.map((segment) => activeBounds(segment, active));
+}
+
+function workdayAvailability(request: ApiRequest, calendar: Calendar): (date: string) => boolean {
   const vacation = new Set(request.vacation ?? []);
   const overtime = new Set(request.overtime ?? []);
-  const active = (date: string) => !vacation.has(date) && (isWorkday(date, calendar) || overtime.has(date));
-  return planOf(request, calendar).segments.map((segment) => {
-    let start = segment.start;
-    let end = segment.end;
-    while (start <= end && !active(start)) start = addDays(start, 1);
-    if (start > end) return null;
-    while (end > start && !active(end)) end = addDays(end, -1);
-    return { start, end };
-  });
+  return (date) => !vacation.has(date) && (isWorkday(date, calendar) || overtime.has(date));
+}
+
+function activeBounds({ start, end }: Pick<Segment, "start" | "end">, active: (date: string) => boolean) {
+  if (!start || !end) return null;
+  while (start <= end && !active(start)) start = addDays(start, 1);
+  if (start > end) return null;
+  while (end > start && !active(end)) end = addDays(end, -1);
+  return { start, end };
+}
+
+export function supportFillBounds(request: ApiRequest, calendar: Calendar) {
+  if (!request.supportSegments?.length) return undefined;
+  const active = workdayAvailability(request, calendar);
+  return request.supportSegments.map((segment) => activeBounds(segment, active));
+}
+
+export function supportIndexAt(request: ApiRequest, date: string): number {
+  return request.supportSegments?.findIndex((segment) => date >= segment.start && date <= segment.end) ?? -1;
+}
+
+export function canAddSupport(request: ApiRequest, date: string, calendar: Calendar): boolean {
+  return Boolean(request.developer) && date >= MIN_SUPPORTED_DATE && date <= MAX_SUPPORTED_DATE &&
+    supportIndexAt(request, date) < 0 && workdayAvailability(request, calendar)(date);
+}
+
+export function adjustSupportSegment(request: ApiRequest, index: number, delta: number, calendar: Calendar, edge?: "start" | "end"): SupportSegment | null {
+  const segment = request.supportSegments?.[index];
+  if (!segment) return null;
+  if (!delta) return segment;
+  const active = workdayAvailability(request, calendar);
+  const bounds = activeBounds(segment, active);
+  if (!bounds) return null;
+
+  let { start, end } = bounds;
+  if (edge === "start") {
+    const previous = request.supportSegments?.[index - 1];
+    const minimum = previous ? addDays(previous.end, 1) : MIN_SUPPORTED_DATE;
+    const target = addDays(start, delta);
+    start = target < end ? target : end;
+    if (start < minimum) start = minimum;
+  } else if (edge === "end") {
+    const next = request.supportSegments?.[index + 1];
+    const maximum = next ? addDays(next.start, -1) : MAX_SUPPORTED_DATE;
+    const target = addDays(end, delta);
+    end = target > start ? target : start;
+    if (end > maximum) end = maximum;
+  } else {
+    const days = countDays(start, end, calendar, request);
+    start = addDays(start, delta);
+    if (!active(start)) return null;
+    end = finishDate(start, days, calendar, request);
+  }
+
+  const adjusted = activeBounds({ start, end }, active);
+  if (!adjusted || adjusted.start < MIN_SUPPORTED_DATE || adjusted.end > MAX_SUPPORTED_DATE) return null;
+  const limit = parseDate(adjusted.start);
+  limit.setUTCFullYear(limit.getUTCFullYear() + MAX_PLAN_YEARS);
+  if (parseDate(adjusted.end) > limit) return null;
+  if (request.supportSegments?.some((other, i) => i !== index && adjusted.start <= other.end && adjusted.end >= other.start)) return null;
+  return { ...segment, ...adjusted };
 }
 
 export function workingHoldGaps(request: ApiRequest, calendar: Calendar): HoldGap[] {

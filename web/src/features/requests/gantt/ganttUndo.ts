@@ -1,6 +1,6 @@
 import type { ApiRequest, Calendar } from "../../../api/types";
 
-type ScheduleFields = Pick<ApiRequest, "developer" | "days" | "start" | "delivery" | "segments" | "vacation" | "overtime">;
+type ScheduleFields = Pick<ApiRequest, "developer" | "days" | "start" | "delivery" | "segments" | "vacation" | "overtime" | "supportSegments">;
 
 export interface GanttUndoStep {
   changes: { id: number; before: ScheduleFields; after: ScheduleFields }[];
@@ -16,6 +16,7 @@ export function scheduleSnapshot(row: ApiRequest): ScheduleFields {
     segments: (row.segments ?? []).map((segment) => ({ start: segment.start, end: segment.end, holdBefore: Boolean(segment.holdBefore) })),
     vacation: [...(row.vacation ?? [])].sort(),
     overtime: [...(row.overtime ?? [])].sort(),
+    supportSegments: row.supportSegments?.length ? row.supportSegments.map((segment) => ({ ...segment })) : undefined,
   };
 }
 
@@ -41,7 +42,15 @@ export function restoreUndoStep(step: GanttUndoStep, current: ApiRequest[], cale
     if (!latest || latest.archived || JSON.stringify(scheduleSnapshot(latest)) !== JSON.stringify(change.after)) {
       throw new Error("这一步的排期已被后续操作修改、归档或删除，已跳过撤回，保留最新数据。");
     }
-    return { ...latest, ...change.before, segments: change.before.segments?.map((segment) => ({ ...segment })), vacation: [...(change.before.vacation ?? [])], overtime: [...(change.before.overtime ?? [])] };
+    const { before, after } = change;
+    return {
+      ...latest,
+      ...before,
+      segments: before.segments?.map((segment) => ({ ...segment })),
+      vacation: [...(before.vacation ?? [])],
+      overtime: [...(before.overtime ?? [])],
+      supportSegments: before.supportSegments?.map((segment) => ({ ...segment })) ?? (after.supportSegments ? [] : undefined),
+    };
   });
 }
 
