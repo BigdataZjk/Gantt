@@ -13,10 +13,11 @@ export interface DialogProps {
   footer?: ReactNode;
   width?: number;
   className?: string;
+  bodyClassName?: string;
   closeLabel?: string;
 }
 
-export function Dialog({ open, onOpenChange, title, caption, children, footer, width, className = "", closeLabel = "关闭窗口" }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, caption, children, footer, width, className = "", bodyClassName = "", closeLabel = "关闭窗口" }: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
@@ -35,7 +36,7 @@ export function Dialog({ open, onOpenChange, title, caption, children, footer, w
               </RadixDialog.Close>
             </header>
           ) : null}
-          <div className={styles.body}>{children}</div>
+          <div className={`${styles.body} ${bodyClassName}`}>{children}</div>
           {footer ? <footer className={styles.footer}>{footer}</footer> : null}
         </RadixDialog.Content>
       </RadixDialog.Portal>

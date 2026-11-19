@@ -78,6 +78,16 @@ export function supportFillBounds(request: ApiRequest, calendar: Calendar) {
   return request.supportSegments.map((segment) => activeBounds(segment, active));
 }
 
+export function supportOverlapsSchedule(request: ApiRequest, calendar: Calendar, plan: Plan, supportBounds: ReturnType<typeof supportFillBounds>): boolean {
+  if (!supportBounds) return false;
+  const occupied = [...plan.segments, ...workingHoldGaps(request, calendar)];
+  const active = workdayAvailability(request, calendar);
+  return supportBounds.some((support) => support && occupied.some(({ start, end }) => activeBounds({
+    start: start > support.start ? start : support.start,
+    end: end < support.end ? end : support.end,
+  }, active) !== null));
+}
+
 export function supportIndexAt(request: ApiRequest, date: string): number {
   return request.supportSegments?.findIndex((segment) => date >= segment.start && date <= segment.end) ?? -1;
 }

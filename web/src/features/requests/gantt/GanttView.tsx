@@ -46,6 +46,7 @@ import {
   supplementRequest,
   supportFillBounds,
   supportIndexAt,
+  supportOverlapsSchedule,
   type DayInfo,
   type OverlapBadge,
   type Plan as GanttPlan,
@@ -144,6 +145,7 @@ const MIN_NAME_COLUMN_WIDTH = 120;
 const MAX_NAME_COLUMN_SCALE = 1.2;
 const MIN_TIMELINE_WIDTH = 80;
 const PERSON_ROW_HEIGHT = 28;
+const SUPPORT_LANE_GAP = 2;
 const ROW_HEIGHT = { compact: 38, comfortable: 50 } as const;
 type MarkerMode = "icon" | "tick" | "hidden";
 
@@ -224,11 +226,13 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     const map = new Map<number, ResolvedRow>();
     for (const row of rows) {
       const plan = planOf(row, calendar);
+      const supportBounds = supportFillBounds(row, calendar);
       map.set(row.id, {
         plan,
         resolve: dayResolver(row, calendar),
         fillBounds: segmentFillBounds(row, calendar),
-        supportBounds: supportFillBounds(row, calendar),
+        supportBounds,
+        supportOverlaps: supportOverlapsSchedule(row, calendar, plan, supportBounds),
         delivery: plan.delivery,
         activeDays: requestActiveDays(row, calendar),
         live: currentLivePhase(row, today, calendar),
@@ -954,7 +958,11 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       for (const row of group.rows) items.push({ kind: "request", row, group });
     }
   }
-  const itemHeights = items.map((item) => (item.kind === "group" ? PERSON_ROW_HEIGHT : ganttRowHeight));
+  const itemHeights = items.map((item) => {
+    if (item.kind === "group") return PERSON_ROW_HEIGHT;
+    const supportHeight = resolved.get(item.row.id)?.supportOverlaps ? ganttRowHeight + SUPPORT_LANE_GAP : 0;
+    return ganttRowHeight + supportHeight + 1;
+  });
   const offsets: number[] = [0];
   for (let index = 0; index < itemHeights.length; index += 1) offsets.push(offsets[index]! + itemHeights[index]!);
   const totalHeight = offsets[offsets.length - 1] ?? 0;
@@ -1026,7 +1034,15 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
             onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} onPointerMove={moveNameColumn}
             onPointerUp={finishNameColumnResize} onPointerCancel={finishNameColumnResize} onLostPointerCapture={finishNameColumnResize}
             onClickCapture={reorder.onClickCapture} onDoubleClickCapture={reorder.onDoubleClickCapture} onScroll={onScroll}>
-            <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{ width: tableWidth, ["--day-width" as string]: `${dayWidth}px`, ["--gantt-row-height" as string]: `${ganttRowHeight}px`, ["--person-row-height" as string]: `${PERSON_ROW_HEIGHT}px`, ["--marker-size" as string]: `${Math.max(8, 12 * zoom)}px`, ["--parallel-scale" as string]: zoom } as CSSProperties}>
+            <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{
+              width: tableWidth,
+              "--day-width": `${dayWidth}px`,
+              "--gantt-row-height": `${ganttRowHeight}px`,
+              "--gantt-lane-gap": `${SUPPORT_LANE_GAP}px`,
+              "--person-row-height": `${PERSON_ROW_HEIGHT}px`,
+              "--marker-size": `${Math.max(8, 12 * zoom)}px`,
+              "--parallel-scale": zoom,
+            } as CSSProperties}>
               <thead>
                 <tr>
                   <th className={styles.nameHead} rowSpan={2} scope="col">
@@ -1143,7 +1159,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
         <span data-legend-icon="estimated" data-tooltip="尚未预估开发人天，暂按 3 个工作日占位"><Hourglass aria-hidden="true" />待估人天</span>
         <span data-legend-icon="hold" data-tooltip="需求名右侧表示 HOLD 状态，时间轴中表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
         <span data-tooltip="同一开发人的连续交叠区域只显示一组箭头，需求保持原色"><span className={styles.parallelSymbol}><ArrowBigUp className={styles.arrowUp} preserveAspectRatio="none" aria-hidden="true" /><ArrowBigDown className={styles.arrowDown} preserveAspectRatio="none" aria-hidden="true" /></span>需求并行</span>
-        <span data-legend-icon="support" data-tooltip="协助需求的排期，悬停线段可查看需求名"><HandHelping aria-hidden="true" />补位</span>
+        <span data-legend-icon="support" data-tooltip="协助需求的排期，悬停线段可查看需求名"><CellMarker kind="support" mode="icon" />补位</span>
         <span data-legend-icon="overtime" data-tooltip="非工作日手动安排开发"><AlarmClockPlus aria-hidden="true" />加班</span>
         <span data-legend-icon="leave" data-tooltip="个人主动请假，区别于法定节假日和周末"><CalendarOff aria-hidden="true" />休假</span>
         {isAdmin ? <span className={styles.selectionHint} data-tooltip="单击起始需求，再按住 Shift 单击末尾需求；右键选中需求可预览顺排，点击其他位置取消选择。">Shift 连选 · 右键顺排{selectedIds.size ? <strong role="status">已选 {selectedIds.size} 项</strong> : null}</span> : null}
@@ -1200,6 +1216,7 @@ interface ResolvedRow {
   resolve: (date: string) => DayInfo;
   fillBounds: ReturnType<typeof segmentFillBounds>;
   supportBounds: ReturnType<typeof supportFillBounds>;
+  supportOverlaps: boolean;
   delivery: string;
   activeDays: number;
   live: number;
@@ -1281,7 +1298,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
     return included ? preview.valid ? "valid" : "invalid" : null;
   };
   return (
-    <tr data-row={row.id} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
+    <tr data-row={row.id} data-support-lane={state.supportOverlaps ? "" : undefined} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
       <th className={styles.nameCell} scope="row" data-request-select onClick={(event) => {
         if (!(event.target as Element).closest("[data-name]") && performance.now() >= suppressClickRef.current) selectRow(row.id, event);
       }}>
@@ -1342,14 +1359,14 @@ const GanttRequestRow = memo(function GanttRequestRow({
           cellPreview && date === preview?.start ? styles.previewStart : "",
           cellPreview && date === preview?.end ? styles.previewEnd : "",
           cellPreview === "valid" && preview?.kind === "add" ? styles.addPreview : "",
-          cellPreview === "valid" && preview?.support ? styles.supportPreview : "",
+          cellPreview && preview?.support ? styles.supportPreview : "",
         ].filter(Boolean).join(" ");
         const badge = groupBadges.get(`${row.id}|${date}`);
         const hold = holds.get(date);
         const sharesHoldCenter = hold?.centerOffset === 0;
         const standaloneMarkerMode = sharesHoldCenter && markerMode === "icon" ? "tick" : markerMode;
         return (
-          <td key={date} className={classes} data-date={date} data-support-overlap={bar && support ? "" : undefined} data-tooltip={hold ? "手动标记的 HOLD 暂停间隔" : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}`}>
+          <td key={date} className={classes} data-date={date} data-tooltip={hold ? "手动标记的 HOLD 暂停间隔" : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}`}>
             {hold ? (
               <span className={styles.holdFill} data-hold-connector aria-hidden="true">
                 {hold.centerOffset !== null ? (
@@ -1393,7 +1410,6 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 className={`${styles.barPiece} ${styles.supportPiece} ${supportStart ? styles.barStart : ""} ${supportEnd ? styles.barEnd : ""}`}
                 data-support-bar
                 data-support-index={supportIndex}
-                data-compact={bar || hold ? "" : undefined}
                 data-tooltip={supportLabel}
                 role={isAdmin ? "button" : undefined}
                 tabIndex={supportStart ? 0 : undefined}
@@ -1408,7 +1424,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 } : undefined}
               >
                 {supportStart ? <CellMarker kind="support" mode={markerMode} /> : null}
-                {!bar && info.overtime ? <CellMarker kind="overtime" mode={supportStart && dayWidth < 27 && markerMode === "icon" ? "tick" : markerMode} /> : null}
+                {!bar && info.overtime ? <CellMarker kind="overtime" mode={supportStart && dayWidth < 36 && markerMode === "icon" ? "tick" : markerMode} /> : null}
                 {isAdmin && supportStart ? <span className={styles.barHandle} data-resize data-edge="start" aria-hidden="true" /> : null}
                 {isAdmin && supportEnd ? <span className={styles.barHandle} data-resize data-edge="end" aria-hidden="true" /> : null}
               </div>

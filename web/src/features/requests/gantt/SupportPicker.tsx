@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Search } from "lucide-react";
 import type { ApiRequest, User } from "../../../api/types";
 import { Button } from "../../../ui/Button";
@@ -19,6 +19,7 @@ export function SupportPicker({ date, developer, rows, users, onClose, onPick }:
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [pending, setPending] = useState(false);
+  const optionsRef = useRef<HTMLDivElement>(null);
   const names = new Map(users.map((user) => [user.id, user.username]));
   const query = search.trim().toLowerCase();
   const matches = rows.filter((row) => `${row.name} ${names.get(row.developer) ?? ""}`.toLowerCase().includes(query));
@@ -35,21 +36,34 @@ export function SupportPicker({ date, developer, rows, users, onClose, onPick }:
   };
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="安排补位" caption={`${names.get(developer) ?? "开发人"} · ${date}`} width={450} footer={
+    <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="安排补位" caption={`${names.get(developer) ?? "开发人"} · ${date}`} width={450} bodyClassName={styles.body} footer={
       <>
         <Button onClick={onClose} disabled={pending}>取消</Button>
         <Button variant="primary" onClick={() => void save()} disabled={pending || !validSelection}>{pending ? "保存中…" : "确认补位"}</Button>
       </>
     }>
       <label className={styles.search}>
-        <Search aria-hidden="true" />
-        <input autoFocus type="search" aria-label="搜索补位需求" placeholder="搜索需求名或开发人" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <Search className={styles.searchIcon} aria-hidden="true" />
+        <input
+          className={styles.searchInput}
+          autoFocus
+          type="search"
+          aria-label="搜索补位需求"
+          placeholder="搜索需求名或开发人"
+          value={search}
+          onChange={(event) => {
+            setSearch(event.target.value);
+            optionsRef.current?.scrollTo({ top: 0 });
+          }}
+        />
       </label>
-      <div className={styles.options} role="radiogroup" aria-label="补位需求">
+      <div ref={optionsRef} className={styles.options} role="radiogroup" aria-label="补位需求">
         {matches.length ? matches.map((row) => (
           <label key={row.id} className={styles.option}>
-            <input className="rsm-sr-only" type="radio" name="support-request" value={row.id} checked={row.id === selected} onChange={() => setSelected(row.id)} disabled={pending} />
-            <span className={styles.radio} aria-hidden="true">{row.id === selected ? <Check /> : null}</span>
+            <span className={styles.radio}>
+              <input type="radio" name="support-request" value={row.id} checked={row.id === selected} onChange={() => setSelected(row.id)} disabled={pending} />
+              {row.id === selected ? <Check aria-hidden="true" /> : null}
+            </span>
             <div className={styles.optionText}>
               <span className={styles.optionName}>{row.name}</span>
               <small>{names.get(row.developer) ?? "未分配开发人"}</small>

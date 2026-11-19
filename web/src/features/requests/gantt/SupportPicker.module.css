@@ -1,24 +1,24 @@
-.search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 0 10px;
-  border: 1px solid var(--rsm-border);
-  border-radius: 8px;
-  background: var(--rsm-panel);
+.body { display: flex; flex-direction: column; gap: 8px; overflow: clip; }
+.search { position: relative; flex: none; }
+.searchIcon {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  width: 15px;
+  height: 15px;
+  transform: translateY(-50%);
   color: var(--rsm-muted);
+  pointer-events: none;
 }
-.search:focus-within { border-color: var(--rsm-accent); }
-.search svg { flex: none; width: 15px; height: 15px; }
-.search input { width: 100%; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: var(--rsm-text); }
-.search input::placeholder { color: var(--rsm-muted); }
-.options { display: grid; gap: 3px; max-height: min(290px, 48vh); overflow-y: auto; margin-top: 8px; }
-.option { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 6px 8px; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
+.body .search .searchInput[type="search"] { height: 34px; padding-inline-start: 34px; border-radius: 8px; }
+.body .search .searchInput:focus { border-color: var(--rsm-accent); outline: none; }
+.options { display: flex; flex-direction: column; gap: 3px; min-height: 0; max-height: 290px; overflow-y: auto; overscroll-behavior: contain; }
+.option { display: flex; flex: none; align-items: center; gap: 10px; min-height: 42px; padding: 6px 8px; border: 1px solid transparent; border-radius: 7px; cursor: pointer; }
 .option:hover { background: color-mix(in srgb, var(--rsm-accent) 5%, transparent); }
 .option:has(input:checked) { border-color: color-mix(in srgb, var(--rsm-accent) 32%, transparent); background: color-mix(in srgb, var(--rsm-accent) 9%, transparent); }
 .option:has(input:focus-visible) { outline: 2px solid var(--rsm-accent); outline-offset: -2px; }
-.radio { display: grid; place-items: center; flex: none; width: 14px; height: 14px; border: 1px solid var(--rsm-border); border-radius: 50%; }
+.radio { position: relative; display: grid; place-items: center; flex: none; width: 14px; height: 14px; border: 1px solid var(--rsm-border); border-radius: 50%; }
+.radio input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
 .option:has(input:checked) .radio { border-color: var(--rsm-accent); background: var(--rsm-accent); color: var(--rsm-on-accent); }
 .radio svg { width: 10px; height: 10px; stroke-width: 2; }
 .optionText { flex: 1; display: grid; gap: 2px; min-width: 0; }
