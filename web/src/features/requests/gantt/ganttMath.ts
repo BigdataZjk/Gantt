@@ -294,13 +294,13 @@ export function currentLivePhase(request: ApiRequest, today: string, calendar: C
 }
 
 export function motionTitle(request: ApiRequest, today: string, calendar: Calendar, reduced: boolean): string {
-  if (!request.developer) return "未播放粒子：未分配开发人";
-  if (!["待开发", "开发中"].includes(request.status) || request.archived) return `未播放粒子：当前状态为${request.archived ? "已归档" : request.status}`;
+  if (!request.developer) return "未播放动效：未分配开发人";
+  if (!["待开发", "开发中"].includes(request.status) || request.archived) return `未播放动效：当前状态为${request.archived ? "已归档" : request.status}`;
   const info = dayInfo(request, today, calendar);
-  if (info.dayType === "leave") return "未播放粒子：今天已标记休假";
-  if (!info.active) return isWorkday(today, calendar) ? "未播放粒子：今天不在有效开发段内" : "未播放粒子：今天是休息日，未安排加班";
-  if (reduced) return "当前开发段：已开启减少动效，粒子保持静态";
-  return "当前开发段：浮动粒子动效";
+  if (info.dayType === "leave") return "未播放动效：今天已标记休假";
+  if (!info.active) return isWorkday(today, calendar) ? "未播放动效：今天不在有效开发段内" : "未播放动效：今天是休息日，未安排加班";
+  if (reduced) return "当前开发段：已开启减少动效，方格静态显示";
+  return "当前开发段：方格波纹动效";
 }
 
 export function monthGroups(dates: string[]): { key: string; count: number; first: string; last: string }[] {

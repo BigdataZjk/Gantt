@@ -90,7 +90,7 @@ for (const theme of ["light", "dark"] as const) {
     await selectRange(page);
     await page.mouse.move(0, 0);
     for (const id of [1, 2, 3]) {
-      const cells = page.locator(`tr[data-row="${id}"] > :not([data-live-particles])`);
+      const cells = page.locator(`tr[data-row="${id}"] > :not([data-live-ripple])`);
       expect(await cells.evaluateAll((elements, image) => (
         elements.length > 1 && elements.every((element) => getComputedStyle(element).backgroundImage === image)
       ), hover)).toBe(true);

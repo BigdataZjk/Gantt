@@ -375,7 +375,7 @@ for (const theme of ["light", "dark"] as const) {
     const next = page.locator('tr[data-row="2"]');
     const name = row.locator("[data-name]");
     await page.mouse.move(0, 0);
-    const background = (target = row) => target.locator(":scope > :not([data-live-particles])").evaluateAll((cells) => cells.map((cell) => ({
+    const background = (target = row) => target.locator(":scope > :not([data-live-ripple])").evaluateAll((cells) => cells.map((cell) => ({
       color: getComputedStyle(cell).backgroundColor,
       image: getComputedStyle(cell).backgroundImage,
     })));
@@ -576,7 +576,7 @@ test("整块左上表头切换全部折叠，部分展开时仍执行全部收�
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`当前开发段粒子跨日期格向右流动并适配线段底色（${theme}）`, async ({ page }, testInfo) => {
+  test(`当前开发段方格铺满线段并斜向右流动（${theme}）`, async ({ page }, testInfo) => {
     const start = addDays(today, -4);
     const end = addDays(today, 36);
     const leave = addDays(today, 3);
@@ -596,66 +596,101 @@ for (const theme of ["light", "dark"] as const) {
             { ...base, id: 1, name: "当前分段", status: "开发中", domain: blue.name, start, delivery: nextEnd, vacation: [leave], overtime: [overtime], segments: [{ start, end, holdBefore: false }, { start: nextStart, end: nextEnd, holdBefore: true }] },
             { ...base, id: 2, name: "浅色开发段", status: "开发中", domain: green.name, delivery: addDays(today, 3) },
             { ...base, id: 3, name: "待估开发段", status: "开发中", domain: blue.name, days: 0, delivery: addDays(today, 2) },
+            { ...base, id: 4, name: "单日开发段", status: "开发中", domain: green.name, days: 1, delivery: today },
           ],
         };
       },
     });
     const row = wrap.locator('[data-row="1"]');
-    const particles = row.locator("[data-live-particles]");
+    const ripple = row.locator("[data-live-ripple]");
     const firstBar = row.locator(`[data-date="${start}"] [data-bar]`);
-    await expect(particles).toHaveCount(1);
-    const box = (await particles.boundingBox())!;
+    const singleRipple = wrap.locator('[data-row="4"] [data-live-ripple]');
+    await expect(ripple).toHaveCount(1);
+    const box = (await ripple.boundingBox())!;
     const barBox = (await firstBar.boundingBox())!;
+    const singleDay = (await singleRipple.boundingBox())!;
     expect(Math.abs(box.x - barBox.x)).toBeLessThan(1);
     expect(box.width).toBeGreaterThan(barBox.width * 2);
-    await expect(particles).toHaveCSS("pointer-events", "none");
-    await expect(particles).not.toHaveCSS("mask-image", "none");
-    await expect(particles).toHaveCSS("color", "rgb(255, 255, 255)");
-    await expect(wrap.locator('[data-row="2"] [data-live-particles]')).toHaveCSS("color", "rgb(16, 24, 40)");
-    await expect(wrap.locator('[data-row="3"] [data-live-particles]')).toHaveCSS("color", theme === "light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
+    expect(box.y).toBe(barBox.y);
+    expect(box.height).toBe(barBox.height);
+    expect(Math.abs(singleDay.width - barBox.width)).toBeLessThan(1);
+    expect(singleDay.height).toBe(barBox.height);
+    await expect(ripple).toHaveCSS("border-top-left-radius", "5px");
+    await expect(singleRipple).toHaveCSS("border-radius", "5px");
+    await expect(ripple).toHaveCSS("pointer-events", "none");
+    await expect(ripple).not.toHaveCSS("mask-image", "none");
+    await expect(ripple).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(wrap.locator('[data-row="2"] [data-live-ripple]')).toHaveCSS("color", "rgb(16, 24, 40)");
+    await expect(wrap.locator('[data-row="3"] [data-live-ripple]')).toHaveCSS("color", theme === "light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
 
-    const motion = await particles.evaluate((element) => {
-      const animation = element.getAnimations({ subtree: true })[0]!;
-      const playState = animation.playState;
-      animation.pause();
+    const pausedTime = 1160;
+    const motion = await ripple.evaluate((element, time) => {
+      const animations = element.getAnimations({ subtree: true });
+      const running = animations.length === 3 && animations.every((animation) => animation.playState === "running");
+      animations.forEach((animation) => animation.pause());
       const position = (time: number) => {
-        animation.currentTime = time;
+        animations.forEach((animation) => { animation.currentTime = time; });
         return new DOMMatrixReadOnly(getComputedStyle(element, "::before").transform);
       };
-      const before = position(900);
-      const after = position(2400);
-      return { playState, x: after.m41 - before.m41, y: after.m42 - before.m42 };
-    });
-    expect(motion.playState).toBe("running");
+      const before = position(240);
+      const after = position(time);
+      const style = getComputedStyle(element, "::before");
+      return {
+        running,
+        step: parseFloat(style.getPropertyValue("--ripple-cell-width")),
+        offsets: style.backgroundPositionX.split(",").map(parseFloat),
+        bandHeight: parseFloat(style.backgroundSize.split(" ")[1]!),
+        fade: Number(getComputedStyle(element, "::after").opacity),
+        x: after.m41 - before.m41,
+        y: after.m42 - before.m42,
+      };
+    }, pausedTime);
+    expect(motion.running).toBe(true);
+    expect(motion.bandHeight).toBeCloseTo(100 / 3);
+    const [topOffset, middleOffset, bottomOffset] = motion.offsets;
+    const bandHeight = barBox.height / 3;
+    const angle = (shift: number) => Math.atan2(bandHeight, shift) * 180 / Math.PI;
+    expect(angle(topOffset! - middleOffset!)).toBeCloseTo(78);
+    expect(angle(middleOffset! - bottomOffset!)).toBeCloseTo(78);
+    expect(motion.fade).toBeGreaterThan(0);
+    expect(motion.fade).toBeLessThan(1);
     expect(motion.x).toBeGreaterThan(barBox.width);
+    expect(motion.x / motion.step).toBeCloseTo(Math.round(motion.x / motion.step));
     expect(motion.y).toBe(0);
-    await wrap.screenshot({ path: testInfo.outputPath("live-particles.png") });
+    await wrap.screenshot({ path: testInfo.outputPath("live-ripple.png") });
 
-    const textureOrigin = () => particles.evaluate((element) => (
-      element.getBoundingClientRect().left + element.closest('[data-scroll-container="gantt"]')!.scrollLeft
-      + parseFloat(getComputedStyle(element, "::before").backgroundPositionX)
-    ));
-    const initialOrigin = await textureOrigin();
+    const origin = () => ripple.evaluate((element) => {
+      const left = element.getBoundingClientRect().left + element.closest('[data-scroll-container="gantt"]')!.scrollLeft;
+      return left + parseFloat(getComputedStyle(element, "::before").backgroundPositionX);
+    });
+    const initialOrigin = await origin();
     await wrap.evaluate((element, width) => { element.scrollLeft = width * 15; }, barBox.width);
     await expect(firstBar).toHaveCount(0);
-    await expect(particles).toHaveCount(1);
-    expect(await textureOrigin()).toBeCloseTo(initialOrigin, 0);
-    expect(await particles.evaluate((element) => element.getAnimations({ subtree: true })[0]?.currentTime)).toBe(2400);
+    await expect(ripple).toHaveCount(1);
+    expect(await origin()).toBeCloseTo(initialOrigin, 0);
+    expect(await ripple.evaluate((element) => element.getAnimations({ subtree: true }).map((animation) => animation.currentTime))).toEqual([pausedTime, pausedTime, pausedTime]);
     await wrap.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
     await expect(row.locator(`[data-date="${nextStart}"] [data-bar]`)).toBeInViewport();
-    await expect(particles).toHaveCount(0);
+    await expect(ripple).toHaveCount(0);
     await wrap.evaluate((element) => { element.scrollLeft = 0; });
-    await expect(particles).toBeVisible();
+    await expect(ripple).toBeVisible();
 
     const reset = page.getByRole("button", { name: "重置比例", exact: true });
     await expect(reset).toHaveCount(0);
     const wrapBox = (await wrap.boundingBox())!;
-    await page.mouse.move(wrapBox.x + 240, wrapBox.y + 60);
-    await page.keyboard.down("Control");
-    await page.mouse.wheel(0, 1000);
-    await page.keyboard.up("Control");
+    const zoomOut = async (delta: number) => {
+      await page.mouse.move(wrapBox.x + 240, wrapBox.y + 60);
+      await page.keyboard.down("Control");
+      await page.mouse.wheel(0, delta);
+      await page.keyboard.up("Control");
+    };
+    await zoomOut(300);
+    await expect(wrap.getByRole("table")).toHaveAttribute("data-marker-mode", "tick");
+    expect((await ripple.boundingBox())!.height).toBe(barBox.height);
+    expect(await ripple.evaluate((element) => getComputedStyle(element, "::before").backgroundSize)).toContain("50%");
+    await zoomOut(1000);
     await expect(reset).toBeVisible();
-    await expect(particles).toHaveCount(0);
+    await expect(ripple).toHaveCount(0);
     const resetBox = (await reset.boundingBox())!;
     expect(resetBox.x + resetBox.width).toBeLessThan(wrapBox.x + wrapBox.width);
     expect(resetBox.y).toBeGreaterThan(wrapBox.y);
@@ -664,9 +699,9 @@ for (const theme of ["light", "dark"] as const) {
     expect(await reset.boundingBox()).toEqual(resetBox);
     await reset.click();
     await expect(reset).toHaveCount(0);
-    await expect(particles).toBeVisible();
+    await expect(ripple).toBeVisible();
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await expect.poll(() => particles.evaluate((element) => getComputedStyle(element, "::before").animationName)).toBe("none");
-    await expect(particles).toBeVisible();
+    await expect.poll(() => ripple.evaluate((element) => element.getAnimations({ subtree: true }).length)).toBe(0);
+    await expect(ripple).toBeVisible();
   });
 }

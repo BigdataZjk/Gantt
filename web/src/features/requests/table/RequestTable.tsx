@@ -306,15 +306,30 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
           <div className={styles.table} style={{ width: Math.max(totalWidth, 100) }}>
             <div className={styles.header} style={{ gridTemplateColumns: template }} role="row">
               {keys.map((key) => {
+                const label = HEADERS[key] ?? key;
                 const index = sorting.findIndex((sort) => sort.key === key);
                 const sort = sorting[index];
                 const Icon = sort ? sort.direction === "asc" ? ArrowUp : ArrowDown : ArrowUpDown;
                 return (
-                  <div key={key} role="columnheader" aria-label={HEADERS[key] ?? key} aria-sort={index === 0 ? sort?.direction === "asc" ? "ascending" : "descending" : undefined} className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`}>
-                    <button type="button" className={styles.sortButton} data-sorted={Boolean(sort)} aria-label={`${HEADERS[key]}，${sort ? `第 ${index + 1} 排序，${sort.direction === "asc" ? "升序" : "降序"}，` : ""}点击${sort?.direction === "asc" ? "降序" : "升序"}`} data-tooltip={sort ? `第 ${index + 1} 排序 · ${sort.direction === "asc" ? "升序" : "降序"}，点击切换` : "点击升序，可依次叠加其他字段"} onClick={() => setSorting(toggleTableSort(sorting, key))}>
-                      <span>{HEADERS[key] ?? key}</span>
-                      <span className={styles.sortIndicator}><Icon aria-hidden="true" />{sort && sorting.length > 1 ? <small>{index + 1}</small> : null}</span>
+                  <div
+                    key={key}
+                    role="columnheader"
+                    aria-label={label}
+                    aria-sort={index === 0 ? sort?.direction === "asc" ? "ascending" : "descending" : undefined}
+                    data-sorted={sort ? true : undefined}
+                    className={`${styles.headerCell} ${key === "name" ? styles.headerName : ""}`}
+                  >
+                    <span className={styles.headerLabel}>{label}</span>
+                    <button
+                      type="button"
+                      className={styles.sortButton}
+                      aria-label={`${label}，${sort ? `第 ${index + 1} 排序，${sort.direction === "asc" ? "升序" : "降序"}，` : ""}点击${sort?.direction === "asc" ? "降序" : "升序"}`}
+                      data-tooltip={sort ? `第 ${index + 1} 排序 · ${sort.direction === "asc" ? "升序" : "降序"}，点击切换` : "点击升序，可依次叠加其他字段"}
+                      onClick={() => setSorting(toggleTableSort(sorting, key))}
+                    >
+                      <Icon aria-hidden="true" />
                     </button>
+                    {sort && sorting.length > 1 ? <small className={styles.sortIndex} aria-hidden="true">{index + 1}</small> : null}
                     {!archive && key === "name" ? <span className={styles.nameResizeHandle} data-pool-column-resize {...nameResize.separatorProps} /> : null}
                   </div>
                 );

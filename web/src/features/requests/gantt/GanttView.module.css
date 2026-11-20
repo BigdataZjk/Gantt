@@ -130,8 +130,8 @@
 .calendar tr[data-support-lane] {
   --gantt-support-offset: calc(var(--gantt-row-height) + var(--gantt-lane-gap));
 }
-.calendar tr[data-row]:hover > :is(th, td):not(.liveParticles),
-.calendar tr[data-row].rowSelected > :is(th, td):not(.liveParticles) {
+.calendar tr[data-row]:hover > :is(th, td):not(.liveRipple),
+.calendar tr[data-row].rowSelected > :is(th, td):not(.liveRipple) {
   background-image: linear-gradient(
     color-mix(in srgb, var(--rsm-accent) 8%, transparent),
     color-mix(in srgb, var(--rsm-accent) 8%, transparent)
@@ -248,44 +248,77 @@
 .holdCenter { position: absolute; top: 50%; display: flex; transform: translate(-50%, -50%); }
 .holdCenter .cellMarker { border-radius: 50%; background: var(--rsm-gantt-surface); box-shadow: 0 0 0 2px var(--rsm-gantt-surface); }
 .holdCenter .cellMarker[data-marker-mode="tick"] { border-radius: 0; box-shadow: none; }
-.liveParticles {
+.liveRipple {
+  --ripple-fill: var(--task-fill, var(--rsm-accent));
+  --ripple-ink: color-mix(in srgb, currentColor 82%, #60efff);
+  --ripple-period: calc(var(--ripple-cell-width) * var(--ripple-columns));
+  --ripple-step: max(110ms, calc(1.5s / var(--ripple-columns)));
+  --ripple-duration: calc(var(--ripple-step) * var(--ripple-columns));
+  --ripple-bands: 3;
+  --ripple-band-height: calc(100% / var(--ripple-bands));
+  --ripple-band-shift: calc(var(--gantt-row-height) / var(--ripple-bands) / tan(78deg));
+  --ripple-wave: linear-gradient(90deg,
+    var(--ripple-fill) 0 var(--ripple-cell-width),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 9%) 0 calc(2 * var(--ripple-cell-width)),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 18%) 0 calc(3 * var(--ripple-cell-width)),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 31%) 0 calc(4 * var(--ripple-cell-width)),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 44%) 0 calc(5 * var(--ripple-cell-width)),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 27%) 0 calc(6 * var(--ripple-cell-width)),
+    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 11%) 0 calc(7 * var(--ripple-cell-width)),
+    var(--ripple-fill) 0
+  );
+  --ripple-middle-wave: var(--ripple-wave);
   position: absolute;
   z-index: 0;
-  top: 4px;
-  height: calc(var(--gantt-row-height) - 8px);
+  top: 0;
+  height: var(--gantt-row-height);
   overflow: hidden;
   pointer-events: none;
   color: var(--task-ink, var(--rsm-on-accent));
 }
-.liveParticles[data-estimated] {
+.liveRipple[data-estimated] {
+  --ripple-fill: var(--task-estimated-fill);
   color: #101828;
   color: light-dark(#101828, white);
 }
 @supports (color: contrast-color(white)) {
-  .liveParticles[data-estimated] { color: contrast-color(var(--task-estimated-fill)); }
+  .liveRipple[data-estimated] { color: contrast-color(var(--task-estimated-fill)); }
 }
-.liveParticles::before {
-  --repeat-width: 136px;
+.liveRipple::before,
+.liveRipple::after {
+  --ripple-offset: var(--ripple-origin);
   content: "";
   position: absolute;
-  inset: 0 0 0 calc(-1 * var(--repeat-width));
-  background-image:
-    radial-gradient(ellipse 1.5px 0.8px at 8px 32%, currentColor 30%, transparent),
-    radial-gradient(ellipse 1.1px 0.8px at 23px 69%, currentColor 30%, transparent),
-    radial-gradient(ellipse 2.6px 0.85px at 34px 49%, currentColor 30%, transparent),
-    radial-gradient(ellipse 1.4px 0.75px at 55px 22%, currentColor 30%, transparent),
-    radial-gradient(ellipse 2.1px 0.85px at 65px 80%, currentColor 30%, transparent),
-    radial-gradient(ellipse 1.2px 0.8px at 86px 43%, currentColor 30%, transparent),
-    radial-gradient(ellipse 2.7px 0.9px at 112px 64%, currentColor 30%, transparent),
-    radial-gradient(ellipse 1.6px 0.8px at 126px 27%, currentColor 30%, transparent);
-  background-size: var(--repeat-width) 100%;
-  background-position: var(--live-particle-offset) 0;
+  inset: 0 0 0 calc(-1 * var(--ripple-period));
+  background-image: var(--ripple-wave), var(--ripple-middle-wave), var(--ripple-wave);
+  background-size: var(--ripple-period) var(--ripple-band-height);
+  background-position:
+    var(--ripple-offset) top,
+    calc(var(--ripple-offset) - var(--ripple-band-shift)) center,
+    calc(var(--ripple-offset) - (var(--ripple-bands) - 1) * var(--ripple-band-shift)) bottom;
   background-repeat: repeat-x;
-  opacity: 0.32;
-  animation: live-particles-right 6.8s linear infinite;
+  animation:
+    gantt-ripple-right var(--ripple-duration) steps(var(--ripple-columns)) var(--ripple-delay) infinite,
+    none var(--ripple-step) ease-in-out var(--ripple-delay) infinite;
 }
-@keyframes live-particles-right { to { transform: translateX(var(--repeat-width)); } }
-@media (prefers-reduced-motion: reduce) { .liveParticles::before { animation: none; } }
+/* Crossfade the next position so each cell changes color without sliding. */
+.liveRipple::after {
+  --ripple-offset: calc(var(--ripple-origin) + var(--ripple-cell-width));
+  animation-name: gantt-ripple-right, gantt-ripple-fade;
+}
+@keyframes gantt-ripple-right { to { transform: translateX(var(--ripple-period)); } }
+@keyframes gantt-ripple-fade { from { opacity: 0; } }
+.calendar[data-marker-mode="tick"] .liveRipple {
+  --ripple-bands: 2;
+  --ripple-middle-wave: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liveRipple::before {
+    inset: 0;
+    animation: none;
+  }
+  .liveRipple::after { content: none; }
+}
 .parallelExchange { position: absolute; top: 100%; left: 50%; width: 18px; height: 22px; transform: translate(-50%, -50%) scale(var(--parallel-scale, 1)); z-index: 1; pointer-events: none; }
 .parallelExchange[data-marker-mode="tick"] { width: 5px; height: 12px; transform: translate(-50%, -50%); }
 .parallelTicks { display: flex; align-items: center; justify-content: center; gap: 2px; width: 100%; height: 100%; }

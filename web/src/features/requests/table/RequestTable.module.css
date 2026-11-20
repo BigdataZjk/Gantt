@@ -25,26 +25,35 @@
   align-items: center;
   min-width: 0;
   height: var(--table-header-height);
-  padding: 0;
+  padding: 0 8px;
   color: var(--rsm-data-header-ink);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
-.headerName { position: sticky; left: 0; z-index: 8; background: var(--rsm-data-header); box-shadow: 1px 0 0 var(--rsm-border); }
-.headerName .sortButton { padding-right: 13px; }
-.headerCell[aria-label="优先级"] .sortButton { justify-content: center; }
-.sortButton { display: flex; align-items: center; gap: 5px; width: 100%; height: 100%; padding: 0 8px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; }
-.sortButton > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.headerName { position: sticky; left: 0; z-index: 8; padding-right: 13px; background: var(--rsm-data-header); box-shadow: 1px 0 0 var(--rsm-border); }
+.headerCell[aria-label="优先级"] { justify-content: center; padding-inline: 4px; }
+.headerCell[data-sorted] { color: var(--rsm-accent); }
+.headerLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sortButton {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.5;
+}
 .sortButton:hover { background: color-mix(in srgb, var(--rsm-accent) 7%, transparent); }
-.sortButton[data-sorted="true"] { color: var(--rsm-accent); }
-.sortButton:focus-visible { outline-offset: -3px; }
-.sortIndicator { display: inline-flex; align-items: center; gap: 1px; flex: none; opacity: 0.35; }
-.sortIndicator svg { width: 12px; height: 12px; stroke-width: 1.8; }
-.sortIndicator small { font-size: 9px; font-variant-numeric: tabular-nums; }
-.sortButton:is(:hover, [data-sorted="true"]) .sortIndicator { opacity: 1; }
+.sortButton:focus-visible { outline-offset: -2px; }
+.headerCell[data-sorted] .sortButton, .sortButton:is(:hover, :focus-visible) { opacity: 1; }
+.sortButton svg { width: 12px; height: 12px; stroke-width: 1.8; }
+.sortIndex { flex: none; font-size: 9px; font-variant-numeric: tabular-nums; }
 .resetSorting { position: absolute; right: 16px; top: calc(var(--table-header-height) + 14px); z-index: 9; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--rsm-border); border-radius: 50%; background: var(--rsm-surface-sticky); color: var(--rsm-accent); box-shadow: var(--rsm-shadow-soft); animation: rsm-fade-in 140ms ease-out both; }
 .resetSorting:hover { background: var(--rsm-accent-soft); }
 .resetSorting svg { width: 16px; height: 16px; stroke-width: 1.8; }

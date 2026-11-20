@@ -1213,9 +1213,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
   const holds = useMemo(() => holdLayout(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const estimates = useMemo(() => estimateCenters(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const visibleDays = useMemo(() => visibleDates.map(resolve), [visibleDates, resolve]);
-  const liveStart = state.fillBounds[live]?.start;
-  const particles = useMemo(() => {
-    if (!liveStart || markerMode === "hidden" || dayWidth < 6) return null;
+  const liveRange = state.fillBounds[live];
+  const ripple = useMemo(() => {
+    if (!liveRange || markerMode === "hidden" || dayWidth < 6) return null;
 
     const runs: { start: number; end: number }[] = [];
     visibleDays.forEach((day, index) => {
@@ -1225,21 +1225,31 @@ const GanttRequestRow = memo(function GanttRequestRow({
       else runs.push({ start: index, end: index + 1 });
     });
     const first = runs[0];
-    if (!first) return null;
+    const last = runs.at(-1);
+    if (!first || !last) return null;
 
     const offset = (index: number) => `${(index - first.start) * dayWidth}px`;
     const mask = runs.length > 1 ? runs.map(({ start, end }) => (
       `transparent ${offset(start)}, black ${offset(start)} ${offset(end)}, transparent ${offset(end)}`
     )).join(", ") : null;
-    // Keep the texture anchored to the segment as the rendered date window moves.
-    const phaseOffset = diffDays(liveStart, visibleDates[first.start]!) * dayWidth;
+    const cellsPerDay = Math.max(1, Math.round(dayWidth / (markerMode === "tick" ? 11 : 9)));
+    const phaseDays = diffDays(liveRange.start, liveRange.end) + 1;
+    // Keep the wave and its grid fixed to the segment during horizontal scrolling.
+    const phaseOffset = diffDays(liveRange.start, visibleDates[first.start]!) * dayWidth;
     return {
-      left: `calc(var(--name-column-width) + ${(leftHidden + first.start) * dayWidth}px)`,
-      width: offset(runs.at(-1)!.end),
-      maskImage: mask ? `linear-gradient(to right, ${mask})` : undefined,
-      "--live-particle-offset": `${(row.id % 19) * 7 - phaseOffset}px`,
-    } as CSSProperties;
-  }, [visibleDays, visibleDates, live, liveStart, markerMode, dayWidth, leftHidden, row.id]);
+      atStart: visibleDates[first.start] === liveRange.start,
+      atEnd: visibleDates[last.end - 1] === liveRange.end,
+      style: {
+        left: `calc(var(--name-column-width) + ${(leftHidden + first.start) * dayWidth}px)`,
+        width: offset(last.end),
+        maskImage: mask ? `linear-gradient(to right, ${mask})` : undefined,
+        "--ripple-origin": `${-phaseOffset}px`,
+        "--ripple-cell-width": `${dayWidth / cellsPerDay}px`,
+        "--ripple-columns": Math.min(18, Math.max(8, phaseDays * cellsPerDay + 2)),
+        "--ripple-delay": `${-(row.id % 11) * 137}ms`,
+      } as CSSProperties,
+    };
+  }, [visibleDays, visibleDates, live, liveRange, markerMode, dayWidth, leftHidden, row.id]);
   const previewCell = (date: string, working: boolean): "valid" | "invalid" | null => {
     if (!preview || (preview.support && !working)) return null;
     const included = preview.dates ? preview.dates.includes(date) : preview.start && preview.end && date >= preview.start && date <= preview.end;
@@ -1391,7 +1401,15 @@ const GanttRequestRow = memo(function GanttRequestRow({
         );
       })}
       {rightHidden > 0 ? <td aria-hidden="true" colSpan={rightHidden} style={{ width: rightHidden * dayWidth }} /> : null}
-      {particles ? <td className={styles.liveParticles} data-live-particles data-estimated={estimated ? "" : undefined} style={particles} aria-hidden="true" /> : null}
+      {ripple ? (
+        <td
+          className={[styles.liveRipple, ripple.atStart ? styles.barStart : "", ripple.atEnd ? styles.barEnd : ""].filter(Boolean).join(" ")}
+          data-live-ripple
+          data-estimated={estimated ? "" : undefined}
+          style={ripple.style}
+          aria-hidden="true"
+        />
+      ) : null}
     </tr>
   );
 });
