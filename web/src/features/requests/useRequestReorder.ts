@@ -14,7 +14,7 @@ interface Options {
   headerHeight: number;
   resolveDrop?: (source: ApiRequest, target: RequestDrop) => RequestDrop | string;
   onReorder: (source: ApiRequest, target: RequestDrop) => void;
-  onStart?: () => void;
+  onStart?: (source: ApiRequest) => void;
   onEnd?: () => void;
 }
 
@@ -65,7 +65,7 @@ export function useRequestReorder(options: Options) {
       const { containerRef, rows, headerHeight, resolveDrop } = latest.current;
       const container = containerRef.current;
       const source = rows.find((row) => row.id === current?.id);
-      if (!current?.active || !container || !source || source.archived) { cleanup(); return; }
+      if (!current?.active || !container || !source) { cleanup(); return; }
       const bounds = container.getBoundingClientRect();
       const inBounds = current.x >= bounds.left && current.x < bounds.right && current.y >= bounds.top + headerHeight && current.y < bounds.bottom;
       const targetElement = inBounds ? document.elementFromPoint(current.x, current.y)?.closest<HTMLElement>("[data-row], [data-reorder-group]") : null;
@@ -133,9 +133,10 @@ export function useRequestReorder(options: Options) {
       if (!(event.buttons & 1) || latest.current.enabled === false) { cleanup(); return; }
       event.preventDefault();
       if (!current.active) {
-        if (!latest.current.rows.some((row) => row.id === current.id && !row.archived)) { cleanup(); return; }
+        const source = latest.current.rows.find((row) => row.id === current.id);
+        if (!source) { cleanup(); return; }
         current.active = true;
-        latest.current.onStart?.();
+        latest.current.onStart?.(source);
         window.getSelection()?.removeAllRanges();
         latest.current.containerRef.current?.setAttribute("data-reordering", "true");
         const bubble = document.createElement("div");
@@ -160,7 +161,7 @@ export function useRequestReorder(options: Options) {
       }
       const source = latest.current.rows.find((row) => row.id === current.id);
       cleanup();
-      if (current.active && source && !source.archived && current.target) latest.current.onReorder(source, current.target);
+      if (current.active && source && current.target) latest.current.onReorder(source, current.target);
     };
     const cancel = (event: PointerEvent) => { if (event.pointerId === drag.current?.pointerId) cleanup(); };
     const key = (event: KeyboardEvent) => {
@@ -193,14 +194,15 @@ export function useRequestReorder(options: Options) {
   }, []);
 
   useEffect(() => {
-    if (drag.current && (!options.rows.some((row) => row.id === drag.current!.id && !row.archived) || options.enabled === false)) cleanupRef.current();
+    const current = drag.current;
+    if (current && (options.enabled === false || !options.rows.some((row) => row.id === current.id))) cleanupRef.current();
   }, [options.rows, options.enabled]);
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button === 0) suppressUntil.current = 0;
     if (latest.current.enabled === false || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
     const handle = (event.target as Element).closest("[data-request-select], [data-request-name]");
-    const row = handle?.closest<HTMLElement>("[data-row]:not([data-archived])");
+    const row = handle?.closest<HTMLElement>("[data-row]");
     if (!row || !latest.current.containerRef.current?.contains(row)) return;
     cleanupRef.current();
     drag.current = { id: Number(row.dataset.row), pointerId: event.pointerId, x: event.clientX, y: event.clientY, downX: event.clientX, downY: event.clientY, active: false, target: null };
@@ -210,5 +212,6 @@ export function useRequestReorder(options: Options) {
     if (event.detail > 0 && performance.now() < suppressUntil.current) { event.preventDefault(); event.stopPropagation(); }
   }, []);
 
-  return { className: styles.container, onPointerDown, onClickCapture: suppressClick, onDoubleClickCapture: suppressClick };
+  const className = options.enabled === false ? styles.container : `${styles.container} ${styles.enabled}`;
+  return { className, onPointerDown, onClickCapture: suppressClick, onDoubleClickCapture: suppressClick };
 }

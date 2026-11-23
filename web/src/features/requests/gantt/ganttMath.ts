@@ -201,16 +201,37 @@ export interface GanttGroup {
   rows: ApiRequest[];
 }
 
-export function groupRequests(rows: ApiRequest[], users: User[], calendar: Calendar, rowOrder: Record<string, number[]>): GanttGroup[] {
-  const starts = new Map(rows.map((row) => [row.id, planOf(row, calendar).segments[0]?.start ?? ""]));
+export function groupRequests(
+  rows: ApiRequest[], users: User[], calendar: Calendar, rowOrder: Record<string, number[]>,
+  range?: { start: string; end: string; visibleIds: ReadonlySet<number> },
+): GanttGroup[] {
+  const starts = new Map(rows.map((row) => {
+    const { segments } = planOf(row, calendar);
+    const start = segments[0]?.start ?? "";
+    const visibleStart = range?.visibleIds.has(row.id)
+      ? segments.find((segment) => segment.start <= range.end && segment.end >= range.start)?.start ?? ""
+      : "";
+    return [row.id, { start, visibleStart }];
+  }));
+  const scheduledFirst = (a: ApiRequest, b: ApiRequest) => Number(!starts.get(a.id)!.start) - Number(!starts.get(b.id)!.start);
   const sorted = (list: ApiRequest[], developer: string) => {
+    list.sort((a, b) => scheduledFirst(a, b) || starts.get(a.id)!.start.localeCompare(starts.get(b.id)!.start) || a.id - b.id);
+    if (range) {
+      const isVisible = (row: ApiRequest) => range.visibleIds.has(row.id);
+      const visible = list.filter(isVisible).sort((a, b) => {
+        const startA = starts.get(a.id)!.visibleStart;
+        const startB = starts.get(b.id)!.visibleStart;
+        return scheduledFirst(a, b) || Number(!startA) - Number(!startB) || startA.localeCompare(startB);
+      });
+      let index = 0;
+      list = list.map((row) => isVisible(row) ? visible[index++]! : row);
+    }
     const rank = new Map((rowOrder[developer] ?? []).map((id, index) => [id, index]));
-    return list.sort((a, b) => {
-      const startA = starts.get(a.id)!;
-      const startB = starts.get(b.id)!;
-      if (Boolean(startA) !== Boolean(startB)) return startA ? -1 : 1;
-      return (rank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || startA.localeCompare(startB) || a.id - b.id;
-    });
+    if (!rank.size) return list;
+    const ranked = list.filter((row) => rank.has(row.id))
+      .sort((a, b) => scheduledFirst(a, b) || rank.get(a.id)! - rank.get(b.id)!);
+    let index = 0;
+    return list.map((row) => rank.has(row.id) ? ranked[index++]! : row);
   };
   const people = new Map<string, { id: string; name: string; deleted: boolean; order: number }>();
   users.forEach((user, index) => {

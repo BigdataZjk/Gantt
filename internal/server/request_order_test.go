@@ -11,7 +11,9 @@ func TestSharedGanttOrderMovesAndValidatesAtomically(t *testing.T) {
 	f := newFixture(t)
 	_, state := f.call("POST", "/api/users", map[string]any{"username": "测试开发人", "password": "test", "role": "admin"}, 200, true)
 	developer := state.Users[1].ID
-	state = f.create("未分配需求")
+	unassigned := example("待分配的排期")
+	unassigned.Start = "2026-11-20"
+	_, state = f.call("POST", "/api/requests", map[string]any{"baseRevision": state.Revision, "request": unassigned}, 200, true)
 	source := state.Requests[0]
 	assigned := example("已分配需求")
 	assigned.Developer = developer
@@ -45,10 +47,23 @@ func TestSharedGanttOrderMovesAndValidatesAtomically(t *testing.T) {
 	if !archived.Archived || archived.Start != assigned.Start || archived.Delivery != assigned.Delivery {
 		t.Fatal("archiving changed the schedule", archived)
 	}
-	f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(source.ID)}, 400, true)
-	_, state = f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(source.ID, assigned.ID)}, 200, true)
-	if !slices.Equal(state.GanttRowOrder[developer], []int64{source.ID, assigned.ID}) || !reflect.DeepEqual(state.Requests[1], archived) {
-		t.Fatal("reordering around an archived request failed or mutated its data", state.GanttRowOrder)
+	earlier := example("更早的归档排期")
+	earlier.Developer, earlier.Start = developer, "2026-11-11"
+	_, state = f.call("POST", "/api/requests", map[string]any{"baseRevision": state.Revision, "request": earlier}, 200, true)
+	earlier = state.Requests[2]
+	_, state = f.call("POST", fmt.Sprintf("/api/requests/%d/archive", earlier.ID), map[string]any{"baseRevision": state.Revision, "archived": true}, 200, true)
+	f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(source.ID, assigned.ID)}, 400, true)
+	_, state = f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(earlier.ID, source.ID, assigned.ID), "draggedRequestId": assigned.ID}, 200, true)
+	if !slices.Equal(state.GanttRowOrder[developer], []int64{earlier.ID, source.ID, assigned.ID}) || !reflect.DeepEqual(state.Requests[1], archived) {
+		t.Fatal("reordering an archived request failed or mutated its data", state.GanttRowOrder)
+	}
+	detail := state.Logs[0].Detail
+	if detail == nil || detail.Subject != archived.Name || len(detail.Changes) != 1 {
+		t.Fatalf("operation log did not identify the moved archived request: %+v", detail)
+	}
+	change := detail.Changes[0]
+	if change.Before == nil || change.Before.Text != "第 2 行" || change.After == nil || change.After.Text != "第 3 行" {
+		t.Fatalf("operation log did not account for the earlier archived row: %+v", change)
 	}
 }
 

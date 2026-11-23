@@ -288,6 +288,9 @@ describe("甘特排期纯计算", () => {
     const defaults = groupRequests([...rows].reverse(), users, calendar, {});
     expect(defaults.find((group) => group.developer === "u1")?.rows.map((row) => row.id)).toEqual([12, 11, 10, 14]);
     expect(defaults.at(-1)?.rows.map((row) => row.id)).toEqual([15, 13, 16]);
+    const archived = request({ id: 17, developer: "u1", archived: true, start: "2026-11-09", delivery: "2026-11-11" });
+    const withArchive = groupRequests([...rows, archived], users, calendar, { u1: [11, 12, 14, 10] });
+    expect(withArchive.find((group) => group.developer === "u1")?.rows.map((row) => row.id)).toEqual([17, 11, 12, 14, 10]);
   });
 
   it("顺排平移多段需求时按有效开发日重算并平移休假标记", () => {

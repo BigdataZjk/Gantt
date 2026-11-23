@@ -170,23 +170,36 @@ func ganttOrderForLog(data *requests.Data, developer string) []int64 {
 		if !schedule.ValidDate(start) {
 			start = ""
 		}
-		rank := ranks[row.ID]
-		if rank == 0 {
-			rank = len(ranks) + 1
-		}
-		rows = append(rows, entry{id: row.ID, start: start, rank: rank})
+		rows = append(rows, entry{id: row.ID, start: start, rank: ranks[row.ID]})
 	}
-	slices.SortFunc(rows, func(a, b entry) int {
+	scheduledFirst := func(a, b entry) int {
 		switch {
 		case a.start != "" && b.start == "":
 			return -1
 		case a.start == "" && b.start != "":
 			return 1
 		}
-		return cmp.Or(cmp.Compare(a.rank, b.rank), cmp.Compare(a.start, b.start), cmp.Compare(a.id, b.id))
+		return 0
+	}
+	slices.SortFunc(rows, func(a, b entry) int {
+		return cmp.Or(scheduledFirst(a, b), cmp.Compare(a.start, b.start), cmp.Compare(a.id, b.id))
+	})
+	ranked := make([]entry, 0, len(ranks))
+	for _, row := range rows {
+		if row.rank > 0 {
+			ranked = append(ranked, row)
+		}
+	}
+	slices.SortFunc(ranked, func(a, b entry) int {
+		return cmp.Or(scheduledFirst(a, b), cmp.Compare(a.rank, b.rank))
 	})
 	ids := make([]int64, 0, len(rows))
+	next := 0
 	for _, row := range rows {
+		if row.rank > 0 {
+			row = ranked[next]
+			next++
+		}
 		ids = append(ids, row.id)
 	}
 	return ids

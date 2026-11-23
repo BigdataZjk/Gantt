@@ -179,7 +179,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
   const calendar = state.calendar;
   const today = todayISO();
   const [viewport, setViewport] = useState({ width: 1200, height: 640 });
-  const [reorderingRows, setReorderingRows] = useState(false);
+  const [showDropOnlyGroups, setShowDropOnlyGroups] = useState(false);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
   const scrollFrame = useRef(0);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set());
@@ -244,13 +244,15 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
     return map;
   }, [rows, domainColor, state.domains]);
 
-  const allGroups = useMemo(() => groupRequests(state.requests, state.users, calendar, state.ganttRowOrder ?? {}), [state.requests, state.users, calendar, state.ganttRowOrder]);
-  const groups = useMemo(() => {
-    const visible = new Set(rows.map((row) => row.id));
-    return allGroups.map((group) => ({ ...group, rows: group.rows.filter((row) => visible.has(row.id)) })).filter((group) => group.rows.length > 0);
-  }, [allGroups, rows]);
+  const visibleIds = useMemo(() => new Set(rows.map((row) => row.id)), [rows]);
+  const allGroups = useMemo(() => groupRequests(state.requests, state.users, calendar, state.ganttRowOrder ?? {}, {
+    start: axisStart, end: rangeEnd, visibleIds,
+  }), [state.requests, state.users, calendar, state.ganttRowOrder, axisStart, rangeEnd, visibleIds]);
+  const groups = useMemo(() => allGroups
+    .map((group) => ({ ...group, rows: group.rows.filter((row) => visibleIds.has(row.id)) }))
+    .filter((group) => group.rows.length > 0), [allGroups, visibleIds]);
   const developers = useMemo(() => new Set(state.users.filter((user) => !user.disabled && !user.deleted).map((user) => user.id)), [state.users]);
-  const dropOnlyGroups = reorderingRows && isAdmin
+  const dropOnlyGroups = showDropOnlyGroups && isAdmin
     ? allGroups.filter((group) => developers.has(group.developer) && !groups.some((visible) => visible.developer === group.developer))
       .map((group) => ({ ...group, rows: [] }))
     : [];
@@ -281,12 +283,19 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
     rows,
     enabled: permissions.canEdit,
     headerHeight: 49,
-    onStart: () => { setReorderingRows(true); setMenu(null); setHovered(null); setSelectedIds(new Set()); setAnchorId(null); },
-    onEnd: () => setReorderingRows(false),
+    onStart: (source) => {
+      setShowDropOnlyGroups(!source.archived);
+      setMenu(null);
+      setHovered(null);
+      setSelectedIds(new Set());
+      setAnchorId(null);
+    },
+    onEnd: () => setShowDropOnlyGroups(false),
     resolveDrop: (source, target) => {
       const developer = target.kind === "row" ? target.row.developer : target.developer;
       const moving = source.developer !== developer;
       if (moving) {
+        if (source.archived) return "已归档需求只能在当前分组排序";
         if (!isAdmin) return "更换开发人需要管理员权限";
         if (developer && !developers.has(developer)) return "请选择可用的开发人";
         if (!developer && source.supportSegments?.length) return "此需求有补位安排，需保留开发人";

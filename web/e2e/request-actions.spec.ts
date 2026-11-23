@@ -355,6 +355,54 @@ test("甘特需求格的两侧空白、优先级短竖线和状态标签均可�
   expect(orderWrites.map((item) => item.orders)).toEqual([[{ developer: "u1", requestIds: [1, 9, 2, 4, 3] }]]);
 });
 
+test("甘特图的默认顺序按筛选范围内第一段开发时间升序排列", async ({ page }) => {
+  const archived = request({
+    id: 9,
+    name: "分段开发的归档需求",
+    archived: true,
+    segments: [
+      { start: "2026-11-10", end: "2026-11-12", holdBefore: false },
+      { start: "2026-11-23", end: "2026-11-24", holdBefore: true },
+    ],
+  });
+  const { orderWrites } = await preview(page, { rows: [requests[0]!, requests[2]!, archived] });
+  await expect.poll(() => rowIds(page)).toEqual([9, 1, 3]);
+  await page.getByLabel("甘特图开始日期", { exact: true }).fill("2026-11-16");
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 3]);
+  await page.getByLabel("甘特图结束日期", { exact: true }).fill("2026-11-18");
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 3]);
+  expect(orderWrites).toEqual([]);
+});
+
+test("甘特图归档需求可拖动调整同组顺序，刷新后仍保留", async ({ page }) => {
+  const { state, mutations, orderWrites } = await preview(page);
+  const before = structuredClone(state.requests);
+  const source = page.locator('tr[data-row="9"][data-archived] [data-request-select]');
+  const hint = page.locator('[data-slot="request-reorder-hint"]');
+  await expect(source).toHaveCSS("cursor", "grab");
+  await dragTo(page, source, nameOf(page, "其他人员需求"), "after", false);
+  await expect(hint).toHaveText("已归档需求只能在当前分组排序");
+  await expect(hint).toHaveAttribute("data-valid", "false");
+  await page.mouse.up();
+  expect(orderWrites).toEqual([]);
+
+  await dragTo(page, source, nameOf(page, "已排期乙"), "after", false);
+  await expect(hint).toHaveText("在「已排期乙」后");
+  await expect(page.locator('tr[data-row="2"]')).toHaveAttribute("data-reorder-edge", "after");
+  await page.mouse.up();
+  const expected = [1, 2, 9, 3, 4, 5, 6, 7];
+  await expect.poll(() => rowIds(page)).toEqual(expected);
+  await page.reload();
+  await expect.poll(() => rowIds(page)).toEqual(expected);
+  expect(orderWrites).toEqual([expect.objectContaining({
+    draggedRequestId: 9,
+    orders: [{ developer: "u1", requestIds: [1, 2, 9, 3, 4] }],
+  })]);
+  expect(orderWrites[0]?.move).toBeUndefined();
+  expect(state.requests).toEqual(before);
+  expect(mutations).toEqual([]);
+});
+
 test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右键仍有需求操作", async ({ page }) => {
   const { state, mutations, orderWrites } = await preview(page);
   await dragTo(page, nameOf(page, "未排期甲"), nameOf(page, "已排期甲"), "before", false);
