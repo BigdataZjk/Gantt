@@ -111,45 +111,94 @@ test("甘特图按日期显示排期，未分配遵循日期范围，隐藏无�
   await expect.poll(() => rowIds(page)).toEqual([13, 12, 9]);
 });
 
-test("需求池仅点击优先级格子才标注，排序开启时按点击顺序编号", async ({ page }) => {
-  const { state } = await preview(page);
-  const clicks: number[] = [];
+test("需求池修改优先级后清除级联排序并保留完整行序", async ({ page }) => {
+  const rows = requests.map((row): ApiRequest => {
+    if (row.id === 2) return { ...row, status: "HOLD", requesterRank: 1 };
+    if (row.id === 6) return { ...row, requesterRank: 2 };
+    return row;
+  });
+  const { state } = await preview(page, { rows });
+  const changes: (number | "clear")[] = [];
   await page.route("**/api/requests/priority", async (route) => {
-    const { requestId } = route.request().postDataJSON();
-    clicks.push(requestId);
-    state.requests.find((row) => row.id === requestId)!.requesterRank = clicks.length;
+    const { action, requestId } = route.request().postDataJSON();
+    const ranked = state.requests.filter((row) => !row.archived && row.requesterRank)
+      .sort((a, b) => a.requesterRank! - b.requesterRank!);
+    changes.push(action === "clear" ? "clear" : requestId);
+    if (action === "toggle") {
+      const row = state.requests.find((item) => item.id === requestId)!;
+      const index = ranked.indexOf(row);
+      if (index < 0) ranked.push(row);
+      else {
+        ranked.splice(index, 1);
+        row.requesterRank = 0;
+      }
+    }
+    ranked.forEach((row, index) => { row.requesterRank = action === "clear" ? 0 : index + 1; });
     state.revision += 1;
     await route.fulfill({ json: state });
   });
   const tab = page.getByRole("tab", { name: "需求池", exact: true });
   await tab.click();
-  const priority = page.getByRole("columnheader", { name: "优先级", exact: true }).getByRole("button");
+  const headerSort = (name: string) => page.getByRole("columnheader", { name, exact: true }).getByRole("button");
+  const priority = headerSort("优先级");
+  const status = headerSort("状态");
+  const reset = page.getByRole("button", { name: "重置排序", exact: true });
   const rank = (id: number) => page.locator(`[data-row="${id}"] [data-key="requesterRank"]`);
+  const toggleStatusFilter = async (label: string) => {
+    await page.getByRole("button", { name: `状态：${label}`, exact: true }).click();
+    await page.getByRole("dialog").getByRole("checkbox", { name: "待开发", exact: true }).click();
+    await page.keyboard.press("Escape");
+  };
+  await status.click();
   await priority.click();
-  await priority.click();
-  const initialOrder = await rowIds(page);
+  const fullOrder = [6, 8, 7, 5, 4, 3, 1, 2];
+  await expect.poll(() => rowIds(page)).toEqual(fullOrder);
+  await expect(priority).toHaveAccessibleName(/第 2 排序，升序/);
+  await toggleStatusFilter("全部");
+  const filteredOrder = fullOrder.filter((id) => id !== 2);
+  await expect.poll(() => rowIds(page)).toEqual(filteredOrder);
 
   await nameOf(page, "未排期甲").click();
   await page.locator('[data-row="7"] [data-key="status"]').click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await rank(3).click({ position: { x: 4, y: 8 } });
-  await expect(rank(3)).toHaveText("1");
-  expect(await rowIds(page)).toEqual(initialOrder);
+  await expect(reset).toHaveCount(0);
+  await expect(priority).toHaveAccessibleName("优先级，点击升序");
+  await expect(status).toHaveAccessibleName("状态，点击升序");
+  await expect(rank(3)).toHaveText("3");
+  await expect.poll(() => rowIds(page)).toEqual(filteredOrder);
   await rank(7).getByRole("button").click();
   await rank(5).getByRole("button").click();
-  await expect(rank(7)).toHaveText("2");
-  await expect(rank(5)).toHaveText("3");
-  expect(clicks).toEqual([3, 7, 5]);
-  expect(await rowIds(page)).toEqual(initialOrder);
+  await expect(rank(7)).toHaveText("4");
+  await expect(rank(5)).toHaveText("5");
+  await rank(6).getByRole("button").click();
+  await expect(rank(6)).toHaveText("–");
+  await expect(rank(3)).toHaveText("2");
 
   await tab.hover();
-  await expect.poll(() => rowIds(page)).toEqual([8, 6, 4, 2, 1, 5, 7, 3]);
+  await expect.poll(() => rowIds(page)).toEqual(filteredOrder);
+  await toggleStatusFilter("待开发");
+  await expect.poll(() => rowIds(page)).toEqual(fullOrder);
+  await page.reload();
+  await expect.poll(() => rowIds(page)).toEqual(fullOrder);
+
   await priority.click();
-  await expect.poll(() => rowIds(page)).toEqual([3, 7, 5, 8, 6, 4, 2, 1]);
-  await expect(rank(3)).toHaveText("1");
-  await expect(rank(7)).toHaveText("2");
-  await expect(rank(5)).toHaveText("3");
-  expect(clicks).toEqual([3, 7, 5]);
+  const rankedOrder = [2, 3, 7, 5, 6, 8, 4, 1];
+  await expect.poll(() => rowIds(page)).toEqual(rankedOrder);
+  await rank(2).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "清除优先级", exact: true }).click();
+  await expect(reset).toHaveCount(0);
+  await expect(rank(2)).toHaveText("–");
+  await expect.poll(() => rowIds(page)).toEqual(rankedOrder);
+
+  await status.click();
+  const statusOrder = [3, 7, 5, 6, 8, 4, 1, 2];
+  await expect.poll(() => rowIds(page)).toEqual(statusOrder);
+  await rank(8).getByRole("button").click();
+  await expect(rank(8)).toHaveText("1");
+  await expect(status).toHaveAccessibleName(/第 1 排序，升序/);
+  await expect.poll(() => rowIds(page)).toEqual(statusOrder);
+  expect(changes).toEqual([3, 7, 5, 6, "clear", 8]);
 });
 
 for (const tab of ["甘特图", "需求池"] as const) {
@@ -462,45 +511,63 @@ test("长列表名称拖动可沿边缘滚动到虚拟化行", async ({ page }) 
   expect(mutations).toEqual([]);
 });
 
-test("需求池可双击表头或行分隔线适应最长名称，包含视口外需求", async ({ page }) => {
-  const name = "用于检查需求池整列适应的很长需求名称".repeat(3);
-  const rows = Array.from({ length: 70 }, (_, index) => request({ id: index + 1, name: index ? `需求 ${index}` : name }));
-  const { mutations } = await preview(page, { rows });
-  await page.getByRole("tab", { name: "需求池", exact: true }).click();
-  const wrap = page.getByRole("table", { name: "需求列表", exact: true });
-  const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
-  const rowEdge = wrap.locator('[data-row="70"] [data-pool-column-resize]');
-  await expect(nameOf(page, name)).toHaveCount(0);
-  await separator.press("Home");
-  await separator.dblclick();
-  const fitted = Number(await separator.getAttribute("aria-valuenow"));
-  expect(fitted).toBeGreaterThan(500);
-  expect(fitted).toBeLessThan(Number(await separator.getAttribute("aria-valuemax")));
+for (const archive of [false, true]) {
+  const tab = archive ? "已归档" : "需求池";
+  test(`${tab}可拖动需求列宽，双击分隔线适应视口外的最长名称`, async ({ page }) => {
+    const name = "用于检查需求列表整列适应的很长需求名称".repeat(3);
+    const rows = Array.from({ length: 70 }, (_, index) => request({ id: index + 1, name: index ? `需求 ${index}` : name, archived: archive }));
+    rows.push(request({ id: 71, name, archived: !archive }));
+    const { mutations } = await preview(page, { rows });
+    const currentTab = page.getByRole("tab", { name: tab, exact: true });
+    await currentTab.click();
+    const wrap = page.getByRole("table", { name: archive ? "归档需求列表" : "需求列表", exact: true });
+    const separator = wrap.getByRole("separator", { name: "调整需求列宽", exact: true });
+    const rowEdge = wrap.locator('[data-row="70"] [data-table-column-resize]');
+    await expect(nameOf(page, name)).toHaveCount(0);
+    await separator.press("Home");
+    const minimum = Number(await separator.getAttribute("aria-valuemin"));
+    await expect(separator).toHaveAttribute("aria-valuenow", String(minimum));
+    const edge = (await separator.boundingBox())!;
+    const x = edge.x + edge.width / 2;
+    const y = edge.y + edge.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 48, y, { steps: 6 });
+    await page.mouse.up();
+    await expect(separator).toHaveAttribute("aria-valuenow", String(minimum + 48));
+    await separator.dblclick();
+    const fitted = Number(await separator.getAttribute("aria-valuenow"));
+    expect(fitted).toBeGreaterThan(500);
+    expect(fitted).toBeLessThan(Number(await separator.getAttribute("aria-valuemax")));
 
-  await separator.press("End");
-  await rowEdge.dblclick();
-  await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
-  await expect(page.getByRole("button", { name: "重置排序", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.reload();
-  await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
+    await separator.press("End");
+    await rowEdge.dblclick();
+    await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
+    await expect(page.getByRole("button", { name: "重置排序", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page.getByRole("tab", { name: archive ? "需求池" : "已归档", exact: true }).click();
+    await expect(page.getByRole("separator", { name: "调整需求列宽", exact: true })).toHaveAttribute("aria-valuenow", "230");
+    await currentTab.click();
+    await page.reload();
+    await expect(separator).toHaveAttribute("aria-valuenow", String(fitted));
 
-  await wrap.evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  const label = nameOf(page, name);
-  await expect(label).toBeVisible();
-  expect(await label.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
-  const { gap, padding } = await label.evaluate((element) => {
-    const cell = element.closest('[data-key="name"]')!;
-    const text = document.createRange();
-    text.selectNodeContents(element);
-    return {
-      gap: cell.getBoundingClientRect().right - text.getBoundingClientRect().right,
-      padding: parseFloat(getComputedStyle(cell).paddingRight),
-    };
+    await wrap.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    const label = nameOf(page, name);
+    await expect(label).toBeVisible();
+    expect(await label.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    const { gap, padding } = await label.evaluate((element) => {
+      const cell = element.closest('[data-key="name"]')!;
+      const text = document.createRange();
+      text.selectNodeContents(element);
+      return {
+        gap: cell.getBoundingClientRect().right - text.getBoundingClientRect().right,
+        padding: parseFloat(getComputedStyle(cell).paddingRight),
+      };
+    });
+    expect(Math.abs(gap - padding)).toBeLessThanOrEqual(1);
+    expect(mutations).toEqual([]);
   });
-  expect(Math.abs(gap - padding)).toBeLessThanOrEqual(1);
-  expect(mutations).toEqual([]);
-});
+}
 
 for (const theme of ["light", "dark"] as const) {
   test(`时间轴与人员分组层级清楚，长姓名单行，日夜窄屏布局稳定（${theme}）`, async ({ page }, testInfo) => {

@@ -13,7 +13,7 @@ import { DomainTag, PriorityTag, RequestTypeTag, StatusTag } from "../../../ui/T
 import { ContextMenu, contextMenuPoint, isContextMenuKey } from "../../../ui/ContextMenu";
 import { useNotice } from "../../../ui/Notice";
 import type { RequestPermissions } from "../types";
-import { deliveryOf } from "../filtering";
+import { deliveryOf, scopeRequests } from "../filtering";
 import { requestMenuItems } from "../requestMenu";
 import { reorderVisibleIds, sortBySavedOrder } from "../rowOrder";
 import { useRequestReorder } from "../useRequestReorder";
@@ -71,7 +71,6 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const runner = useMutationRunner();
   const notice = useNotice();
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [ranksAtEditStart, setRanksAtEditStart] = useState<ReadonlyMap<number, number> | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const nameMeasureRef = useRef<HTMLDivElement>(null);
   const rankQueue = useRef<Promise<void>>(Promise.resolve());
@@ -81,14 +80,19 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const openRow = archive ? onOpenDetails : onOpen;
   const sorting = archive ? ui.archiveSorting : ui.poolSorting;
   const hasRanks = state.requests.some((row) => !row.archived && row.requesterRank);
+  const nameWidthKey = archive ? "archiveNameColumnWidth" : "poolNameColumnWidth";
   const nameResize = useNameColumnResize({
-    rows: incomingRows, viewportWidth, defaultWidth: WIDTHS.name!, savedWidth: ui.poolNameColumnWidth,
-    measureRef: nameMeasureRef, onSave: (width) => patch({ poolNameColumnWidth: width }),
+    rows: incomingRows, viewportWidth, defaultWidth: WIDTHS.name!, savedWidth: ui[nameWidthKey],
+    measureRef: nameMeasureRef, onSave: (width) => patch({ [nameWidthKey]: width }),
   });
+  const getPoolRowsInSavedOrder = () => {
+    const newest = newestRequests(scopeRequests(state.requests, "pool"), false);
+    return sortBySavedOrder(newest, ui.poolRowOrder, true);
+  };
   const changeRank = (id?: number) => {
-    if (id === undefined) setRanksAtEditStart(null);
-    else if (sorting.some(({ key }) => key === "requesterRank")) {
-      setRanksAtEditStart((ranks) => ranks ?? new Map(state.requests.map((row) => [row.id, row.requesterRank ?? 0])));
+    if (sorting.some(({ key }) => key === "requesterRank")) {
+      const ordered = sortRequests(getPoolRowsInSavedOrder(), sorting, state.users);
+      patch({ poolSorting: [], poolRowOrder: ordered.map(({ id }) => id) });
     }
     rankQueue.current = rankQueue.current.then(async () => {
       const saved = await runner((base) => api.rankRequests(base, id));
@@ -108,17 +112,15 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const rows = useMemo(() => {
     const newest = newestRequests(incomingRows, archive);
     const ordered = archive ? newest : sortBySavedOrder(newest, ui.poolRowOrder, true);
-    return sortRequests(ordered, sorting, state.users, ranksAtEditStart);
-  }, [archive, incomingRows, ui.poolRowOrder, sorting, state.users, ranksAtEditStart]);
+    return sortRequests(ordered, sorting, state.users);
+  }, [archive, incomingRows, ui.poolRowOrder, sorting, state.users]);
   const setSorting = (next: TableSort[]) => {
-    setRanksAtEditStart(null);
     patch(archive ? { archiveSorting: next } : { poolSorting: next, ...(!next.length ? { poolRowOrder: [] } : {}) });
     setMenu(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   };
   useEffect(() => {
     setMenu(null);
-    setRanksAtEditStart(null);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }, [archive]);
   const reorder = useRequestReorder({
@@ -129,7 +131,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
     onStart: () => setMenu(null),
     onReorder: (source, target) => {
       if (target.kind !== "row") return;
-      const all = sortBySavedOrder(newestRequests(state.requests.filter((row) => !row.archived), false), ui.poolRowOrder, true).map((row) => row.id);
+      const all = getPoolRowsInSavedOrder().map((row) => row.id);
       const order = reorderVisibleIds(all, rows.map((row) => row.id), source.id, target.row.id, target.edge);
       if (order) patch({ poolRowOrder: order });
     },
@@ -137,7 +139,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
 
   const visible = archive ? ui.archiveVisibleColumns : ui.visibleColumns;
   const keys = useMemo(() => ui.columnOrder.filter((key) => visible.includes(key) && (!archive || ARCHIVE_COLUMN_KEYS.includes(key))), [ui.columnOrder, visible, archive]);
-  const nameWidth = archive ? WIDTHS.name : nameResize.width;
+  const nameWidth = nameResize.width;
   const columns = useMemo<ColumnDef<ApiRequest>[]>(
     () =>
       keys.map((key) => ({
@@ -257,14 +259,12 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   return (
     <>
       <div className={styles.viewport} data-column-dragging={nameResize.dragging || undefined}>
-        {!archive ? <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
+        <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
           <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.nameButton} data-name-measure-label /></div>
-        </div> : null}
+        </div>
         <div ref={scrollRef} {...reorder} {...nameResize.pointerHandlers} onPointerDown={(event) => {
-          if ((event.target as Element).closest("[data-pool-column-resize]")) nameResize.begin(event);
+          if ((event.target as Element).closest("[data-table-column-resize]")) nameResize.begin(event);
           else if (!nameResize.dragging) reorder.onPointerDown(event);
-        }} onMouseLeave={() => setRanksAtEditStart(null)} onBlur={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget)) setRanksAtEditStart(null);
         }} className={`${styles.wrap} ${archive ? "" : reorder.className}`} data-scroll-container="table" role="table" aria-label={archive ? "归档需求列表" : "需求列表"} aria-rowcount={rows.length + 1}>
           <div className={styles.table} style={{ width: Math.max(totalWidth, 100) }}>
             <div className={styles.header} style={{ gridTemplateColumns: template }} role="row">
@@ -293,7 +293,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
                       <Icon aria-hidden="true" />
                     </button>
                     {sort && sorting.length > 1 ? <small className={styles.sortIndex} aria-hidden="true">{index + 1}</small> : null}
-                    {!archive && key === "name" ? <span className={styles.nameResizeHandle} data-pool-column-resize {...nameResize.separatorProps} /> : null}
+                    {key === "name" ? <span className={styles.nameResizeHandle} data-table-column-resize {...nameResize.separatorProps} /> : null}
                   </div>
                 );
               })}
@@ -318,7 +318,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
                         setMenu({ row, priority: true, ...contextMenuPoint(event) });
                       } : undefined}>
                         {cellContent(row, key)}
-                        {!archive && key === "name" ? <span className={styles.nameResizeHandle} data-pool-column-resize aria-hidden="true" {...nameResize.handleProps} /> : null}
+                        {key === "name" ? <span className={styles.nameResizeHandle} data-table-column-resize aria-hidden="true" {...nameResize.handleProps} /> : null}
                       </div>;
                     })}
                   </div>
