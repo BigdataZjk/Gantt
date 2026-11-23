@@ -52,7 +52,7 @@ export function VersionsPanel({ state, permissions }: { state: State; permission
           保存当前版本
         </Button>
       </div>
-      <div className={`${styles.tableWrap} ${styles.tableFill}`}>
+      <div className={styles.tableWrap}>
         <table className={styles.table} aria-label="版本记录">
           <thead><tr><th>版本号</th><th>保存时间</th><th>保存人</th><th>操作</th></tr></thead>
           <tbody>

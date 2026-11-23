@@ -87,7 +87,7 @@ export function CalendarPanel({ state }: { state: State }) {
       </div>
       {candidate ? <div className={local.importPreview} role="status"><span>{candidate.name} · {candidate.count} 条日期安排，将替换 {year} 年日历。</span><Button variant="primary" disabled={pending} onClick={() => void update("file")}>应用导入</Button><Button disabled={pending} onClick={() => setCandidate(null)}>取消</Button></div> : null}
       {error ? <p role="alert" className={styles.uploadError}>{error}</p> : null}
-      <div className={`${styles.tableWrap} ${styles.tableFill} ${local.tableViewport}`}>
+      <div className={`${styles.tableWrap} ${local.tableViewport}`}>
         <table className={styles.table} aria-label={`${year} 年节假日及调休`}>
           <thead><tr><th>日期</th><th>安排</th><th>节日</th></tr></thead>
           <tbody>{sorted.length ? sorted.map((day) => <tr key={day.date}><td>{day.date}</td><td><span className={day.isOffDay ? local.rest : local.work}>{day.isOffDay ? "放假" : "调休上班"}</span></td><td>{day.name}</td></tr>) : <tr><td colSpan={3} className={styles.empty}>尚无该年节假日安排，请刷新公开日历或导入 JSON。</td></tr>}</tbody>

@@ -61,7 +61,7 @@ export function LogsPanel({ state, permissions }: { state: State; permissions: R
         </div>
         {permissions.isAdmin ? <Button onClick={() => setManagementOpen(true)}><Settings2 aria-hidden="true" />日志管理</Button> : null}
       </div>
-      <div className={`${styles.tableWrap} ${styles.logsTable}`}>
+      <div className={styles.tableWrap}>
         <table className={styles.table} aria-label="操作记录">
           <thead><tr><th>时间</th><th>操作人</th><th>操作</th><th>状态</th><th>撤回</th></tr></thead>
           <tbody>

@@ -110,7 +110,7 @@ export function RolePanel({ state, permissions, onOpenCredential }: Props) {
         </Button>
       </div>
 
-      <div className={`${styles.tableWrap} ${styles.tableFill}`}>
+      <div className={styles.tableWrap}>
         <table className={styles.table} aria-label="账号列表">
           <thead>
             <tr><th>用户名</th><th>角色</th><th>状态</th><th>操作</th></tr>

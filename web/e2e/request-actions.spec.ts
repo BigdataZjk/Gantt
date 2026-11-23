@@ -80,20 +80,35 @@ async function dragTo(page: Page, source: Locator, target: Locator, edge: "befor
   if (release) await page.mouse.up();
 }
 
-test("甘特图按日期显示排期及归档需求，并保留未排期和未分配需求", async ({ page }) => {
-  await preview(page);
-  await expect.poll(() => rowIds(page)).toEqual([1, 9, 2, 3, 4, 5, 6, 7]);
-  await expect(page.getByRole("button", { name: "收起-的 2 条需求", exact: true })).toBeVisible();
-  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("显示 8 / 共 9 条需求");
+test("甘特图按日期显示排期，未分配遵循日期范围，隐藏无排期的历史需求", async ({ page }) => {
+  await preview(page, { rows: [
+    ...requests,
+    request({ id: 10, name: "范围外的未分配需求", developer: "", status: "已完成" }),
+    request({ id: 11, name: "未排期的已完成需求", developer: "", status: "已完成", start: "", delivery: "" }),
+    request({ id: 12, name: "未排期的归档需求", archived: true, start: "", delivery: "" }),
+    request({ id: 13, name: "范围内的已归档排期", developer: "", archived: true, status: "已完成", start: "2026-11-23", delivery: "2026-11-25" }),
+  ] });
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 2, 3, 4, 5, 10, 13, 6, 7]);
+  await expect(page.getByRole("button", { name: "收起-的 4 条需求", exact: true })).toBeVisible();
+  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("显示 10 / 共 13 条需求");
   const endDate = page.getByLabel("甘特图结束日期", { exact: true });
   const startDate = page.getByLabel("甘特图开始日期", { exact: true });
+  await endDate.fill("2027-01-17");
+  await startDate.fill("2026-11-23");
+  await expect.poll(() => rowIds(page)).toEqual([2, 3, 4, 13, 6, 7]);
+  await expect(page.locator('tr[data-row="2"] [data-date="2026-11-23"] [data-bar]')).toBeVisible();
+  await expect(page.locator('tr[data-row="13"][data-archived] [data-date="2026-11-23"] [data-bar]')).toBeVisible();
+  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("显示 6 / 共 13 条需求");
+
   await endDate.fill("2027-05-12");
   await startDate.fill("2027-05-10");
   await expect.poll(() => rowIds(page)).toEqual([3, 4, 8, 6, 7]);
   await expect(page.locator('tr[data-row="8"] [data-date="2027-05-10"] [data-bar]')).toBeVisible();
   await page.getByRole("tab", { name: "需求池", exact: true }).click();
-  await expect.poll(() => rowIds(page)).toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
-  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
+  await expect.poll(() => rowIds(page)).toEqual([11, 10, 8, 7, 6, 5, 4, 3, 2, 1]);
+  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("10 条需求");
+  await page.getByRole("tab", { name: "已归档", exact: true }).click();
+  await expect.poll(() => rowIds(page)).toEqual([13, 12, 9]);
 });
 
 test("需求池按点击顺序标注优先级，排序开启时连续标注行位置稳定", async ({ page }) => {

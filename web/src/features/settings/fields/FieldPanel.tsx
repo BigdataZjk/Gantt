@@ -132,7 +132,7 @@ export function FieldPanel({ state }: { state: State }) {
               <Plus aria-hidden="true" />新增业务域
             </Button>
           </div>
-          <div className={`${styles.tableWrap} ${styles.tableFill}`}>
+          <div className={styles.tableWrap}>
             <table className={styles.table} aria-label="业务域枚举">
               <thead><tr><th>业务域</th><th>默认颜色</th><th>需求池</th><th>归档</th><th>操作</th></tr></thead>
               <tbody>
@@ -157,7 +157,7 @@ export function FieldPanel({ state }: { state: State }) {
               合并名称{selected.length ? `（${selected.length}）` : ""}
             </Button>
           </div>
-          <div className={`${styles.tableWrap} ${styles.tableFill}`}>
+          <div className={styles.tableWrap}>
             <table className={styles.table} aria-label={`${tab === "project" ? "项目" : "提需人"}名称维护`}>
               <thead>
                 <tr>

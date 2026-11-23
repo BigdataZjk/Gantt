@@ -31,15 +31,44 @@
 .toolbar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
 .caption { color: var(--rsm-muted); font-size: 12px; }
 .captionSmall { color: var(--rsm-muted); font-size: 11px; }
-.tableWrap { min-width: 0; flex: none; overflow-x: auto; border: 1px solid color-mix(in srgb, var(--rsm-panel) 85%, var(--rsm-border)); border-radius: 12px; background: var(--rsm-surface); box-shadow: var(--rsm-shadow-soft); }
-.tableFill { flex: 1; min-height: 0; overflow: auto; }
-.tableFill .table thead th { position: sticky; top: 0; z-index: 2; }
-.logsTable { flex: 1; min-height: 0; overflow: auto; }
-.logsTable .table thead th { position: sticky; top: 0; z-index: 2; }
-.table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
-.table th { padding: 10px 12px; background: var(--rsm-data-header); color: var(--rsm-data-header-ink); font-weight: 600; white-space: nowrap; }
-.table td { padding: 9px 12px; border-top: 1px solid color-mix(in srgb, var(--rsm-border) 72%, transparent); white-space: nowrap; }
-.table tr:hover td { background: color-mix(in srgb, var(--rsm-soft) 26%, transparent); }
+.tableWrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+  container-type: inline-size;
+  border: 1px solid color-mix(in srgb, var(--rsm-panel) 85%, var(--rsm-border));
+  border-radius: 12px;
+  background: var(--rsm-surface);
+  box-shadow: var(--rsm-shadow-soft);
+}
+.table { width: max-content; border-collapse: separate; border-spacing: 0; font-size: 12px; text-align: left; }
+.table thead { position: sticky; top: 0; z-index: 2; }
+.table tr { position: relative; }
+.table tr::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 100%;
+  width: max(0px, calc(100cqw - 100%));
+  background-color: inherit;
+}
+.table thead tr { background: var(--rsm-data-header); }
+.table th {
+  padding: 10px 12px;
+  color: var(--rsm-data-header-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.table td, .table tbody tr::after { border-top: 1px solid color-mix(in srgb, var(--rsm-border) 72%, transparent); }
+.table td {
+  max-width: clamp(11rem, 40vw, 28rem);
+  padding: 9px 12px;
+  overflow-wrap: anywhere;
+}
+.table [data-dict-field="domain"] { height: auto; min-height: 22px; white-space: normal; }
+.table tbody tr:hover { background: color-mix(in srgb, var(--rsm-soft) 26%, transparent); }
 .empty { text-align: center; padding: 28px !important; color: var(--rsm-muted); }
 .actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .actions button { font-size: 12px; }

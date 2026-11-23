@@ -69,8 +69,23 @@ describe("甘特排期纯计算", () => {
     const withDayMarks = { ...row, vacation: ["2026-11-27"], overtime: ["2026-11-28"] };
     expect(matchesGanttRange(withDayMarks, calendar, "2026-11-27", "2026-11-27")).toBe(true);
     expect(matchesGanttRange(withDayMarks, calendar, "2026-11-28", "2026-11-28")).toBe(true);
-    expect(matchesGanttRange({ ...row, developer: "" }, calendar, "2026-12-01", "2026-12-02")).toBe(true);
-    expect(matchesGanttRange(request({ archived, start: "", delivery: "" }), calendar, "2026-12-01", "2026-12-02")).toBe(true);
+    const unassigned = { ...row, developer: "" };
+    expect(matchesGanttRange(unassigned, calendar, "2026-11-24", "2026-11-26")).toBe(true);
+    expect(matchesGanttRange(unassigned, calendar, "2026-12-01", "2026-12-02")).toBe(false);
+  });
+
+  it("无开发排期时保留待安排的需求，以及范围内有补位或日标记的历史需求", () => {
+    const start = "2026-11-23";
+    const end = "2027-01-17";
+    const unplanned = request({ start: "", delivery: "" });
+    const archived = { ...unplanned, archived: true };
+    const completed = { ...unplanned, developer: "", status: "已完成" as const };
+    expect(matchesGanttRange(unplanned, calendar, start, end)).toBe(true);
+    expect(matchesGanttRange({ ...unplanned, developer: "" }, calendar, start, end)).toBe(true);
+    expect(matchesGanttRange(completed, calendar, start, end)).toBe(false);
+    expect(matchesGanttRange(archived, calendar, start, end)).toBe(false);
+    expect(matchesGanttRange({ ...completed, vacation: [start] }, calendar, start, end)).toBe(true);
+    expect(matchesGanttRange({ ...archived, supportSegments: [{ start, end: start, requestId: 1 }] }, calendar, start, end)).toBe(true);
   });
 
   it("单段从准入/交付构造排期", () => {

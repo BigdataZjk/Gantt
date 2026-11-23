@@ -64,6 +64,62 @@ async function dialog(page: Page) {
   return panel;
 }
 
+test("设置表格行铺满可用宽度，列按内容收紧，窄屏在表格内滚动", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 1600, height: 780 });
+  const { state } = await open(page);
+  state.logs = Array.from({ length: 30 }, (_, index) => ({ ...state.logs[0]!, id: index + 1, action: "调整需求方优先级" }));
+  await page.reload();
+  const pageSize = page.getByLabel("操作记录每页行数");
+  await pageSize.fill("30");
+  await pageSize.press("Enter");
+  const table = page.getByRole("table", { name: "操作记录", exact: true });
+  const viewport = table.locator("..");
+  const size = () => viewport.evaluate((element) => ({
+    width: element.clientWidth,
+    viewportWidth: Math.round(element.getBoundingClientRect().width),
+    tableWidth: element.querySelector("table")!.offsetWidth,
+    scrollWidth: element.scrollWidth,
+    height: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    panelWidth: element.closest('[data-scroll-container="settings-content"]')!.clientWidth,
+  }));
+  await expect(table.getByRole("row")).toHaveCount(31);
+  const short = await size();
+  expect(short.viewportWidth).toBe(short.panelWidth);
+  expect(short.tableWidth).toBeLessThan(short.panelWidth / 2);
+  expect(short.scrollHeight).toBeGreaterThan(short.height);
+  expect(short.scrollWidth).toBe(short.width);
+  expect(await table.evaluate((element) => {
+    const container = element.parentElement!;
+    const x = container.getBoundingClientRect().left + container.clientWidth - 8;
+    return Array.from(element.querySelectorAll("tr")).slice(0, 2).every((row) => {
+      const bounds = row.getBoundingClientRect();
+      return row.contains(document.elementFromPoint(x, bounds.top + bounds.height / 2));
+    });
+  })).toBe(true);
+  await pageSize.blur();
+  await page.screenshot({ path: testInfo.outputPath("operation-log-wide.png") });
+
+  state.logs[0]!.action = `新增需求：${"RSM-2026-测试日志".repeat(24)}`;
+  await page.reload();
+  const longCell = table.getByRole("cell", { name: state.logs[0]!.action, exact: true });
+  await expect(longCell).toBeVisible();
+  expect((await size()).tableWidth).toBeGreaterThan(short.tableWidth);
+  expect(await longCell.evaluate((cell) => {
+    const text = document.createRange();
+    text.selectNodeContents(cell);
+    return text.getClientRects().length;
+  })).toBeGreaterThan(1);
+
+  await page.setViewportSize({ width: 390, height: 720 });
+  const narrow = await size();
+  expect(narrow.width).toBeLessThanOrEqual(narrow.panelWidth);
+  expect(narrow.scrollWidth).toBeGreaterThan(narrow.width);
+  await viewport.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+  await expect(table.getByRole("columnheader", { name: "撤回", exact: true })).toBeInViewport();
+  await expect(page.getByRole("navigation", { name: "操作记录分页", exact: true })).toBeInViewport();
+});
+
 test("管理员保存自动清理策略，刷新保留，未保存的修改不提交", async ({ page }) => {
   const model = await open(page);
   const panel = await dialog(page);
