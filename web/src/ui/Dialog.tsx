@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import * as RadixDialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { Button } from "./Button";
@@ -14,15 +14,25 @@ export interface DialogProps {
   width?: number;
   className?: string;
   bodyClassName?: string;
+  overlayClassName?: string;
+  onOpenAutoFocus?: ComponentProps<typeof RadixDialog.Content>["onOpenAutoFocus"];
   closeLabel?: string;
 }
 
-export function Dialog({ open, onOpenChange, title, caption, children, footer, width, className = "", bodyClassName = "", closeLabel = "关闭窗口" }: DialogProps) {
+export function Dialog({
+  open, onOpenChange, title, caption, children, footer, width, className = "", bodyClassName = "",
+  overlayClassName = "", onOpenAutoFocus, closeLabel = "关闭窗口",
+}: DialogProps) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className={styles.scrim} />
-        <RadixDialog.Content className={`${styles.content} ${className}`} style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined} aria-describedby={undefined}>
+        <RadixDialog.Overlay className={`${styles.scrim} ${overlayClassName}`} />
+        <RadixDialog.Content
+          className={`${styles.content} ${className}`}
+          style={width ? { width: `min(${width}px, calc(100vw - 32px))` } : undefined}
+          aria-describedby={undefined}
+          onOpenAutoFocus={onOpenAutoFocus}
+        >
           {title || caption ? (
             <header className={styles.header}>
               <div className={styles.headerText}>

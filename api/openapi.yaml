@@ -216,6 +216,8 @@ paths:
     post:
       operationId: postApiCalendarRefresh
       summary: 管理员刷新公开年度日历
+      parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       requestBody:
         required: true
         content:
@@ -247,10 +249,14 @@ paths:
           description: 仅管理员可更新
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
   /api/calendar/import:
     post:
       operationId: postApiCalendarImport
       summary: 管理员导入年度日历 JSON
+      parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       requestBody:
         required: true
         content:
@@ -285,6 +291,8 @@ paths:
           description: 仅管理员可更新
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
   /api/preferences:
     put:
       operationId: putApiPreferences
@@ -354,6 +362,8 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
       requestBody:
         required: true
         content:
@@ -361,6 +371,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RequestUpdate'
       parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       - name: id
         in: path
         required: true
@@ -400,6 +411,8 @@ paths:
     post:
       operationId: postApiRequestsBatch
       summary: 批量顺排
+      parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       responses:
         '200':
           description: 成功
@@ -415,6 +428,8 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
       requestBody:
         required: true
         content:
@@ -692,6 +707,8 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
       requestBody:
         required: true
         content:
@@ -699,6 +716,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RevisionInput'
       parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       - name: id
         in: path
         required: true
@@ -723,6 +741,8 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
       requestBody:
         required: true
         content:
@@ -730,6 +750,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RevisionInput'
       parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       - name: id
         in: path
         required: true
@@ -930,6 +951,20 @@ paths:
         '200':
           description: 原始图片字节
 components:
+  parameters:
+    P0DeliveryConfirmationHeader:
+      in: header
+      name: X-RSM-Confirm-P0-Delivery
+      description: 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+      schema:
+        type: string
+  responses:
+    P0DeliveryConfirmationRequired:
+      description: 本次操作涉及 P0 需求交付日期变更，待确认后保存。
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/P0DeliveryConfirmationError'
   schemas:
     Segment:
       type: object
@@ -1735,6 +1770,46 @@ components:
           type: string
         code:
           type: string
+      additionalProperties: false
+    P0DeliveryConfirmationError:
+      type: object
+      required: [error, code, confirmation]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          enum: [p0_delivery_confirmation_required]
+        confirmation:
+          $ref: '#/components/schemas/P0DeliveryConfirmation'
+      additionalProperties: false
+    P0DeliveryConfirmation:
+      type: object
+      required: [token, changes]
+      properties:
+        token:
+          type: string
+        changes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/P0DeliveryChange'
+      additionalProperties: false
+    P0DeliveryChange:
+      type: object
+      required: [requestId, name, before, after]
+      properties:
+        requestId:
+          type: integer
+          format: int64
+        name:
+          type: string
+        before:
+          type: string
+          description: 原交付日期，未排期时为空字符串。
+        after:
+          type: string
+          description: 新交付日期，未排期时为空字符串。
       additionalProperties: false
     LoginInput:
       type: object

@@ -1,4 +1,4 @@
-import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogDetail, LogManagement, LogPolicy, Preferences, ScheduleOperation, State, UserPatch } from "./types";
+import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogDetail, LogManagement, LogPolicy, P0DeliveryConfirmation, Preferences, ScheduleOperation, State, UserPatch } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -11,17 +11,31 @@ export class ApiError extends Error {
   }
 }
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
+export class P0DeliveryConfirmationError extends ApiError {
+  constructor(message: string, readonly confirmation: P0DeliveryConfirmation, private readonly retry: () => Promise<Response>) {
+    super(message, 428, "p0_delivery_confirmation_required");
+  }
 
-async function parse<T>(response: Response): Promise<T> {
+  async confirm<T>(): Promise<T> {
+    return parse<T>(await this.retry());
+  }
+}
+
+async function parse<T>(response: Response, retry?: (token: string) => Promise<Response>): Promise<T> {
   if (!response.ok) {
-    let payload: { error?: string; code?: string } | null = null;
+    let payload: { error?: string; code?: string; confirmation?: P0DeliveryConfirmation } | null = null;
     try {
-      payload = (await response.json()) as { error?: string; code?: string };
+      payload = await response.json();
     } catch {
       payload = null;
     }
-    throw new ApiError(payload?.error || "请求失败，请稍后重试", response.status, payload?.code || String(response.status));
+    const message = payload?.error || "请求失败，请稍后重试";
+    const confirmation = payload?.confirmation;
+    if (response.status === 428 && payload?.code === "p0_delivery_confirmation_required" &&
+        confirmation?.token && Array.isArray(confirmation.changes) && confirmation.changes.length > 0 && retry) {
+      throw new P0DeliveryConfirmationError(message, confirmation, () => retry(confirmation.token));
+    }
+    throw new ApiError(message, response.status, payload?.code || String(response.status));
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();
@@ -30,17 +44,20 @@ async function parse<T>(response: Response): Promise<T> {
 }
 
 async function send<T>(path: string, method: string, body?: unknown, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const headers = new Headers(options.headers);
+  if (body !== undefined && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  const init: RequestInit = {
     method,
     credentials: "same-origin",
     ...options,
-    headers: {
-      ...(body !== undefined ? JSON_HEADERS : {}),
-      ...(options.headers ?? {}),
-    },
+    headers,
     body: body !== undefined ? JSON.stringify(body) : options.body,
+  };
+  return parse<T>(await fetch(path, init), (token) => {
+    const confirmedHeaders = new Headers(headers);
+    confirmedHeaders.set("X-RSM-Confirm-P0-Delivery", token);
+    return fetch(path, { ...init, headers: confirmedHeaders });
   });
-  return parse<T>(response);
 }
 
 export const api = {

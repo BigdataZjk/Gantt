@@ -93,6 +93,21 @@ func (e LogValueKind) Valid() bool {
 	}
 }
 
+// Defines values for P0DeliveryConfirmationErrorCode.
+const (
+	P0DeliveryConfirmationErrorCodeP0DeliveryConfirmationRequired P0DeliveryConfirmationErrorCode = "p0_delivery_confirmation_required"
+)
+
+// Valid indicates whether the value is a known member of the P0DeliveryConfirmationErrorCode enum.
+func (e P0DeliveryConfirmationErrorCode) Valid() bool {
+	switch e {
+	case P0DeliveryConfirmationErrorCodeP0DeliveryConfirmationRequired:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PreferencesDensity.
 const (
 	Comfortable PreferencesDensity = "comfortable"
@@ -561,6 +576,33 @@ type Mutation struct {
 	Request      Request `json:"request"`
 }
 
+// P0DeliveryChange defines model for P0DeliveryChange.
+type P0DeliveryChange struct {
+	// After 新交付日期，未排期时为空字符串。
+	After string `json:"after"`
+
+	// Before 原交付日期，未排期时为空字符串。
+	Before    string `json:"before"`
+	Name      string `json:"name"`
+	RequestId int64  `json:"requestId"`
+}
+
+// P0DeliveryConfirmation defines model for P0DeliveryConfirmation.
+type P0DeliveryConfirmation struct {
+	Changes []P0DeliveryChange `json:"changes"`
+	Token   string             `json:"token"`
+}
+
+// P0DeliveryConfirmationError defines model for P0DeliveryConfirmationError.
+type P0DeliveryConfirmationError struct {
+	Code         P0DeliveryConfirmationErrorCode `json:"code"`
+	Confirmation P0DeliveryConfirmation          `json:"confirmation"`
+	Error        string                          `json:"error"`
+}
+
+// P0DeliveryConfirmationErrorCode defines model for P0DeliveryConfirmationError.Code.
+type P0DeliveryConfirmationErrorCode string
+
 // PasswordInput defines model for PasswordInput.
 type PasswordInput struct {
 	CurrentPassword string `json:"currentPassword"`
@@ -758,11 +800,23 @@ type VersionInput struct {
 	Label        string `json:"label"`
 }
 
+// P0DeliveryConfirmationHeader defines model for P0DeliveryConfirmationHeader.
+type P0DeliveryConfirmationHeader = string
+
+// P0DeliveryConfirmationRequired defines model for P0DeliveryConfirmationRequired.
+type P0DeliveryConfirmationRequired = P0DeliveryConfirmationError
+
 // PostApiCalendarImportJSONBody defines parameters for PostApiCalendarImport.
 type PostApiCalendarImportJSONBody struct {
 	BaseRevision int64                  `json:"baseRevision"`
 	Calendar     map[string]interface{} `json:"calendar"`
 	Year         int                    `json:"year"`
+}
+
+// PostApiCalendarImportParams defines parameters for PostApiCalendarImport.
+type PostApiCalendarImportParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // PostApiCalendarRefreshJSONBody defines parameters for PostApiCalendarRefresh.
@@ -771,10 +825,40 @@ type PostApiCalendarRefreshJSONBody struct {
 	Year         int   `json:"year"`
 }
 
+// PostApiCalendarRefreshParams defines parameters for PostApiCalendarRefresh.
+type PostApiCalendarRefreshParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
 // GetEventsParams defines parameters for GetEvents.
 type GetEventsParams struct {
 	// ClientId 当前浏览器页面的连接标识，用于统计在线成员和游客
 	ClientId *string `form:"clientId,omitempty" json:"clientId,omitempty"`
+}
+
+// PostApiHistoryIdUndoParams defines parameters for PostApiHistoryIdUndo.
+type PostApiHistoryIdUndoParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
+// PostApiRequestsBatchParams defines parameters for PostApiRequestsBatch.
+type PostApiRequestsBatchParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
+// PutApiRequestsIdParams defines parameters for PutApiRequestsId.
+type PutApiRequestsIdParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
+// PostApiVersionsIdRestoreParams defines parameters for PostApiVersionsIdRestore.
+type PostApiVersionsIdRestoreParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // PostApiAuthPasswordJSONRequestBody defines body for PostApiAuthPassword for application/json ContentType.

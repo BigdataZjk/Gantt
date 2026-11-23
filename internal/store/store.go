@@ -412,7 +412,14 @@ func (s *Store) change(ctx context.Context, actorID string, base *int64, permiss
 	if e != nil {
 		return 0, e
 	}
+	deliveries, e := readDeliveryDates(ctx, tx, data.Requests)
+	if e != nil {
+		return 0, e
+	}
 	if e = fn(tx, &data, who); e != nil {
+		return 0, e
+	}
+	if e = checkP0DeliveryChanges(ctx, tx, revision, deliveries, data.Requests); e != nil {
 		return 0, e
 	}
 	after, e := json.Marshal(data)

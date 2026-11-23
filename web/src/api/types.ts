@@ -22,6 +22,7 @@ export type Calendar = components["schemas"]["Calendar"];
 export type Presence = components["schemas"]["Presence"];
 export type GanttOrderInput = components["schemas"]["GanttOrderInput"];
 export type ScheduleOperation = components["schemas"]["ScheduleOperation"];
+export type P0DeliveryConfirmation = components["schemas"]["P0DeliveryConfirmation"];
 export type Priority = ApiRequest["priority"];
 export type Status = ApiRequest["status"];
 export type RequestType = ApiRequest["requestType"];

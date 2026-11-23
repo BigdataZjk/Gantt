@@ -1,9 +1,10 @@
 import { useCallback } from "react";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, ApiError } from "./client";
+import { api, ApiError, P0DeliveryConfirmationError } from "./client";
 import type { State } from "./types";
 import { createStateWriter, STATE_KEY } from "./stateCache";
 import { useNotice } from "../ui/Notice";
+import { useP0DeliveryConfirmation } from "../ui/P0DeliveryConfirmation";
 
 export { STATE_KEY } from "./stateCache";
 
@@ -28,13 +29,18 @@ export function useAppState() {
 export function useMutationRunner() {
   const client = useQueryClient();
   const notice = useNotice();
+  const confirmP0Delivery = useP0DeliveryConfirmation();
 
   return useCallback(
     async (mutator: (baseRevision: number) => Promise<State>, options: { silent?: boolean } = {}): Promise<State | null> => {
       const baseRevision = client.getQueryData<State>(STATE_KEY)?.revision ?? 0;
       const writeState = createStateWriter(client);
       try {
-        const next = await mutator(baseRevision);
+        const next = await mutator(baseRevision).catch(async (error: unknown) => {
+          if (!(error instanceof P0DeliveryConfirmationError)) throw error;
+          if (!await confirmP0Delivery(error.confirmation)) return null;
+          return error.confirm<State>();
+        });
         if (next && !await writeState(next)) return null;
         return next ?? null;
       } catch (error) {
@@ -54,7 +60,7 @@ export function useMutationRunner() {
         return null;
       }
     },
-    [client, notice],
+    [client, notice, confirmP0Delivery],
   );
 }
 

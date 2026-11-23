@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { NoticeProvider } from "../ui/Notice";
+import { P0DeliveryConfirmationProvider } from "../ui/P0DeliveryConfirmation";
 import { TooltipHost } from "../ui/TooltipHost";
 import { Root } from "./Root";
 
@@ -28,7 +29,9 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <NoticeProvider>
         <TooltipHost />
-        <Root />
+        <P0DeliveryConfirmationProvider>
+          <Root />
+        </P0DeliveryConfirmationProvider>
       </NoticeProvider>
     </QueryClientProvider>
   );

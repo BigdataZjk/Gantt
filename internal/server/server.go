@@ -19,16 +19,17 @@ import (
 )
 
 type Server struct {
-	Store       *store.Store
-	Version     string
-	mux         *http.ServeMux
-	dummyHash   string
-	mu          sync.Mutex
-	subscribers map[*eventSubscriber]struct{}
-	visitors    map[string]visitor
-	online      Presence
-	attempts    map[string]attempt
-	static      http.Handler
+	Store           *store.Store
+	Version         string
+	mux             *http.ServeMux
+	dummyHash       string
+	confirmationKey []byte
+	mu              sync.Mutex
+	subscribers     map[*eventSubscriber]struct{}
+	visitors        map[string]visitor
+	online          Presence
+	attempts        map[string]attempt
+	static          http.Handler
 }
 type visitor struct {
 	userID     string
@@ -43,7 +44,7 @@ type actorKey struct{}
 
 func New(db *store.Store, assets fs.FS, version string) *Server {
 	dummy, _ := auth.Hash(auth.Token())
-	s := &Server{Store: db, Version: version, mux: http.NewServeMux(), dummyHash: dummy, subscribers: map[*eventSubscriber]struct{}{}, visitors: map[string]visitor{}, online: Presence{Users: []string{}}, attempts: map[string]attempt{}}
+	s := &Server{Store: db, Version: version, mux: http.NewServeMux(), dummyHash: dummy, confirmationKey: []byte(auth.Token()), subscribers: map[*eventSubscriber]struct{}{}, visitors: map[string]visitor{}, online: Presence{Users: []string{}}, attempts: map[string]attempt{}}
 	if assets != nil {
 		s.static = http.FileServer(http.FS(assets))
 	}
@@ -118,7 +119,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if cookie, e := r.Cookie("rsm_session"); e == nil {
 		u, _ = s.Store.Session(r.Context(), cookie.Value)
 	}
-	s.mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), actorKey{}, u)))
+	r = r.WithContext(context.WithValue(r.Context(), actorKey{}, u))
+	if u.ID != "" && r.Method != http.MethodGet && r.Method != http.MethodHead {
+		r = s.withP0DeliveryConfirmation(r, u.ID)
+	}
+	s.mux.ServeHTTP(w, r)
 }
 func actor(r *http.Request) auth.User { u, _ := r.Context().Value(actorKey{}).(auth.User); return u }
 func decode(w http.ResponseWriter, r *http.Request, value any) error {
@@ -142,7 +147,13 @@ func send(w http.ResponseWriter, code int, value any) {
 func (s *Server) fail(w http.ResponseWriter, e error) {
 	status, code, message := http.StatusInternalServerError, "internal", "服务暂时无法完成此操作"
 	var invalid store.Invalid
+	var confirmation store.P0DeliveryConfirmation
 	switch {
+	case errors.As(e, &confirmation):
+		send(w, http.StatusPreconditionRequired, map[string]any{
+			"error": confirmation.Error(), "code": "p0_delivery_confirmation_required", "confirmation": confirmation,
+		})
+		return
 	case errors.Is(e, store.ErrUnauthorized):
 		status, code, message = 401, "unauthorized", e.Error()
 	case errors.Is(e, store.ErrForbidden):

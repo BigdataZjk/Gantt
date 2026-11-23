@@ -40,7 +40,7 @@ func newFixture(t *testing.T) *fixture {
 	}
 	return f
 }
-func (f *fixture) call(method, path string, value any, want int, logged bool) (*httptest.ResponseRecorder, store.Snapshot) {
+func (f *fixture) call(method, path string, value any, want int, logged bool, headers ...http.Header) (*httptest.ResponseRecorder, store.Snapshot) {
 	f.t.Helper()
 	var body io.Reader
 	switch b := value.(type) {
@@ -56,6 +56,13 @@ func (f *fixture) call(method, path string, value any, want int, logged bool) (*
 	}
 	req := httptest.NewRequest(method, path, body)
 	req.Header.Set("Content-Type", "application/json")
+	for _, header := range headers {
+		for name, values := range header {
+			for _, value := range values {
+				req.Header.Add(name, value)
+			}
+		}
+	}
 	if logged && f.cookie != nil {
 		req.AddCookie(f.cookie)
 	}

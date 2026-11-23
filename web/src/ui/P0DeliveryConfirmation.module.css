@@ -1,0 +1,36 @@
+.overlay { z-index: 210; }
+.dialog { z-index: 211; }
+
+.list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 9px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--rsm-border);
+  border-radius: var(--rsm-radius-md);
+}
+
+.heading { display: flex; align-items: baseline; gap: 8px; }
+.heading strong { min-width: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+
+.dates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.dates > svg { width: 15px; height: 15px; color: var(--rsm-muted); }
+.date { margin: 0; padding: 6px 8px; border-radius: var(--rsm-radius-sm); background: var(--rsm-soft); }
+.date dt { color: var(--rsm-muted); font-size: 11px; }
+.date dd { margin: 1px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.nextDate { background: var(--rsm-accent-soft); }
+.nextDate dd { color: var(--rsm-accent); font-weight: 600; }

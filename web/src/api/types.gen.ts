@@ -938,6 +938,25 @@ export interface components {
             error: string;
             code: string;
         };
+        P0DeliveryConfirmationError: {
+            error: string;
+            /** @enum {string} */
+            code: "p0_delivery_confirmation_required";
+            confirmation: components["schemas"]["P0DeliveryConfirmation"];
+        };
+        P0DeliveryConfirmation: {
+            token: string;
+            changes: components["schemas"]["P0DeliveryChange"][];
+        };
+        P0DeliveryChange: {
+            /** Format: int64 */
+            requestId: number;
+            name: string;
+            /** @description 原交付日期，未排期时为空字符串。 */
+            before: string;
+            /** @description 新交付日期，未排期时为空字符串。 */
+            after: string;
+        };
         LoginInput: {
             username: string;
             password: string;
@@ -1000,8 +1019,21 @@ export interface components {
             guests: number;
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description 本次操作涉及 P0 需求交付日期变更，待确认后保存。 */
+        P0DeliveryConfirmationRequired: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["P0DeliveryConfirmationError"];
+            };
+        };
+    };
+    parameters: {
+        /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+        P0DeliveryConfirmationHeader: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -1446,7 +1478,10 @@ export interface operations {
     postApiCalendarRefresh: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1497,12 +1532,16 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     postApiCalendarImport: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1556,6 +1595,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     putApiPreferences: {
@@ -1665,7 +1705,10 @@ export interface operations {
     putApiRequestsId: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path: {
                 id: string;
             };
@@ -1714,6 +1757,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     deleteApiRequestsId: {
@@ -1773,7 +1817,10 @@ export interface operations {
     postApiRequestsBatch: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -1820,6 +1867,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     putGanttOrder: {
@@ -2315,7 +2363,10 @@ export interface operations {
     postApiVersionsIdRestore: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path: {
                 id: string;
             };
@@ -2364,12 +2415,16 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     postApiHistoryIdUndo: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path: {
                 id: string;
             };
@@ -2418,6 +2473,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     getHistoryDetail: {
