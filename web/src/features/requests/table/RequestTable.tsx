@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, ListX, RotateCcw } from "lucide-react";
@@ -64,7 +64,6 @@ const WIDTHS: Record<string, number> = {
 };
 
 const HEADERS = Object.fromEntries(COLUMN_CATALOG.map(({ key, label }) => [key, label]));
-const NAME_CLICK_DELAY_MS = 500;
 
 export function RequestTable({ state, permissions, rows: incomingRows, totalCount, draftHint, archive, onOpen, onOpenDetails, onDelete, onArchive, onRestore }: Props) {
   const { ui, patch } = useUiState();
@@ -76,47 +75,26 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const scrollRef = useRef<HTMLDivElement>(null);
   const nameMeasureRef = useRef<HTMLDivElement>(null);
   const rankQueue = useRef<Promise<void>>(Promise.resolve());
-  const pendingNameRank = useRef<{ id: number; timer: number } | null>(null);
   const [viewportWidth, setViewportWidth] = useState(1200);
   const canEdit = permissions.canEdit;
   const canRank = canEdit && !archive;
+  const openRow = archive ? onOpenDetails : onOpen;
   const sorting = archive ? ui.archiveSorting : ui.poolSorting;
   const hasRanks = state.requests.some((row) => !row.archived && row.requesterRank);
   const nameResize = useNameColumnResize({
     rows: incomingRows, viewportWidth, defaultWidth: WIDTHS.name!, savedWidth: ui.poolNameColumnWidth,
     measureRef: nameMeasureRef, onSave: (width) => patch({ poolNameColumnWidth: width }),
   });
-  const cancelNameRank = useCallback(() => {
-    const pending = pendingNameRank.current;
-    if (!pending) return;
-    window.clearTimeout(pending.timer);
-    pendingNameRank.current = null;
-    return pending.id;
-  }, []);
-  const enqueueRank = (id?: number) => {
+  const changeRank = (id?: number) => {
+    if (id === undefined) setRanksAtEditStart(null);
+    else if (sorting.some(({ key }) => key === "requesterRank")) {
+      setRanksAtEditStart((ranks) => ranks ?? new Map(state.requests.map((row) => [row.id, row.requesterRank ?? 0])));
+    }
     rankQueue.current = rankQueue.current.then(async () => {
       const saved = await runner((base) => api.rankRequests(base, id));
       if (saved && id === undefined) notice.notify("已清除需求池优先级");
     });
   };
-  const changeRank = (id?: number, waitForDoubleClick = false) => {
-    if (id === undefined) setRanksAtEditStart(null);
-    else if (sorting.some(({ key }) => key === "requesterRank")) {
-      setRanksAtEditStart((ranks) => ranks ?? new Map(state.requests.map((row) => [row.id, row.requesterRank ?? 0])));
-    }
-    const previous = cancelNameRank();
-    if (previous !== undefined) enqueueRank(previous);
-    if (id === undefined || !waitForDoubleClick) {
-      enqueueRank(id);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      pendingNameRank.current = null;
-      enqueueRank(id);
-    }, NAME_CLICK_DELAY_MS);
-    pendingNameRank.current = { id, timer };
-  };
-  useEffect(() => () => { cancelNameRank(); }, [canRank, cancelNameRank]);
   useLayoutEffect(() => {
     const element = scrollRef.current;
     if (!element) return;
@@ -214,31 +192,16 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
             <button
               type="button"
               className={styles.nameButton}
-              aria-pressed={canRank ? Boolean(row.requesterRank) : undefined}
-              aria-description={canRank ? "单击标注或取消优先级，双击编辑" : undefined}
-              onMouseDown={canRank ? (event) => {
-                if (event.detail === 2 && pendingNameRank.current?.id === row.id) cancelNameRank();
-              } : undefined}
-              onClick={canRank ? (event) => {
-                if (event.detail <= 1) changeRank(row.id, event.detail === 1);
-              } : undefined}
-              onDoubleClick={() => {
-                if (pendingNameRank.current?.id === row.id) cancelNameRank();
-                if (archive) onOpenDetails(row.id);
-                else onOpen(row.id);
+              onClick={(event) => {
+                if (event.detail === 0) openRow(row.id);
               }}
+              onDoubleClick={() => openRow(row.id)}
               onKeyDown={(event) => {
-                if (isContextMenuKey(event)) {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  setMenu({ row, x: rect.left, y: rect.bottom });
-                  return;
-                }
-                if (event.key === "Enter" && (archive || !canEdit)) {
-                  event.preventDefault();
-                  onOpenDetails(row.id);
-                }
+                if (!isContextMenuKey(event)) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const rect = event.currentTarget.getBoundingClientRect();
+                setMenu({ row, x: rect.left, y: rect.bottom });
               }}
               aria-haspopup="menu"
             >
@@ -288,7 +251,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
     : menuRow
     ? archive && canEdit
       ? [{ key: "restore", label: "恢复到需求池", icon: RotateCcw, onSelect: () => onRestore(menuRow) }]
-      : requestMenuItems(menuRow, { canEdit: canEdit && !archive, onOpen: archive ? onOpenDetails : onOpen, onDelete, onArchive })
+      : requestMenuItems(menuRow, { canEdit: canEdit && !archive, onOpen: openRow, onDelete, onArchive })
     : [];
 
   return (

@@ -111,7 +111,7 @@ test("甘特图按日期显示排期，未分配遵循日期范围，隐藏无�
   await expect.poll(() => rowIds(page)).toEqual([13, 12, 9]);
 });
 
-test("需求池按点击顺序标注优先级，排序开启时连续标注行位置稳定", async ({ page }) => {
+test("需求池仅点击优先级格子才标注，排序开启时按点击顺序编号", async ({ page }) => {
   const { state } = await preview(page);
   const clicks: number[] = [];
   await page.route("**/api/requests/priority", async (route) => {
@@ -130,9 +130,12 @@ test("需求池按点击顺序标注优先级，排序开启时连续标注行�
   const initialOrder = await rowIds(page);
 
   await nameOf(page, "未排期甲").click();
+  await page.locator('[data-row="7"] [data-key="status"]').click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await rank(3).click({ position: { x: 4, y: 8 } });
   await expect(rank(3)).toHaveText("1");
   expect(await rowIds(page)).toEqual(initialOrder);
-  await nameOf(page, "未分配乙").click();
+  await rank(7).getByRole("button").click();
   await rank(5).getByRole("button").click();
   await expect(rank(7)).toHaveText("2");
   await expect(rank(5)).toHaveText("3");
@@ -383,8 +386,11 @@ test("自定义右键不叠浏览器菜单，键盘与窄屏边缘可用，输�
   await expect(page.getByRole("menu")).toHaveCount(0);
 });
 
-test("游客右键仅查看详情，双击只读详情保持可用", async ({ page }) => {
-  const { mutations } = await preview(page, { guest: true });
+test("游客可看需求详情和优先级，无法修改优先级", async ({ page }) => {
+  const { mutations } = await preview(page, {
+    guest: true,
+    rows: requests.map((row) => row.id === 3 ? { ...row, requesterRank: 1 } : row),
+  });
   for (const tab of ["甘特图", "需求池"]) {
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const name = nameOf(page, "未排期甲");
@@ -397,6 +403,12 @@ test("游客右键仅查看详情，双击只读详情保持可用", async ({ pa
     await expect(page.getByRole("heading", { name: "需求详情", exact: true })).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
   }
+  const rank = page.locator('[data-row="3"] [data-key="requesterRank"]');
+  await expect(rank.getByRole("button")).toHaveCount(0);
+  await rank.click();
+  await rank.click({ button: "right" });
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(rank).toHaveText("1");
   expect(mutations).toEqual([]);
 });
 
