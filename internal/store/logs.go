@@ -93,8 +93,9 @@ func logAdmin(ctx context.Context, q queryer, actorID string) error {
 
 func readStoredLogs(ctx context.Context, q queryer) ([]storedLog, error) {
 	rows, e := q.QueryContext(ctx, `select id,created_at,
-        length(cast(actor as blob))+length(cast(action as blob))+length(cast(created_at as blob))+coalesce(length(cast(before_data as blob)),0),
-        reversible,undone from history order by id desc`)
+        length(cast(actor as blob))+length(cast(action as blob))+length(cast(created_at as blob))+coalesce(length(cast(before_data as blob)),0)
+          +coalesce(length(cast(preview as blob))+length(cast(payload as blob)),0),
+        reversible,undone from history left join history_details on id=history_id order by id desc`)
 	if e != nil {
 		return nil, e
 	}
@@ -218,13 +219,27 @@ func (s *Store) SaveLogPolicy(ctx context.Context, actorID string, base *int64, 
 	}
 	s.logMu.Lock()
 	defer s.logMu.Unlock()
-	return s.Change(ctx, actorID, base, "admin", "更新日志保留策略", false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+	detail := history.Detail{Label: "更新日志清理策略"}
+	return s.ChangeLogged(ctx, actorID, base, "admin", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+		before, e := readLogPolicy(ctx, tx)
+		if e != nil {
+			return e
+		}
+		detail.Add("操作记录", retentionValue(before.OperationRetentionDays), retentionValue(policy.OperationRetentionDays))
+		detail.Add("日志归档文件", retentionValue(before.ArchiveRetentionDays), retentionValue(policy.ArchiveRetentionDays))
 		if e := writeSetting(ctx, tx, logPolicyKey, policy); e != nil {
 			return e
 		}
-		_, e := tx.ExecContext(ctx, "delete from system_settings where key=?", lastAutomaticKey)
+		_, e = tx.ExecContext(ctx, "delete from system_settings where key=?", lastAutomaticKey)
 		return e
 	})
+}
+
+func retentionValue(days int) history.Value {
+	if days == 0 {
+		return history.Text("关闭")
+	}
+	return history.Text(fmt.Sprintf("保留 %d 天", days))
 }
 
 func selectLogCleanup(logs []storedLog, files []archivedLog, scope string, days int, revision int64, at time.Time) (history.CleanupPreview, []int64, []archivedLog, error) {
@@ -360,11 +375,8 @@ func (s *Store) CleanupLogs(ctx context.Context, actorID string, base *int64, ex
 		defer cancel()
 	}
 	run := history.CleanupRun{CheckedAt: at.UTC().Format(time.RFC3339Nano)}
-	action := "手动清理操作记录"
-	if expected.Scope == "archives" {
-		action = "手动清理归档文件日志"
-	}
-	rev, e := s.Change(ctx, actorID, base, "admin", action, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+	detail := history.Detail{Label: "手动清理日志"}
+	rev, e := s.ChangeLogged(ctx, actorID, base, "admin", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
 		var currentRev int64
 		if e := tx.QueryRowContext(ctx, "select revision from metadata where id=1").Scan(&currentRev); e != nil {
 			return e
@@ -394,10 +406,16 @@ func (s *Store) CleanupLogs(ctx context.Context, actorID string, base *int64, ex
 			return e
 		}
 		run.OperationsDeleted = len(ids)
+		detail.Tags = []history.Value{history.Text(fmt.Sprintf("%d 天前", expected.Days)), {Text: preview.Before, Kind: "timestamp"}}
 		if expected.Scope == "operations" {
 			run.Bytes = preview.Bytes
+			detail.Tags = append(detail.Tags, cleanupCount(run.OperationsDeleted, "条操作记录"))
 		} else {
 			run.ArchivesDeleted, run.Bytes, run.Error = deleteArchivedLogs(root, selected)
+			detail.Tags = append(detail.Tags, cleanupCount(run.ArchivesDeleted, "个日志归档文件"))
+		}
+		if run.Error != "" {
+			detail.Tags = append(detail.Tags, history.Text(run.Error))
 		}
 		return writeSetting(ctx, tx, lastManualKey, run)
 	})
@@ -480,8 +498,13 @@ func (s *Store) MaintainLogs(ctx context.Context, at time.Time) (revision int64,
 	}
 	changed = run.OperationsDeleted+run.ArchivesDeleted > 0
 	if changed {
-		action := fmt.Sprintf("自动清理日志：%d 条操作记录、%d 个归档文件", run.OperationsDeleted, run.ArchivesDeleted)
-		if _, e = tx.ExecContext(ctx, "insert into history(actor,action,created_at,reversible) values (?,?,?,0)", "系统", action, run.CheckedAt); e != nil {
+		detail := history.Detail{Label: "自动清理日志", Tags: []history.Value{
+			cleanupCount(run.OperationsDeleted, "条操作记录"), cleanupCount(run.ArchivesDeleted, "个日志归档文件"),
+		}}
+		if run.Error != "" {
+			detail.Tags = append(detail.Tags, history.Text(run.Error))
+		}
+		if e = insertHistory(ctx, tx, "系统", "", run.CheckedAt, false, nil, &detail); e != nil {
 			return 0, false, e
 		}
 		if _, e = tx.ExecContext(ctx, "delete from history where id not in (select id from history order by id desc limit 200)"); e != nil {
@@ -493,4 +516,8 @@ func (s *Store) MaintainLogs(ctx context.Context, at time.Time) (revision int64,
 		}
 	}
 	return revision, changed, tx.Commit()
+}
+
+func cleanupCount(count int, unit string) history.Value {
+	return history.Text(fmt.Sprintf("清理 %d %s", count, unit))
 }

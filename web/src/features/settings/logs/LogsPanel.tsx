@@ -10,6 +10,7 @@ import { Dialog } from "../../../ui/Dialog";
 import { useNotice } from "../../../ui/Notice";
 import type { RequestPermissions } from "../../requests/types";
 import styles from "../Settings.module.css";
+import { LogAction } from "./LogAction";
 import { LogManagementDialog } from "./LogManagementDialog";
 
 export function LogsPanel({ state, permissions }: { state: State; permissions: RequestPermissions }) {
@@ -71,7 +72,7 @@ export function LogsPanel({ state, permissions }: { state: State; permissions: R
                 <tr key={entry.id}>
                   <td>{timeLabel(entry.createdAt)}</td>
                   <td>{entry.actor}</td>
-                  <td className={entry.undone ? styles.undoneTag : ""}>{entry.action}</td>
+                  <td className={`${styles.logAction}${entry.undone ? ` ${styles.undoneTag}` : ""}`}><LogAction entry={entry} /></td>
                   <td className={styles.logStatus}>{entry.undone ? "已撤回" : entry.reversible ? "可撤回" : "不可撤回"}</td>
                   <td>
                     <Button size="sm" variant="quiet" disabled={!canUndo} onClick={() => setUndoTarget(entry.id)}>撤回到此动作</Button>

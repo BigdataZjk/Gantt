@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import type { LogCleanupPreview, LogCleanupRun, LogManagement, State, User } from "../src/api/types";
+import type { LogCleanupPreview, LogCleanupRun, LogDetail, LogManagement, State, User } from "../src/api/types";
 import { users } from "../src/test/fixtures";
 
 async function open(page: Page, options: { role?: User["role"] | "guest"; theme?: "light" | "dark" } = {}) {
@@ -63,6 +63,52 @@ async function dialog(page: Page) {
   await expect(panel.getByText("3 条", { exact: true })).toBeVisible();
   return panel;
 }
+
+test("多字段变更在同一条操作记录换行，按需展开其余字段", async ({ page }) => {
+  const { state } = await open(page);
+  const detail = {
+    label: "编辑需求",
+    subject: "测试 DAU 口径调整",
+    changes: [
+      { field: "状态", before: { text: "待开发", kind: "status" }, after: { text: "开发中", kind: "status" } },
+      { field: "开发人", before: { text: "测试开发人甲" }, after: { text: "测试开发人乙" } },
+      { field: "优先级", before: { text: "P1", kind: "priority" }, after: { text: "P0", kind: "priority" } },
+      { field: "项目", before: { text: "未填写" }, after: { text: "测试项目" } },
+    ],
+  } satisfies LogDetail;
+  const entry = state.logs[0]!;
+  entry.detail = { ...detail, changes: detail.changes.slice(0, 2), expandable: true, remaining: 2 };
+  let detailRequests = 0;
+  await page.route(`**/api/history/${entry.id}/detail`, (route) => {
+    detailRequests += 1;
+    return route.fulfill({ json: detail });
+  });
+  await page.reload();
+  const table = page.getByRole("table", { name: "操作记录", exact: true });
+  const row = table.getByRole("row", { name: /测试 DAU 口径调整/ });
+  await expect(row).toHaveCount(1);
+  await expect(row.getByText(detail.subject, { exact: true })).toHaveCount(2);
+  await expect(row.getByText("编辑需求", { exact: true })).toHaveCount(2);
+  await expect(row.getByText("待开发", { exact: true })).toBeVisible();
+  await expect(row.getByText("开发中", { exact: true })).toBeVisible();
+  await expect(table.getByText("历史操作 2", { exact: true })).toBeVisible();
+  const expand = row.getByRole("button", { name: "展开其余 2 项", exact: true });
+  const statusBounds = await row.getByText("状态", { exact: true }).boundingBox();
+  const developerBounds = await row.getByText("开发人", { exact: true }).boundingBox();
+  const toggleBounds = await expand.boundingBox();
+  expect(developerBounds!.y).toBeGreaterThan(statusBounds!.y);
+  expect(Math.abs(toggleBounds!.y - developerBounds!.y)).toBeLessThan(5);
+  expect(detailRequests).toBe(0);
+
+  await expand.click();
+  await expect(row.getByText(detail.subject, { exact: true })).toHaveCount(4);
+  await expect(row.getByText("P0", { exact: true })).toBeVisible();
+  await expect(row.getByText("测试项目", { exact: true })).toBeVisible();
+  expect(detailRequests).toBe(1);
+  await row.getByRole("button", { name: "收起详情", exact: true }).click();
+  await expect(row.getByText(detail.subject, { exact: true })).toHaveCount(2);
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+});
 
 test("设置表格行铺满可用宽度，列按内容收紧，窄屏在表格内滚动", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1600, height: 780 });

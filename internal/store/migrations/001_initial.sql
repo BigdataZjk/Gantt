@@ -32,6 +32,11 @@ create table if not exists history (
     undone integer not null default 0,
     before_data text
 );
+create table if not exists history_details (
+    history_id integer primary key references history(id) on delete cascade,
+    preview text not null,
+    payload text not null
+);
 create table if not exists versions (
     id text primary key,
     label text not null,

@@ -57,6 +57,42 @@ func (e LogCleanupPreviewScope) Valid() bool {
 	}
 }
 
+// Defines values for LogValueKind.
+const (
+	LogValueKindColor       LogValueKind = "color"
+	LogValueKindDomain      LogValueKind = "domain"
+	LogValueKindPriority    LogValueKind = "priority"
+	LogValueKindRank        LogValueKind = "rank"
+	LogValueKindRequestType LogValueKind = "requestType"
+	LogValueKindRole        LogValueKind = "role"
+	LogValueKindStatus      LogValueKind = "status"
+	LogValueKindTimestamp   LogValueKind = "timestamp"
+)
+
+// Valid indicates whether the value is a known member of the LogValueKind enum.
+func (e LogValueKind) Valid() bool {
+	switch e {
+	case LogValueKindColor:
+		return true
+	case LogValueKindDomain:
+		return true
+	case LogValueKindPriority:
+		return true
+	case LogValueKindRank:
+		return true
+	case LogValueKindRequestType:
+		return true
+	case LogValueKindRole:
+		return true
+	case LogValueKindStatus:
+		return true
+	case LogValueKindTimestamp:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PreferencesDensity.
 const (
 	Comfortable PreferencesDensity = "comfortable"
@@ -180,6 +216,24 @@ func (e RequesterRankInputAction) Valid() bool {
 	}
 }
 
+// Defines values for ScheduleOperation.
+const (
+	GanttUndo ScheduleOperation = "ganttUndo"
+	Sequence  ScheduleOperation = "sequence"
+)
+
+// Valid indicates whether the value is a known member of the ScheduleOperation enum.
+func (e ScheduleOperation) Valid() bool {
+	switch e {
+	case GanttUndo:
+		return true
+	case Sequence:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for UserRole.
 const (
 	Admin        UserRole = "admin"
@@ -289,8 +343,11 @@ type ArchiveInput struct {
 
 // BatchMutation defines model for BatchMutation.
 type BatchMutation struct {
-	BaseRevision int64     `json:"baseRevision"`
-	Requests     []Request `json:"requests"`
+	BaseRevision int64 `json:"baseRevision"`
+
+	// Operation 发起这次排期变更的操作
+	Operation *ScheduleOperation `json:"operation,omitempty"`
+	Requests  []Request          `json:"requests"`
 }
 
 // Calendar defines model for Calendar.
@@ -329,6 +386,9 @@ type DomainInput struct {
 type GanttOrderInput struct {
 	BaseRevision int64 `json:"baseRevision"`
 
+	// DraggedRequestId 组内拖动的需求 ID
+	DraggedRequestId *int64 `json:"draggedRequestId,omitempty"`
+
 	// Move 跨组拖动时同时更新开发人，需要管理员权限
 	Move *struct {
 		Developer string `json:"developer"`
@@ -340,6 +400,9 @@ type GanttOrderInput struct {
 		// RequestIds 对应分组的全部需求 ID，包含已归档需求
 		RequestIds []int64 `json:"requestIds"`
 	} `json:"orders"`
+
+	// SortByAdmission 由按准入日期排序操作发起
+	SortByAdmission *bool `json:"sortByAdmission,omitempty"`
 }
 
 // GanttRowOrder 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
@@ -354,12 +417,22 @@ type HolidayDay struct {
 
 // Log defines model for Log.
 type Log struct {
-	Action     string `json:"action"`
-	Actor      string `json:"actor"`
-	CreatedAt  string `json:"createdAt"`
-	Id         int64  `json:"id"`
-	Reversible bool   `json:"reversible"`
-	Undone     bool   `json:"undone"`
+	Action     string     `json:"action"`
+	Actor      string     `json:"actor"`
+	CreatedAt  string     `json:"createdAt"`
+	Detail     *LogDetail `json:"detail,omitempty"`
+	Id         int64      `json:"id"`
+	Reversible bool       `json:"reversible"`
+	Undone     bool       `json:"undone"`
+}
+
+// LogChange defines model for LogChange.
+type LogChange struct {
+	After   *LogValue   `json:"after,omitempty"`
+	Before  *LogValue   `json:"before,omitempty"`
+	Field   *string     `json:"field,omitempty"`
+	Subject *string     `json:"subject,omitempty"`
+	Tags    *[]LogValue `json:"tags,omitempty"`
 }
 
 // LogCleanupConfirm defines model for LogCleanupConfirm.
@@ -413,6 +486,18 @@ type LogCleanupRun struct {
 	OperationsDeleted int    `json:"operationsDeleted"`
 }
 
+// LogDetail defines model for LogDetail.
+type LogDetail struct {
+	Changes    *[]LogChange `json:"changes,omitempty"`
+	Expandable *bool        `json:"expandable,omitempty"`
+	Label      string       `json:"label"`
+
+	// Remaining 摘要中折叠的变更项数
+	Remaining *int        `json:"remaining,omitempty"`
+	Subject   *string     `json:"subject,omitempty"`
+	Tags      *[]LogValue `json:"tags,omitempty"`
+}
+
 // LogManagement defines model for LogManagement.
 type LogManagement struct {
 	ActiveFileBytes   int64          `json:"activeFileBytes"`
@@ -442,6 +527,16 @@ type LogPolicyInput struct {
 	BaseRevision           int64 `json:"baseRevision"`
 	OperationRetentionDays int   `json:"operationRetentionDays"`
 }
+
+// LogValue defines model for LogValue.
+type LogValue struct {
+	Color *string       `json:"color,omitempty"`
+	Kind  *LogValueKind `json:"kind,omitempty"`
+	Text  string        `json:"text"`
+}
+
+// LogValueKind defines model for LogValue.Kind.
+type LogValueKind string
 
 // LoginInput defines model for LoginInput.
 type LoginInput struct {
@@ -553,6 +648,15 @@ type RequestRequestType string
 // RequestStatus defines model for Request.Status.
 type RequestStatus string
 
+// RequestUpdate defines model for RequestUpdate.
+type RequestUpdate struct {
+	BaseRevision int64 `json:"baseRevision"`
+
+	// Operation 发起这次排期变更的操作
+	Operation *ScheduleOperation `json:"operation,omitempty"`
+	Request   Request            `json:"request"`
+}
+
 // RequesterRankInput defines model for RequesterRankInput.
 type RequesterRankInput struct {
 	Action       RequesterRankInputAction `json:"action"`
@@ -569,6 +673,9 @@ type RequesterRankInputAction string
 type RevisionInput struct {
 	BaseRevision int64 `json:"baseRevision"`
 }
+
+// ScheduleOperation 发起这次排期变更的操作
+type ScheduleOperation string
 
 // Segment defines model for Segment.
 type Segment struct {
@@ -728,7 +835,7 @@ type PostRequesterRankJSONRequestBody = RequesterRankInput
 type DeleteApiRequestsIdJSONRequestBody = RevisionInput
 
 // PutApiRequestsIdJSONRequestBody defines body for PutApiRequestsId for application/json ContentType.
-type PutApiRequestsIdJSONRequestBody = Mutation
+type PutApiRequestsIdJSONRequestBody = RequestUpdate
 
 // PostApiRequestsIdArchiveJSONRequestBody defines body for PostApiRequestsIdArchive for application/json ContentType.
 type PostApiRequestsIdArchiveJSONRequestBody = ArchiveInput

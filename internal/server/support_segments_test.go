@@ -54,6 +54,14 @@ func TestGanttSupportSegments(t *testing.T) {
 	anchor = state.Requests[0]
 	anchor.SupportSegments = []requests.SupportSegment{{RequestID: target.ID, Start: "2026-11-22", End: "2026-11-22"}}
 	write(anchor, 200)
+	detail := state.Logs[0].Detail
+	if detail == nil || detail.Label != "新增补位" || len(detail.Changes) != 1 {
+		t.Fatalf("unexpected support log: %+v", detail)
+	}
+	change := detail.Changes[0]
+	if change.Subject != target.Name || len(change.Tags) != 1 || change.Tags[0].Text != state.Me.Username || change.After == nil || change.After.Text != "2026-11-22" {
+		t.Fatalf("support log must identify the target, developer and date: %+v", change)
+	}
 	anchor = state.Requests[0]
 	anchor.SupportSegments = []requests.SupportSegment{{RequestID: target.ID, Start: "2026-11-20", End: "2026-11-24"}}
 	write(anchor, 200)

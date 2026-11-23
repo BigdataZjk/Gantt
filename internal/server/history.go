@@ -13,9 +13,25 @@ import (
 	"time"
 
 	"rsm/internal/auth"
+	"rsm/internal/history"
 	"rsm/internal/requests"
 	"rsm/internal/store"
 )
+
+func (s *Server) historyDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	detail, err := s.Store.HistoryDetail(r.Context(), id)
+	if err != nil {
+		s.fail(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	send(w, http.StatusOK, detail)
+}
 
 func (s *Server) saveVersion(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -34,7 +50,8 @@ func (s *Server) saveVersion(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, store.Bad("版本备注最多160字"))
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), actor(r).ID, in.Base, "edit", "手动保存版本", false, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
+	detail := history.Detail{Label: "保存版本"}
+	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, false, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
 		var count int
 		if e := tx.QueryRowContext(r.Context(), "select count(*) from versions").Scan(&count); e != nil {
 			return e
@@ -54,7 +71,9 @@ func (s *Server) saveVersion(w http.ResponseWriter, r *http.Request) {
 			if count != 0 {
 				continue
 			}
-			_, e = tx.ExecContext(r.Context(), "insert into versions(id,label,actor,created_at,revision,payload) values (?,?,?,?,?,?)", id, strings.TrimSpace(in.Label), u.Username, time.Now().UTC().Format(time.RFC3339Nano), *in.Base, jsonValue(*d))
+			label := strings.TrimSpace(in.Label)
+			describeVersion(&detail, id, label, *in.Base)
+			_, e = tx.ExecContext(r.Context(), "insert into versions(id,label,actor,created_at,revision,payload) values (?,?,?,?,?,?)", id, label, u.Username, time.Now().UTC().Format(time.RFC3339Nano), *in.Base, jsonValue(*d))
 			return e
 		}
 		return store.Bad("版本编号暂时无法生成，请重试")
@@ -71,8 +90,16 @@ func (s *Server) deleteVersion(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), actor(r).ID, in.Base, "edit", "删除版本："+r.PathValue("id"), false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
-		result, e := tx.ExecContext(r.Context(), "delete from versions where id=?", r.PathValue("id"))
+	detail := history.Detail{Label: "删除版本"}
+	id := r.PathValue("id")
+	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+		var label string
+		var versionRevision int64
+		if e := tx.QueryRowContext(r.Context(), "select label,revision from versions where id=?", id).Scan(&label, &versionRevision); e != nil {
+			return store.ErrNotFound
+		}
+		describeVersion(&detail, id, label, versionRevision)
+		result, e := tx.ExecContext(r.Context(), "delete from versions where id=?", id)
 		if e != nil {
 			return e
 		}
@@ -94,11 +121,15 @@ func (s *Server) restoreVersion(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), actor(r).ID, in.Base, "admin", "恢复版本："+r.PathValue("id"), true, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
-		var raw string
-		if e := tx.QueryRowContext(r.Context(), "select payload from versions where id=?", r.PathValue("id")).Scan(&raw); e != nil {
+	detail := history.Detail{Label: "恢复版本"}
+	id := r.PathValue("id")
+	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "admin", &detail, true, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
+		var raw, label string
+		var versionRevision int64
+		if e := tx.QueryRowContext(r.Context(), "select payload,label,revision from versions where id=?", id).Scan(&raw, &label, &versionRevision); e != nil {
 			return store.ErrNotFound
 		}
+		describeVersion(&detail, id, label, versionRevision)
 		saved, e := store.DecodeData(raw)
 		if e != nil {
 			return e
@@ -108,6 +139,15 @@ func (s *Server) restoreVersion(w http.ResponseWriter, r *http.Request) {
 	})
 	s.finish(w, r, rev, e)
 }
+
+func describeVersion(detail *history.Detail, id, label string, revision int64) {
+	if label == "" {
+		label = "版本 " + id
+	}
+	detail.Subject = label
+	detail.Tags = []history.Value{history.Text("#" + id), history.Text(fmt.Sprintf("修订 %d", revision))}
+}
+
 func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
 	var in revisionInput
 	if e := decode(w, r, &in); e != nil {
@@ -123,11 +163,13 @@ func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), actor(r).ID, in.Base, "admin", "撤回到操作之前", false, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
+	detail := history.Detail{Label: "撤回到操作之前", SummaryOnly: true}
+	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "admin", &detail, false, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
 		var raw sql.NullString
 		var reversible, undone bool
 		var newer int
-		if e := tx.QueryRowContext(r.Context(), "select before_data,reversible,undone from history where id=?", id).Scan(&raw, &reversible, &undone); e != nil {
+		var targetTime string
+		if e := tx.QueryRowContext(r.Context(), "select before_data,reversible,undone,action,created_at from history where id=?", id).Scan(&raw, &reversible, &undone, &detail.Subject, &targetTime); e != nil {
 			return store.ErrNotFound
 		}
 		if e := tx.QueryRowContext(r.Context(), "select count(*) from history where id>?", id).Scan(&newer); e != nil {
@@ -140,6 +182,24 @@ func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
 		if e != nil {
 			return e
 		}
+		rows, e := tx.QueryContext(r.Context(), "select actor,action,created_at from history where id>=? and reversible=1 and undone=0 order by id", id)
+		if e != nil {
+			return e
+		}
+		for rows.Next() {
+			var name, action, at string
+			if e = rows.Scan(&name, &action, &at); e != nil {
+				rows.Close()
+				return e
+			}
+			detail.Changes = append(detail.Changes, history.Change{Subject: action, Tags: []history.Value{history.Text(name), {Text: at, Kind: "timestamp"}}})
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return e
+		}
+		detail.Tags = []history.Value{{Text: targetTime, Kind: "timestamp"}, history.Text(fmt.Sprintf("影响 %d 条操作", len(detail.Changes)))}
 		store.RestoreData(d, saved)
 		_, e = tx.ExecContext(r.Context(), "update history set undone=1 where id>=? and reversible=1 and undone=0", id)
 		return e

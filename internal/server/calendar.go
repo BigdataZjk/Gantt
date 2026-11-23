@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	"rsm/internal/auth"
+	"rsm/internal/history"
 	"rsm/internal/requests"
 	"rsm/internal/schedule"
 	"rsm/internal/store"
@@ -132,8 +134,80 @@ func (s *Server) importCalendar(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) saveCalendar(w http.ResponseWriter, r *http.Request, base *int64, edition schedule.CalendarEdition) {
 	edition.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	rev, err := s.Store.Change(r.Context(), actor(r).ID, base, "admin", fmt.Sprintf("更新 %d 年工作日历", edition.Year), false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+	detail := history.Detail{Label: "同步工作日历", SummaryOnly: true}
+	source := "holiday-cn"
+	if edition.Source != holidaySource {
+		detail.Label, source = "导入工作日历", "JSON 导入"
+	}
+	detail.Tags = []history.Value{history.Text(fmt.Sprintf("%d 年", edition.Year)), history.Text(source)}
+	rev, err := s.Store.ChangeLogged(r.Context(), actor(r).ID, base, "admin", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+		calendar, err := store.ReadCalendar(r.Context(), tx)
+		if err != nil {
+			return err
+		}
+		var before schedule.CalendarEdition
+		for _, current := range calendar.Editions {
+			if current.Year == edition.Year {
+				before = current
+				break
+			}
+		}
+		describeCalendarChange(&detail, before, edition)
 		return store.SaveCalendar(r.Context(), tx, edition)
 	})
 	s.finish(w, r, rev, err)
+}
+
+func describeCalendarChange(detail *history.Detail, before, after schedule.CalendarEdition) {
+	oldDays, nextDays := map[string]schedule.HolidayDay{}, map[string]schedule.HolidayDay{}
+	dates := make([]string, 0, len(before.Days)+len(after.Days))
+	for _, day := range before.Days {
+		oldDays[day.Date] = day
+		dates = append(dates, day.Date)
+	}
+	for _, day := range after.Days {
+		nextDays[day.Date] = day
+		dates = append(dates, day.Date)
+	}
+	slices.Sort(dates)
+	holidays, workdays, other := 0, 0, 0
+	for _, date := range slices.Compact(dates) {
+		old, next := oldDays[date], nextDays[date]
+		if old == next {
+			continue
+		}
+		before, after := calendarDayValue(old), calendarDayValue(next)
+		detail.Changes = append(detail.Changes, history.Change{Field: "日期安排", Tags: []history.Value{history.Text(date)}, Before: &before, After: &after})
+		switch {
+		case next.IsOffDay && !old.IsOffDay:
+			holidays++
+		case (old.Date != "" && !old.IsOffDay) || (next.Date != "" && !next.IsOffDay):
+			workdays++
+		default:
+			other++
+		}
+	}
+	for _, count := range []struct {
+		value int
+		label string
+	}{{holidays, "新增 %d 个节假日"}, {workdays, "调整 %d 个补班日"}, {other, "更新 %d 个节假日"}} {
+		if count.value > 0 {
+			detail.Tags = append(detail.Tags, history.Text(fmt.Sprintf(count.label, count.value)))
+		}
+	}
+	if len(detail.Changes) == 0 {
+		detail.Tags = append(detail.Tags, history.Text("日期安排未变"))
+	}
+	logField(detail, "数据来源", before.Source, after.Source, "")
+}
+
+func calendarDayValue(day schedule.HolidayDay) history.Value {
+	switch {
+	case day.Date == "":
+		return history.Text("常规日历")
+	case day.IsOffDay:
+		return history.Text("节假日 · " + day.Name)
+	default:
+		return history.Text("补班 · " + day.Name)
+	}
 }

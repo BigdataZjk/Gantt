@@ -99,7 +99,9 @@ test("版本保存恢复删除及日志撤回均同步界面和持久化", async
   const sentinel = await createRequest(page, `日志撤回-${runId}`);
   await page.reload();
   await page.getByRole("tab", { name: "操作记录", exact: true }).click();
-  const log = page.getByRole("table", { name: "操作记录", exact: true }).getByRole("row").filter({ hasText: `新增需求：${sentinel.name}` });
+  const log = page.getByRole("table", { name: "操作记录", exact: true }).getByRole("row")
+    .filter({ has: page.getByText("新增需求", { exact: true }) })
+    .filter({ has: page.getByText(sentinel.name, { exact: true }) });
   await log.getByRole("button", { name: "撤回到此动作", exact: true }).click();
   await page.getByRole("dialog", { name: "撤回到此动作", exact: true }).getByRole("button", { name: "确认撤回", exact: true }).click();
   await expect(page.getByText("已撤回到所选操作之前", { exact: true })).toBeVisible();

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"rsm/internal/auth"
+	"rsm/internal/history"
 	"rsm/internal/requests"
 	"rsm/internal/settings"
 	"rsm/internal/store"
@@ -51,7 +52,9 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), "", nil, "setup", "初始化超级管理员", false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+	const username = "张金科"
+	detail := history.Detail{Label: "初始化超级管理员", Subject: username, Tags: []history.Value{{Text: "superadmin", Kind: "role"}}}
+	rev, e := s.Store.ChangeLogged(r.Context(), "", nil, "setup", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
 		var count int
 		if e := tx.QueryRowContext(r.Context(), "select count(*) from users").Scan(&count); e != nil {
 			return e
@@ -59,14 +62,14 @@ func (s *Server) setup(w http.ResponseWriter, r *http.Request) {
 		if count != 0 {
 			return store.ErrForbidden
 		}
-		_, e := tx.ExecContext(r.Context(), "insert into users(id,username,role,password_hash,password_cipher) values (?,?,'superadmin',?,?)", id, "张金科", hash, cipher)
+		_, e := tx.ExecContext(r.Context(), "insert into users(id,username,role,password_hash,password_cipher) values (?,?,'superadmin',?,?)", id, username, hash, cipher)
 		return e
 	})
 	if e != nil {
 		s.fail(w, e)
 		return
 	}
-	token, e := s.Store.Login(r.Context(), "张金科", in.Password, s.dummyHash)
+	token, e := s.Store.Login(r.Context(), username, in.Password, s.dummyHash)
 	if e != nil {
 		s.fail(w, e)
 		return
@@ -155,7 +158,8 @@ func (s *Server) createUser(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), u.ID, nil, "admin", "新增账号："+in.Username, false, func(tx *sql.Tx, _ *requests.Data, who auth.User) error {
+	detail := history.Detail{Label: "新增账号", Subject: in.Username, Tags: []history.Value{{Text: in.Role, Kind: "role"}}}
+	rev, e := s.Store.ChangeLogged(r.Context(), u.ID, nil, "admin", &detail, false, func(tx *sql.Tx, _ *requests.Data, who auth.User) error {
 		if !who.Super() && in.Role == "admin" {
 			return store.ErrForbidden
 		}
@@ -208,7 +212,8 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	noChange := errors.New("account unchanged")
-	rev, e := s.Store.Change(r.Context(), who.ID, nil, "admin", "更新账号资料", false, func(tx *sql.Tx, _ *requests.Data, u auth.User) error {
+	detail := history.Detail{Label: "更新账号资料"}
+	rev, e := s.Store.ChangeLogged(r.Context(), who.ID, nil, "admin", &detail, false, func(tx *sql.Tx, _ *requests.Data, u auth.User) error {
 		var name, role string
 		var disabled, deleted bool
 		if e := tx.QueryRowContext(r.Context(), "select username,role,disabled,deleted from users where id=?", id).Scan(&name, &role, &disabled, &deleted); e != nil {
@@ -243,6 +248,30 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		if role == oldRole && disabled == oldDisabled && deleted == oldDeleted && hash == "" {
 			return noChange
 		}
+		detail.Subject = name
+		detail.Add("角色", logValue(oldRole, "role"), logValue(role, "role"))
+		detail.Add("账号状态", accountStatus(oldDisabled, oldDeleted), accountStatus(disabled, deleted))
+		if hash != "" {
+			reset := history.Text("已重置")
+			detail.Changes = append(detail.Changes, history.Change{Field: "密码", After: &reset})
+		}
+		if len(detail.Changes) == 1 {
+			switch detail.Changes[0].Field {
+			case "角色":
+				detail.Label = "修改角色"
+			case "账号状态":
+				switch {
+				case deleted:
+					detail.Label = "删除账号"
+				case disabled:
+					detail.Label = "停用账号"
+				default:
+					detail.Label = "启用账号"
+				}
+			case "密码":
+				detail.Label = "重置密码"
+			}
+		}
 		if _, e := tx.ExecContext(r.Context(), "update users set role=?,disabled=?,deleted=? where id=?", role, disabled, deleted, id); e != nil {
 			return e
 		}
@@ -263,6 +292,16 @@ func (s *Server) updateUser(w http.ResponseWriter, r *http.Request) {
 		r = withActor(r, auth.User{})
 	}
 	s.finish(w, r, rev, e)
+}
+func accountStatus(disabled, deleted bool) history.Value {
+	switch {
+	case deleted:
+		return history.Text("已删除")
+	case disabled:
+		return history.Text("已停用")
+	default:
+		return history.Text("已启用")
+	}
 }
 func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -297,7 +336,8 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, e)
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), u.ID, nil, "login", "修改本人密码", false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
+	detail := history.Detail{Label: "修改本人密码", Subject: u.Username, Tags: []history.Value{history.Text("已完成")}}
+	rev, e := s.Store.ChangeLogged(r.Context(), u.ID, nil, "login", &detail, false, func(tx *sql.Tx, _ *requests.Data, _ auth.User) error {
 		result, e := tx.ExecContext(r.Context(), "update users set password_hash=?,password_cipher=? where id=? and password_hash=?", hash, cipher, u.ID, old)
 		if e != nil {
 			return e
@@ -382,7 +422,9 @@ func (s *Server) uploadAvatar(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, store.Bad("头像仅支持 JPG、PNG、WebP、GIF"))
 		return
 	}
-	rev, e := s.Store.Change(r.Context(), actor(r).ID, nil, "login", "更新头像", false, func(tx *sql.Tx, _ *requests.Data, u auth.User) error {
+	detail := history.Detail{Label: "更新头像", Tags: []history.Value{history.Text("已完成")}}
+	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, nil, "login", &detail, false, func(tx *sql.Tx, _ *requests.Data, u auth.User) error {
+		detail.Subject = u.Username
 		_, e := tx.ExecContext(r.Context(), "update users set avatar=?,avatar_type=?,avatar_version=? where id=?", b, typ, auth.ID(), u.ID)
 		return e
 	})

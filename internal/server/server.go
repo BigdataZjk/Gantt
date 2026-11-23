@@ -81,6 +81,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/versions/{id}", s.deleteVersion)
 	s.mux.HandleFunc("POST /api/versions/{id}/restore", s.restoreVersion)
 	s.mux.HandleFunc("POST /api/history/{id}/undo", s.undo)
+	s.mux.HandleFunc("GET /api/history/{id}/detail", s.historyDetail)
 	s.mux.HandleFunc("GET /api/logs/management", s.logManagement)
 	s.mux.HandleFunc("PUT /api/logs/policy", s.saveLogPolicy)
 	s.mux.HandleFunc("POST /api/logs/cleanup/preview", s.previewLogCleanup)

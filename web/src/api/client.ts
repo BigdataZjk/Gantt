@@ -1,4 +1,4 @@
-import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogManagement, LogPolicy, Preferences, State, UserPatch } from "./types";
+import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogDetail, LogManagement, LogPolicy, Preferences, ScheduleOperation, State, UserPatch } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -68,10 +68,11 @@ export const api = {
   importCalendar: (baseRevision: number, year: number, calendar: Record<string, unknown>): Promise<State> => send<State>("/api/calendar/import", "POST", { baseRevision, year, calendar }),
 
   createRequest: (baseRevision: number, request: ApiRequest): Promise<State> => send<State>("/api/requests", "POST", { baseRevision, request }),
-  updateRequest: (baseRevision: number, request: ApiRequest): Promise<State> => send<State>(`/api/requests/${encodeURIComponent(String(request.id))}`, "PUT", { baseRevision, request }),
+  updateRequest: (baseRevision: number, request: ApiRequest, operation?: ScheduleOperation): Promise<State> => send<State>(`/api/requests/${encodeURIComponent(String(request.id))}`, "PUT", { baseRevision, request, operation }),
   deleteRequest: (baseRevision: number, id: number): Promise<State> => send<State>(`/api/requests/${id}`, "DELETE", { baseRevision }),
-  batchRequests: (baseRevision: number, requests: ApiRequest[]): Promise<State> => send<State>("/api/requests/batch", "POST", { baseRevision, requests }),
-  orderGantt: (baseRevision: number, orders: GanttOrderInput["orders"], move?: GanttOrderInput["move"]): Promise<State> => send<State>("/api/requests/gantt-order", "PUT", { baseRevision, orders, move }),
+  batchRequests: (baseRevision: number, requests: ApiRequest[], operation?: ScheduleOperation): Promise<State> => send<State>("/api/requests/batch", "POST", { baseRevision, requests, operation }),
+  orderGantt: (baseRevision: number, orders: GanttOrderInput["orders"], move?: GanttOrderInput["move"], context?: Pick<GanttOrderInput, "draggedRequestId" | "sortByAdmission">): Promise<State> =>
+    send<State>("/api/requests/gantt-order", "PUT", { baseRevision, orders, move, ...context }),
   rankRequests: (baseRevision: number, requestId?: number): Promise<State> => send<State>("/api/requests/priority", "POST", { baseRevision, action: requestId === undefined ? "clear" : "toggle", requestId }),
   archiveRequest: (baseRevision: number, id: number, archived: boolean): Promise<State> => send<State>(`/api/requests/${id}/archive`, "POST", { baseRevision, archived }),
 
@@ -84,6 +85,7 @@ export const api = {
   deleteVersion: (baseRevision: number, id: string): Promise<State> => send<State>(`/api/versions/${encodeURIComponent(id)}`, "DELETE", { baseRevision }),
   restoreVersion: (baseRevision: number, id: string): Promise<State> => send<State>(`/api/versions/${encodeURIComponent(id)}/restore`, "POST", { baseRevision }),
   undoLog: (baseRevision: number, id: number | string): Promise<State> => send<State>(`/api/history/${encodeURIComponent(String(id))}/undo`, "POST", { baseRevision }),
+  logDetail: (id: number, signal?: AbortSignal): Promise<LogDetail> => send<LogDetail>(`/api/history/${id}/detail`, "GET", undefined, { signal }),
   logManagement: (): Promise<LogManagement> => send<LogManagement>("/api/logs/management", "GET"),
   saveLogPolicy: (baseRevision: number, policy: LogPolicy): Promise<State> => send<State>("/api/logs/policy", "PUT", { baseRevision, ...policy }),
   previewLogCleanup: (scope: LogCleanupPreview["scope"], days: number): Promise<LogCleanupPreview> => send<LogCleanupPreview>("/api/logs/cleanup/preview", "POST", { scope, days }),

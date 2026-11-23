@@ -229,16 +229,23 @@ func (s *Store) Snapshot(ctx context.Context, actorID string) (Snapshot, error) 
 			_ = json.Unmarshal([]byte(raw), &out.Preferences)
 		}
 	}
-	rows, e := tx.QueryContext(ctx, "select id,actor,action,created_at,reversible,undone from history order by id desc limit 200")
+	rows, e := tx.QueryContext(ctx, "select id,actor,action,created_at,reversible,undone,preview from history left join history_details on id=history_id order by id desc limit 200")
 	if e != nil {
 		return out, e
 	}
 	i := 0
 	for rows.Next() {
 		var x history.Entry
-		if e = rows.Scan(&x.ID, &x.Actor, &x.Action, &x.CreatedAt, &x.Reversible, &x.Undone); e != nil {
+		var preview sql.NullString
+		if e = rows.Scan(&x.ID, &x.Actor, &x.Action, &x.CreatedAt, &x.Reversible, &x.Undone, &preview); e != nil {
 			rows.Close()
 			return out, e
+		}
+		if preview.Valid {
+			if e = json.Unmarshal([]byte(preview.String), &x.Detail); e != nil {
+				rows.Close()
+				return out, e
+			}
 		}
 		x.Reversible = x.Reversible && i < 50 && !x.Undone
 		out.Logs = append(out.Logs, x)
@@ -354,6 +361,14 @@ func DecodeData(raw string) (requests.Data, error) {
 }
 
 func (s *Store) Change(ctx context.Context, actorID string, base *int64, permission, action string, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
+	return s.change(ctx, actorID, base, permission, action, nil, reversible, fn)
+}
+
+func (s *Store) ChangeLogged(ctx context.Context, actorID string, base *int64, permission string, detail *history.Detail, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
+	return s.change(ctx, actorID, base, permission, "", detail, reversible, fn)
+}
+
+func (s *Store) change(ctx context.Context, actorID string, base *int64, permission, action string, detail *history.Detail, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return 0, e
@@ -411,7 +426,7 @@ func (s *Store) Change(ctx context.Context, actorID string, base *int64, permiss
 	if reversible {
 		beforeValue = string(before)
 	}
-	if _, e = tx.ExecContext(ctx, "insert into history(actor,action,created_at,reversible,before_data) values (?,?,?,?,?)", who.Username, action, now(), reversible, beforeValue); e != nil {
+	if e = insertHistory(ctx, tx, who.Username, action, now(), reversible, beforeValue, detail); e != nil {
 		return 0, e
 	}
 	if _, e = tx.ExecContext(ctx, "delete from history where id not in (select id from history order by id desc limit 200)"); e != nil {

@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/history/{id}/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 展开一条操作记录的完整变更 */
+        get: operations["getHistoryDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/logs/management": {
         parameters: {
             query?: never;
@@ -787,6 +804,29 @@ export interface components {
             createdAt: string;
             reversible: boolean;
             undone: boolean;
+            detail?: components["schemas"]["LogDetail"];
+        };
+        LogDetail: {
+            label: string;
+            subject?: string;
+            tags?: components["schemas"]["LogValue"][];
+            changes?: components["schemas"]["LogChange"][];
+            /** @description 摘要中折叠的变更项数 */
+            remaining?: number;
+            expandable?: boolean;
+        };
+        LogChange: {
+            subject?: string;
+            field?: string;
+            tags?: components["schemas"]["LogValue"][];
+            before?: components["schemas"]["LogValue"];
+            after?: components["schemas"]["LogValue"];
+        };
+        LogValue: {
+            text: string;
+            /** @enum {string} */
+            kind?: "priority" | "status" | "domain" | "requestType" | "role" | "color" | "rank" | "timestamp";
+            color?: string;
         };
         Version: {
             id: string;
@@ -838,6 +878,13 @@ export interface components {
         GanttOrderInput: {
             /** Format: int64 */
             baseRevision: number;
+            /**
+             * Format: int64
+             * @description 组内拖动的需求 ID
+             */
+            draggedRequestId?: number;
+            /** @description 由按准入日期排序操作发起 */
+            sortByAdmission?: boolean;
             orders: {
                 developer: string;
                 /** @description 对应分组的全部需求 ID，包含已归档需求 */
@@ -866,10 +913,22 @@ export interface components {
             baseRevision: number;
             request: components["schemas"]["Request"];
         };
+        /**
+         * @description 发起这次排期变更的操作
+         * @enum {string}
+         */
+        ScheduleOperation: "sequence" | "ganttUndo";
+        RequestUpdate: {
+            /** Format: int64 */
+            baseRevision: number;
+            request: components["schemas"]["Request"];
+            operation?: components["schemas"]["ScheduleOperation"];
+        };
         BatchMutation: {
             /** Format: int64 */
             baseRevision: number;
             requests: components["schemas"]["Request"][];
+            operation?: components["schemas"]["ScheduleOperation"];
         };
         RevisionInput: {
             /** Format: int64 */
@@ -1614,7 +1673,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Mutation"];
+                "application/json": components["schemas"]["RequestUpdate"];
             };
         };
         responses: {
@@ -2354,6 +2413,35 @@ export interface operations {
             };
             /** @description 版本冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getHistoryDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 成功 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogDetail"];
+                };
+            };
+            /** @description 日志不存在或仅有历史摘要 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

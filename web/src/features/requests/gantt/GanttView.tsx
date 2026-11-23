@@ -305,7 +305,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
         if (target.kind !== "row") return;
         const visible = groups.find((candidate) => candidate.developer === developer)?.rows ?? [];
         const requestIds = reorderVisibleIds(ids, visible.map((row) => row.id), source.id, target.row.id, target.edge);
-        if (requestIds) void runner(() => api.orderGantt(state.revision, [{ developer, requestIds }]));
+        if (requestIds) void runner(() => api.orderGantt(state.revision, [{ developer, requestIds }], undefined, { draggedRequestId: source.id }));
         return;
       }
       const position = target.kind === "row" ? ids.indexOf(target.row.id) + Number(target.edge === "after") : ids.length;
@@ -803,7 +803,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
       notice.notify("已选需求已按准入日期排列");
       return;
     }
-    const saved = await runner(() => api.orderGantt(state.revision, orders));
+    const saved = await runner(() => api.orderGantt(state.revision, orders, undefined, { sortByAdmission: true }));
     if (saved) notice.notify("已按准入日期升序排列");
   };
 
@@ -826,7 +826,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
       setSequence(null);
       return;
     }
-    const saved = await undo.save(sequence.plan.changes, `顺排已应用，移动 ${sequence.plan.changes.length} 条需求`);
+    const saved = await undo.save(sequence.plan.changes, `顺排已应用，移动 ${sequence.plan.changes.length} 条需求`, "sequence");
     if (saved) {
       setSequence(null);
       clearSelection();

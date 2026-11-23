@@ -111,6 +111,7 @@
 .colorBar > .rest { background: color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 25%, var(--rsm-panel)); }
 .colorBar .point { position: absolute; bottom: 0; width: 2.5px; height: 2.5px; border-radius: 50%; background: var(--rsm-particle-core); }
 .schedulePreviewLabel { color: var(--rsm-muted); font-size: 11px; }
+.table .logAction { max-width: clamp(15rem, 56vw, 43rem); }
 .logStatus { font-size: 11px; color: var(--rsm-muted); }
 .undoneTag { color: var(--rsm-muted); text-decoration: line-through; }
 .versionNumber { font-weight: 500; font-variant-numeric: tabular-nums; }

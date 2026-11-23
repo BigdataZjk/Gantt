@@ -2,12 +2,12 @@ import { useCallback, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api/client";
 import { STATE_KEY, useMutationRunner } from "../../../api/hooks";
-import type { ApiRequest, State } from "../../../api/types";
+import type { ApiRequest, ScheduleOperation, State } from "../../../api/types";
 import { useNotice } from "../../../ui/Notice";
 import { makeUndoStep, restoreUndoStep, type GanttUndoStep } from "./ganttUndo";
 
 export interface GanttUndo {
-  save: (changes: { before: ApiRequest; after: ApiRequest }[], message: string) => Promise<boolean>;
+  save: (changes: { before: ApiRequest; after: ApiRequest }[], message: string, operation?: ScheduleOperation) => Promise<boolean>;
   undo: () => boolean;
 }
 
@@ -36,7 +36,9 @@ export function useGanttUndo(userId: string | undefined): GanttUndo {
     }
     busy.current = "reverting";
     try {
-      const result = await runner((base) => requests.length === 1 ? api.updateRequest(base, requests[0]!) : api.batchRequests(base, requests));
+      const result = await runner((base) => requests.length === 1
+        ? api.updateRequest(base, requests[0]!, "ganttUndo")
+        : api.batchRequests(base, requests, "ganttUndo"));
       if (result) {
         history.current.pop();
         notice.notify(`已撤回上一步甘特操作${requests.length > 1 ? `（${requests.length} 条需求）` : ""}`);
@@ -55,7 +57,7 @@ export function useGanttUndo(userId: string | undefined): GanttUndo {
     return true;
   }, [current, revert]);
 
-  const save = useCallback(async (changes: { before: ApiRequest; after: ApiRequest }[], message: string) => {
+  const save = useCallback(async (changes: { before: ApiRequest; after: ApiRequest }[], message: string, operation?: ScheduleOperation) => {
     const state = current();
     if (!state || !changes.length) return false;
     if (busy.current) { notice.notify("正在保存上一步操作，请稍候"); return false; }
@@ -63,7 +65,7 @@ export function useGanttUndo(userId: string | undefined): GanttUndo {
     let saved = false;
     try {
       const after = changes.map((change) => change.after);
-      const result = await runner((base) => after.length === 1 ? api.updateRequest(base, after[0]!) : api.batchRequests(base, after));
+      const result = await runner((base) => after.length === 1 ? api.updateRequest(base, after[0]!, operation) : api.batchRequests(base, after, operation));
       if (result) {
         const step = makeUndoStep(changes.map((change) => change.before), result.requests, result.calendar);
         if (step.changes.length && current()) history.current = [...history.current.slice(-49), step];
