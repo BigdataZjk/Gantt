@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Columns3, SlidersHorizontal } from "lucide-react";
 import type { State } from "../../api/types";
-import { useUiState } from "../../app/uiState";
+import { useUiState, type UiState } from "../../app/uiState";
 import { ARCHIVE_COLUMN_KEYS, COLUMN_CATALOG } from "../../lib/format";
 import { addDays, isValidDate, todayISO } from "../../lib/dates";
 import { Checkbox } from "../../ui/Checkbox";
@@ -20,11 +20,11 @@ interface FilterBarProps {
   state: State;
   scopeRows: { priority: string }[];
   tab: "gantt" | "pool" | "archive";
-  ganttFitDays: number;
+  ganttRange: UiState["ganttRange"] | null;
   navigation: ReactNode;
 }
 
-export function FilterBar({ state, scopeRows, tab, ganttFitDays, navigation }: FilterBarProps) {
+export function FilterBar({ state, scopeRows, tab, ganttRange, navigation }: FilterBarProps) {
   const { ui, patch, patchFilters } = useUiState();
   const { domainColor } = usePreferences();
   const filters = ui.filters;
@@ -35,8 +35,8 @@ export function FilterBar({ state, scopeRows, tab, ganttFitDays, navigation }: F
   const [axisError, setAxisError] = useState("");
   const dragStart = useRef<{ key: string; order: string[] } | null>(null);
   const today = todayISO();
-  const axisStart = ui.ganttRange.start || addDays(today, -Math.min(7, Math.floor(ganttFitDays / 3)));
-  const axisEnd = ui.ganttRange.end || addDays(axisStart, ganttFitDays - 1);
+  const axisStart = ui.ganttRange.start || ganttRange?.start || today;
+  const axisEnd = ui.ganttRange.end || ganttRange?.end || axisStart;
 
   const setAxisDate = (edge: "start" | "end", value: string) => {
     if (!isValidDate(value)) {
@@ -44,13 +44,13 @@ export function FilterBar({ state, scopeRows, tab, ganttFitDays, navigation }: F
       return;
     }
     const start = edge === "start" ? value : axisStart;
-    const end = edge === "end" ? value : ui.ganttRange.end || addDays(start, ganttFitDays - 1);
-    if (end < start) {
+    const end = edge === "end" ? value : ui.ganttRange.end;
+    if (end && end < start) {
       setAxisError("结束日期不能早于开始日期，请调整显示范围");
       return;
     }
     setAxisError("");
-    patch({ ganttRange: { start, end: edge === "end" || ui.ganttRange.end ? end : "" }, ganttZoom: 1 });
+    patch({ ganttRange: { start, end }, ganttZoom: 1 });
   };
 
   const domainChoices = useMemo(() => domainOptions(state.domains).map((option) => ({ ...option, node: <DomainTag name={option.label} color={domainColor(option.label, state.domains)} /> })), [state.domains, domainColor]);

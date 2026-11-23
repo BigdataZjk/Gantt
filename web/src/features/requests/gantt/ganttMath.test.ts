@@ -11,6 +11,7 @@ import {
   extendLastSegment,
   groupRequests,
   holdLayout,
+  matchesGanttRange,
   moveSegmentDates,
   planOf,
   removeSegment,
@@ -55,6 +56,23 @@ const twoSegments = request({
 });
 
 describe("甘特排期纯计算", () => {
+  it.each([false, true])("按实际线段与日期范围相交筛选（归档：%s）", (archived) => {
+    const row = { ...twoSegments, archived };
+    expect(matchesGanttRange(row, calendar, "2026-11-12", "2026-11-16")).toBe(true);
+    expect(matchesGanttRange(row, calendar, "2026-11-24", "2026-11-26")).toBe(true);
+    expect(matchesGanttRange(row, calendar, "2026-11-25", "2026-11-26")).toBe(false);
+    expect(matchesGanttRange(row, calendar, "2026-11-18", "2026-11-20")).toBe(true);
+    const withoutHold = { ...row, segments: row.segments.map((segment) => ({ ...segment, holdBefore: false })) };
+    expect(matchesGanttRange(withoutHold, calendar, "2026-11-18", "2026-11-20")).toBe(false);
+    const withSupport = { ...row, supportSegments: [{ start: "2026-11-25", end: "2026-11-26", requestId: 1 }] };
+    expect(matchesGanttRange(withSupport, calendar, "2026-11-25", "2026-11-26")).toBe(true);
+    const withDayMarks = { ...row, vacation: ["2026-11-27"], overtime: ["2026-11-28"] };
+    expect(matchesGanttRange(withDayMarks, calendar, "2026-11-27", "2026-11-27")).toBe(true);
+    expect(matchesGanttRange(withDayMarks, calendar, "2026-11-28", "2026-11-28")).toBe(true);
+    expect(matchesGanttRange({ ...row, developer: "" }, calendar, "2026-12-01", "2026-12-02")).toBe(true);
+    expect(matchesGanttRange(request({ archived, start: "", delivery: "" }), calendar, "2026-12-01", "2026-12-02")).toBe(true);
+  });
+
   it("单段从准入/交付构造排期", () => {
     const plan = planOf(request({ id: 1, start: "2026-11-16", delivery: "2026-11-18", days: 3 }), calendar);
     expect(plan.segments).toHaveLength(1);

@@ -200,7 +200,6 @@ func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests[index].Archived = in.Archived
 		stamp := time.Now().UTC().Format(time.RFC3339Nano)
 		if in.Archived {
-			removeGanttOrder(d, d.Requests[index])
 			unrankRequest(d, index)
 			d.Requests[index].ArchivedAt = stamp
 		} else {

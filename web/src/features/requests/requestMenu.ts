@@ -8,7 +8,7 @@ export function requestMenuItems(row: ApiRequest, actions: {
   onDelete: (row: ApiRequest) => void;
   onArchive: (row: ApiRequest) => void;
 }): ContextMenuItem[] {
-  if (!actions.canEdit) return [{ key: "details", label: "查看详情", icon: Eye, onSelect: () => actions.onOpen(row.id) }];
+  if (!actions.canEdit || row.archived) return [{ key: "details", label: "查看详情", icon: Eye, onSelect: () => actions.onOpen(row.id) }];
   return [
     { key: "edit", label: "编辑", icon: Pencil, onSelect: () => actions.onOpen(row.id) },
     { key: "archive", label: "归档", icon: Archive, onSelect: () => actions.onArchive(row) },

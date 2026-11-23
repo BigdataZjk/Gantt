@@ -840,7 +840,7 @@ export interface components {
             baseRevision: number;
             orders: {
                 developer: string;
-                /** @description 对应分组的全部未归档需求 ID */
+                /** @description 对应分组的全部需求 ID，包含已归档需求 */
                 requestIds: number[];
             }[];
             /** @description 跨组拖动时同时更新开发人，需要管理员权限 */

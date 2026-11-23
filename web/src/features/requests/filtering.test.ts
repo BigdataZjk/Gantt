@@ -14,15 +14,7 @@ describe("需求筛选", () => {
   it("按归档范围拆分", () => {
     expect(scopeRequests(rows, "pool").map((row) => row.id)).toEqual([1, 2, 3]);
     expect(scopeRequests(rows, "archive").map((row) => row.id)).toEqual([4]);
-    expect(scopeRequests(rows, "gantt").map((row) => row.id)).toEqual([1, 2, 3]);
-  });
-
-  it("未排期、未分配和日期轴外的未归档需求都属于甘特图和需求池", () => {
-    const all = [...rows, request({ id: 5, start: "", delivery: "", developer: "u1" }), request({ id: 6, start: "", delivery: "", developer: "" })];
-    const gantt = filterRequests(scopeRequests(all, "gantt"), EMPTY_FILTERS, { applyDates: false });
-    const pool = filterRequests(scopeRequests(all, "pool"), EMPTY_FILTERS, { applyDates: true });
-    expect(gantt.map((row) => row.id)).toEqual([1, 2, 3, 5, 6]);
-    expect(gantt).toEqual(pool);
+    expect(scopeRequests(rows, "gantt")).toEqual(rows);
   });
 
   it("多选业务域/状态/开发人/优先级", () => {

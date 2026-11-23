@@ -5,7 +5,8 @@ import { countDays } from "../../lib/dates";
 export const UNASSIGNED = "unassigned";
 
 export function scopeRequests(requests: ApiRequest[], tab: "gantt" | "pool" | "archive"): ApiRequest[] {
-  return requests.filter((request) => (tab === "archive" ? request.archived === true : request.archived !== true));
+  if (tab === "gantt") return requests;
+  return requests.filter((request) => (request.archived === true) === (tab === "archive"));
 }
 
 export function deliveryOf(request: ApiRequest): string {

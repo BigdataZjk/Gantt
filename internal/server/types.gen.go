@@ -337,7 +337,7 @@ type GanttOrderInput struct {
 	Orders []struct {
 		Developer string `json:"developer"`
 
-		// RequestIds 对应分组的全部未归档需求 ID
+		// RequestIds 对应分组的全部需求 ID，包含已归档需求
 		RequestIds []int64 `json:"requestIds"`
 	} `json:"orders"`
 }

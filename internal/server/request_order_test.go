@@ -38,8 +38,17 @@ func TestSharedGanttOrderMovesAndValidatesAtomically(t *testing.T) {
 		t.Fatal("shared order was not saved", guest.GanttRowOrder)
 	}
 	_, state = f.call("POST", fmt.Sprintf("/api/requests/%d/archive", assigned.ID), map[string]any{"baseRevision": state.Revision, "archived": true}, 200, true)
-	if !slices.Equal(state.GanttRowOrder[developer], []int64{source.ID}) {
-		t.Fatal("archived row remained in the shared order", state.GanttRowOrder)
+	if !slices.Equal(state.GanttRowOrder[developer], []int64{assigned.ID, source.ID}) {
+		t.Fatal("archiving changed the shared Gantt order", state.GanttRowOrder)
+	}
+	archived := state.Requests[1]
+	if !archived.Archived || archived.Start != assigned.Start || archived.Delivery != assigned.Delivery {
+		t.Fatal("archiving changed the schedule", archived)
+	}
+	f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(source.ID)}, 400, true)
+	_, state = f.call("PUT", "/api/requests/gantt-order", map[string]any{"baseRevision": state.Revision, "orders": order(source.ID, assigned.ID)}, 200, true)
+	if !slices.Equal(state.GanttRowOrder[developer], []int64{source.ID, assigned.ID}) || !reflect.DeepEqual(state.Requests[1], archived) {
+		t.Fatal("reordering around an archived request failed or mutated its data", state.GanttRowOrder)
 	}
 }
 

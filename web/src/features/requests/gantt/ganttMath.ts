@@ -45,6 +45,17 @@ export function planOf(request: ApiRequest, calendar: Calendar): Plan {
   return { segments: [{ start: request.start, end, holdBefore: false, index: 0 }], delivery: end, days: Math.max(0, Number(request.days) || 0) };
 }
 
+export function matchesGanttRange(request: ApiRequest, calendar: Calendar, start: string, end: string): boolean {
+  if (!request.developer) return true;
+  const { segments, delivery } = planOf(request, calendar);
+  if (!segments.length) return true;
+  const overlapsRange = (segment: { start: string; end: string }) => segment.start <= end && segment.end >= start;
+  if (segments.some(overlapsRange) || request.supportSegments?.some(overlapsRange)) return true;
+  const includesDate = (date: string) => date >= start && date <= end;
+  if (request.vacation?.some(includesDate) || request.overtime?.some((date) => includesDate(date) && !isWorkday(date, calendar))) return true;
+  return segments.length > 1 && segments[0]!.start <= end && delivery >= start && workingHoldGaps(request, calendar).some(overlapsRange);
+}
+
 export function activeDaysInSegment(request: ApiRequest, segment: Segment, calendar: Calendar): number {
   return countDays(segment.start, segment.end, calendar, { vacation: request.vacation, overtime: request.overtime });
 }

@@ -18,7 +18,7 @@ import type { ApiRequest, Calendar, State, SupportSegment } from "../../../api/t
 import { api } from "../../../api/client";
 import { useMutationRunner } from "../../../api/hooks";
 import { usePreferences } from "../../../app/preferences";
-import { useUiState } from "../../../app/uiState";
+import { useUiState, type UiState } from "../../../app/uiState";
 import { addDays, diffDays, enumerateDates, isWorkday, todayISO } from "../../../lib/dates";
 import { colorFromHex } from "../../../lib/color";
 import { Button } from "../../../ui/Button";
@@ -37,6 +37,7 @@ import {
   estimateCenters,
   groupRequests,
   holdLayout,
+  matchesGanttRange,
   monthGroups,
   moveSegmentDates,
   overlapBadges,
@@ -77,7 +78,7 @@ interface Props {
   onOpen: (id: number) => void;
   onDelete: (row: ApiRequest) => void;
   onArchive: (row: ApiRequest) => void;
-  onFitDaysChange: (days: number) => void;
+  onDateRangeChange: (range: UiState["ganttRange"]) => void;
 }
 
 type MenuState =
@@ -170,7 +171,7 @@ function rippleTexture(height: number): CSSProperties {
   } as CSSProperties;
 }
 
-export const GanttView = memo(function GanttView({ state, permissions, rows, totalCount, draftHint, onOpen, onDelete, onArchive, onFitDaysChange, undo }: Props) {
+export const GanttView = memo(function GanttView({ state, permissions, rows: filteredRows, totalCount, draftHint, onOpen, onDelete, onArchive, onDateRangeChange, undo }: Props) {
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
   const notice = useNotice();
@@ -199,7 +200,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   const isAdmin = permissions.isAdmin;
   const nameResize = useNameColumnResize({
-    rows, viewportWidth: viewport.width, defaultWidth: DEFAULT_NAME_COLUMN_WIDTH,
+    rows: filteredRows, viewportWidth: viewport.width, defaultWidth: DEFAULT_NAME_COLUMN_WIDTH,
     savedWidth: ui.ganttNameColumnWidth, measureRef: nameMeasureRef,
     onSave: (width) => patch({ ganttNameColumnWidth: width }),
   });
@@ -226,6 +227,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     return addDays(axisStart, Math.max(baseDays, visible) - 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [axisStart, normalEnd, normalStart, zoom, minZoom, availableWidth, dayWidth, fitToViewport]);
+  const rangeEnd = ui.ganttRange.end || axisEnd;
+  const rows = useMemo(() => filteredRows.filter((row) => matchesGanttRange(row, calendar, axisStart, rangeEnd)), [filteredRows, calendar, axisStart, rangeEnd]);
   const dates = useMemo(() => enumerateDates(axisStart, axisEnd), [axisStart, axisEnd]);
   const tableWidth = nameColumnWidth + (fitToViewport ? availableWidth : dates.length * dayWidth);
   const showReturnToStart = scroll.left >= Math.max(1, Math.min(30, diffDays(axisStart, today) + 1)) * dayWidth;
@@ -241,7 +244,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     return map;
   }, [rows, domainColor, state.domains]);
 
-  const allGroups = useMemo(() => groupRequests(state.requests.filter((row) => !row.archived), state.users, calendar, state.ganttRowOrder ?? {}), [state.requests, state.users, calendar, state.ganttRowOrder]);
+  const allGroups = useMemo(() => groupRequests(state.requests, state.users, calendar, state.ganttRowOrder ?? {}), [state.requests, state.users, calendar, state.ganttRowOrder]);
   const groups = useMemo(() => {
     const visible = new Set(rows.map((row) => row.id));
     return allGroups.map((group) => ({ ...group, rows: group.rows.filter((row) => visible.has(row.id)) })).filter((group) => group.rows.length > 0);
@@ -313,23 +316,23 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     },
   });
 
-  const selectedList = useMemo(() => rows.filter((row) => selectedIds.has(row.id)), [rows, selectedIds]);
-  const allVisibleIds = useMemo(() => {
+  const selectedList = useMemo(() => rows.filter((row) => !row.archived && selectedIds.has(row.id)), [rows, selectedIds]);
+  const selectableIds = useMemo(() => {
     const list: number[] = [];
     for (const group of groups) {
       if (ui.collapsedPeople.includes(group.developer)) continue;
       for (const row of group.rows) {
-        list.push(row.id);
+        if (!row.archived) list.push(row.id);
       }
     }
     return list;
   }, [groups, ui.collapsedPeople]);
 
   useEffect(() => {
-    const visible = new Set(allVisibleIds);
+    const visible = new Set(selectableIds);
     setSelectedIds((current) => [...current].every((id) => visible.has(id)) ? current : new Set([...current].filter((id) => visible.has(id))));
     setAnchorId((current) => current !== null && !visible.has(current) ? null : current);
-  }, [allVisibleIds]);
+  }, [selectableIds]);
 
   useEffect(() => {
     if (!selectedIds.size) return;
@@ -339,8 +342,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       if (target?.closest('[role="menu"], [role="dialog"]')) return;
       const name = target?.closest('[data-request-select]');
       if (name && wrapRef.current?.contains(name)) {
-        const rowId = Number(name.closest<HTMLElement>('[data-row]')?.dataset.row);
-        if (event.button === 0 || (event.button === 2 && selectedIds.has(rowId))) return;
+        const row = name.closest<HTMLElement>('[data-row]:not([data-archived])');
+        if (row && (event.button === 0 || (event.button === 2 && selectedIds.has(Number(row.dataset.row))))) return;
       }
       clear();
     };
@@ -356,8 +359,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   }, [selectedIds]);
 
   useLayoutEffect(() => {
-    onFitDaysChange(fitDays);
-  }, [fitDays, onFitDaysChange]);
+    onDateRangeChange({ start: axisStart, end: rangeEnd });
+  }, [axisStart, rangeEnd, onDateRangeChange]);
 
   useLayoutEffect(() => {
     const node = wrapRef.current;
@@ -412,10 +415,10 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     const next = new Set(selectedIds);
     if (event?.shiftKey && anchorId !== null) {
       if (!event.ctrlKey && !event.metaKey) next.clear();
-      const from = allVisibleIds.indexOf(anchorId);
-      const to = allVisibleIds.indexOf(id);
+      const from = selectableIds.indexOf(anchorId);
+      const to = selectableIds.indexOf(id);
       if (from >= 0 && to >= 0) {
-        for (const candidate of allVisibleIds.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(candidate);
+        for (const candidate of selectableIds.slice(Math.min(from, to), Math.max(from, to) + 1)) next.add(candidate);
       }
     } else if (event?.ctrlKey || event?.metaKey) {
       if (next.has(id)) next.delete(id);
@@ -427,7 +430,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       setAnchorId(id);
     }
     setSelectedIds(next);
-  }, [isAdmin, rows, selectedIds, anchorId, allVisibleIds]);
+  }, [isAdmin, rows, selectedIds, anchorId, selectableIds]);
 
   const openDayMenuFor = useCallback((rowId: number, date: string, x: number, y: number) => {
     if (!isAdmin) return;
@@ -458,14 +461,14 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   const applyUpdate = async (next: ApiRequest, message: string) => {
     const before = rows.find((row) => row.id === next.id);
-    if (!before) return false;
+    if (!before || before.archived) return false;
     const saved = await undo.save([{ before, after: next }], message);
     return saved;
   };
 
   const commitPreview = async (gesture: Gesture, current: Preview) => {
     const row = rows.find((candidate) => candidate.id === gesture.rowId);
-    if (!row || !current.valid) {
+    if (!row || row.archived || !current.valid) {
       if (current.reason) notice.error(current.reason);
       return;
     }
@@ -500,7 +503,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
 
   const computePreview = (gesture: Gesture, delta: number): Preview | null => {
     const row = rows.find((candidate) => candidate.id === gesture.rowId);
-    if (!row) return null;
+    if (!row || row.archived) return null;
     const withinRow = gesture.lastY >= (gesture.rowTop ?? 0) - 2 && gesture.lastY <= (gesture.rowBottom ?? 0) + 2;
     const withinGrid = gesture.lastX >= (gesture.wrapLeft ?? 0) + nameColumnWidth && gesture.lastX <= (gesture.wrapRight ?? window.innerWidth);
     if (gesture.supportIndex !== undefined) {
@@ -741,7 +744,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       event.preventDefault();
       return;
     }
-    if (!isAdmin) return;
+    if (!isAdmin || rowElement.hasAttribute("data-archived")) return;
     const cell = target.closest<HTMLElement>("td[data-date]");
     if (!cell) return;
     event.preventDefault();
@@ -869,7 +872,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     if (menu.type === "request") {
       const row = rows.find((candidate) => candidate.id === menu.rowId);
       if (!row) return { items: [] };
-      const multiple = isAdmin && selectedIds.size >= 2 && selectedIds.has(row.id);
+      const multiple = isAdmin && !row.archived && selectedIds.size >= 2 && selectedIds.has(row.id);
       const canSort = selectedList.some((item) => {
         const group = groups.find((candidate) => candidate.developer === item.developer);
         return group ? admissionSortOrderForRows(group.rows, [...selectedIds], calendar) !== null : false;
@@ -887,7 +890,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       };
     }
     const row = rows.find((candidate) => candidate.id === menu.rowId);
-    if (!row) return { items: [] };
+    if (!row || row.archived) return { items: [] };
     const working = isWorkday(menu.date, calendar);
     const info = dayResolver(row, calendar)(menu.date);
     const supportIndex = supportIndexAt(row, menu.date);
@@ -996,6 +999,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
     };
   }, [preview, axisStart, dayWidth, nameColumnWidth]);
 
+  const contextMenu = menuItems();
   return (
     <div className={styles.page}>
       <div className={styles.plotArea} data-scroll-container="gantt-content">
@@ -1108,8 +1112,8 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
                     preview={preview?.rowId === row.id ? preview : null}
                     hoveredPhase={hovered?.rowId === row.id ? hovered.phaseIndex : -1}
                     rowSelected={selectedIds.has(row.id)}
-                    isAdmin={isAdmin}
-                    canEdit={permissions.canEdit}
+                    isAdmin={isAdmin && !row.archived}
+                    canEdit={permissions.canEdit && !row.archived}
                     today={today}
                     suppressClickRef={suppressClickRef}
                     selectRow={selectRow}
@@ -1157,7 +1161,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
         {preview ? `${preview.valid ? "" : preview.reason ? preview.reason + " · " : ""}${preview.kind === "add" && preview.dates ? `松开补入 ${preview.dates.length} 个开发日` : preview.start && preview.end ? `${preview.start} 至 ${preview.end}` : ""}` : ""}
       </p>
 
-      <ContextMenu open={Boolean(menu && rows.some((row) => row.id === menu.rowId))} x={menu?.x ?? 0} y={menu?.y ?? 0} onClose={() => setMenu(null)} header={menuItems().header} items={menuItems().items} ariaLabel={menu?.type === "request" ? "需求操作" : "编辑当天安排"} scrollContainer={wrapRef.current} />
+      <ContextMenu open={contextMenu.items.length > 0} x={menu?.x ?? 0} y={menu?.y ?? 0} onClose={() => setMenu(null)} header={contextMenu.header} items={contextMenu.items} ariaLabel={menu?.type === "request" ? "需求操作" : "编辑当天安排"} scrollContainer={wrapRef.current} />
 
       {isAdmin && supportDraft ? <SupportPicker
         date={supportDraft.date}
@@ -1286,7 +1290,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
     return included ? preview.valid ? "valid" : "invalid" : null;
   };
   return (
-    <tr data-row={row.id} data-support-lane={state.supportOverlaps ? "" : undefined} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
+    <tr data-row={row.id} data-archived={row.archived || undefined} data-support-lane={state.supportOverlaps ? "" : undefined} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
       <th className={styles.nameCell} scope="row" data-request-select onClick={(event) => {
         if (!(event.target as Element).closest("[data-name]") && performance.now() >= suppressClickRef.current) selectRow(row.id, event);
       }}>
@@ -1299,7 +1303,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             className={styles.requestName}
             data-name
             data-tooltip={`${row.name}　${state.activeDays}人天`}
-            aria-description={`优先级 ${row.priority}，状态 ${row.status}`}
+            aria-description={`优先级 ${row.priority}，状态 ${row.status}${row.archived ? "，已归档" : ""}`}
             aria-pressed={rowSelected}
             aria-haspopup="menu"
             onClick={(event) => { if (performance.now() < suppressClickRef.current) return; selectRow(row.id, event); }}

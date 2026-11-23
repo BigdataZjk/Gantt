@@ -1562,7 +1562,7 @@ components:
                 type: string
               requestIds:
                 type: array
-                description: 对应分组的全部未归档需求 ID
+                description: 对应分组的全部需求 ID，包含已归档需求
                 items:
                   type: integer
                   format: int64

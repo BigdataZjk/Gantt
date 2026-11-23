@@ -76,7 +76,7 @@ test("Shift 正反向连选覆盖未排期和未分配需求，保留起点可�
   await selectRange(page, 7, 1);
   await expect.poll(() => selected(page)).toEqual([1, 2, 3, 4, 5, 6, 7]);
   await expect(page.getByRole("status").filter({ hasText: "已选 7 项" })).toBeVisible();
-  await expect(page.locator('tr[data-row="8"]')).toHaveCount(0);
+  await expect(page.locator('tr[data-row="8"][data-archived]')).toHaveAttribute("aria-selected", "false");
   expect(writes).toHaveLength(0);
 });
 
@@ -193,7 +193,7 @@ test("Shift 按共享顺序和当前筛选连选，隐藏及收起需求不进�
   await page.keyboard.press("Escape");
   await selectRange(page, 3, 4);
   await expect.poll(() => selected(page)).toEqual([3, 1, 4]);
-  await page.getByRole("button", { name: "收起张金科的 3 条需求", exact: true }).click();
+  await page.getByRole("button", { name: "收起张金科的 4 条需求", exact: true }).click();
   await expect.poll(() => selected(page)).toEqual([]);
   await name(page, 5).click({ modifiers: ["Shift"] });
   await expect.poll(() => selected(page)).toEqual([5]);

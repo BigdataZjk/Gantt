@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
+import type { State } from "../src/api/types";
 
 const PASSWORD = process.env.RSM_E2E_PASSWORD || "rsm-e2e-pass-123";
 const RUN_ID = Date.now().toString(36).toUpperCase();
@@ -45,6 +46,15 @@ async function searchRequirements(page: Page, name: string) {
   await page.waitForTimeout(200);
 }
 
+async function showGanttRange(page: Page, first: string, last: string) {
+  await page.getByRole("tab", { name: "甘特图", exact: true }).click();
+  const start = page.getByLabel("甘特图开始日期", { exact: true });
+  const end = page.getByLabel("甘特图结束日期", { exact: true });
+  if (first > await end.inputValue()) await end.fill(last);
+  await start.fill(first);
+  await end.fill(last);
+}
+
 async function openEdit(page: Page, name: string) {
   await page.getByRole("tab", { name: "需求池" }).click();
   await searchRequirements(page, name);
@@ -83,7 +93,7 @@ test("创建需求、持久化与真后端刷新", async ({ page }) => {
   await page.getByRole("tab", { name: "需求池" }).click();
   await searchRequirements(page, MAIN_NAME);
   await expect(page.getByRole("button", { name: MAIN_NAME, exact: true })).toBeVisible();
-  await page.getByRole("tab", { name: "甘特图" }).click();
+  await showGanttRange(page, "2026-11-09", "2026-12-10");
   await expect(page.getByRole("button", { name: MAIN_NAME, exact: true })).toBeVisible();
   await expect(page.getByText("张金科").first()).toBeVisible();
   // 页面刷新后仍能读到 SQLite 中持久化的正式数据
@@ -198,11 +208,34 @@ test("甘特图缩放仅在图表区域生效并可重置", async ({ page }) => 
 
 test("右键归档、归档只读详情与恢复", async ({ page }) => {
   await login(page);
-  await page.getByRole("tab", { name: "需求池" }).click();
+  const before = await apiState(page) as State;
+  const request = before.requests.find((row) => row.name === MAIN_NAME)!;
+  const segments = [
+    { start: "2026-11-16", end: "2026-11-17", holdBefore: false },
+    { start: "2026-11-19", end: "2026-11-20", holdBefore: true },
+  ];
+  const scheduled = await page.request.put(`/api/requests/${request.id}`, {
+    data: { baseRevision: before.revision, request: { ...request, days: 4, start: segments[0]!.start, delivery: segments[1]!.end, segments } },
+  });
+  expect(scheduled.ok()).toBeTruthy();
+  const scheduledState = await scheduled.json() as State;
+  const savedSegments = scheduledState.requests.find((row) => row.id === request.id)!.segments;
+  await page.reload();
+  await showGanttRange(page, segments[0]!.start, segments[1]!.end);
   await searchRequirements(page, MAIN_NAME);
+  const ganttRow = page.locator(`tr[data-row="${request.id}"]`);
+  const bars = ganttRow.locator("[data-bar]");
+  const hold = ganttRow.locator('[data-date="2026-11-18"] [data-hold-connector]');
+  await expect(bars).toHaveCount(4);
+  await expect(hold).toBeVisible();
   await page.getByRole("button", { name: MAIN_NAME, exact: true }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "归档" }).click();
   await expect(page.getByText("已归档，可在需求归档中查看")).toBeVisible();
+  await expect(ganttRow).toHaveAttribute("data-archived", "true");
+  await expect(bars).toHaveCount(4);
+  await expect(hold).toBeVisible();
+  const state = await apiState(page) as State;
+  expect(state.requests.find((row) => row.id === request.id)?.segments).toEqual(savedSegments);
   await page.getByRole("tab", { name: "已归档" }).click();
   const archived = page.getByRole("button", { name: MAIN_NAME, exact: true });
   await expect(archived).toBeVisible();
@@ -217,6 +250,10 @@ test("右键归档、归档只读详情与恢复", async ({ page }) => {
   await page.getByRole("button", { name: MAIN_NAME, exact: true }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "恢复到需求池" }).click();
   await expect(page.getByText("已恢复到需求池")).toBeVisible();
+  await page.getByRole("tab", { name: "甘特图", exact: true }).click();
+  await expect(ganttRow).not.toHaveAttribute("data-archived", "true");
+  await expect(bars).toHaveCount(4);
+  await expect(hold).toBeVisible();
 });
 
 test("筛选、搜索与显示字段", async ({ page }) => {
@@ -238,7 +275,7 @@ test("筛选、搜索与显示字段", async ({ page }) => {
 test("日夜切换与桌面/窄屏截图", async ({ page }) => {
   fs.mkdirSync(SHOTS, { recursive: true });
   await login(page);
-  await page.getByRole("tab", { name: "甘特图" }).click();
+  await showGanttRange(page, "2026-11-09", "2026-12-10");
   await searchRequirements(page, MAIN_NAME);
   await page.waitForTimeout(300);
   const toggle = page.getByRole("switch", { name: /切换为夜间模式|切换为日间模式/ });
@@ -355,7 +392,7 @@ test("甘特拖段/双端拉伸真实保存且无 React 嵌套错误", async ({ 
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => { if (message.type() === "error" && /validateDOMNesting|nesting|button/i.test(message.text())) errors.push(message.text()); });
   await page.reload();
-  await page.getByRole("tab", { name: "甘特图" }).click();
+  await showGanttRange(page, "2026-11-09", "2026-12-10");
   await page.getByRole("button", { name: "展开搜索" }).click();
   await page.getByRole("searchbox", { name: "搜索需求" }).fill(name);
   const row = page.locator(`tr[data-row="${rowId}"]`);
@@ -442,7 +479,7 @@ test("右键日标记：工作日休假/取消休假、休息日加班/取消加
   expect(created.ok()).toBeTruthy();
   const rowId = (await created.json()).requests.find((item: { name: string }) => item.name === name).id as number;
   await page.goto("/");
-  await page.getByRole("tab", { name: "甘特图" }).click();
+  await showGanttRange(page, "2026-12-01", "2026-12-31");
   await searchRequirements(page, name);
   const row = page.locator(`tr[data-row="${rowId}"]`);
   await expect(row).toBeVisible();
@@ -539,7 +576,7 @@ test("多选带标记多段需求顺排预览 batch 请求返回 200 且标记�
     createdIds.push(next.requests.find((item: { name: string }) => item.name === body.request.name).id);
   }
   await page.goto("/");
-  await page.getByRole("tab", { name: "甘特图" }).click();
+  await showGanttRange(page, "2026-12-01", "2026-12-31");
   await searchRequirements(page, `SQB-${RUN_ID}`);
   await page.locator(`tr[data-row="${createdIds[0]}"] [data-name]`).click();
   await page.locator(`tr[data-row="${createdIds[2]}"] [data-name]`).click({ modifiers: ["Shift"] });

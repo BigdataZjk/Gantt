@@ -71,10 +71,8 @@ func (s *Server) orderGantt(w http.ResponseWriter, r *http.Request) {
 		people := make(map[int64]string, len(data.Requests))
 		counts := make(map[string]int)
 		for _, row := range data.Requests {
-			if !row.Archived {
-				people[row.ID] = row.Developer
-				counts[row.Developer]++
-			}
+			people[row.ID] = row.Developer
+			counts[row.Developer]++
 		}
 		groups := make(map[string]bool, len(in.Orders))
 		seen := make(map[int64]bool)

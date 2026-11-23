@@ -80,11 +80,17 @@ async function dragTo(page: Page, source: Locator, target: Locator, edge: "befor
   if (release) await page.mouse.up();
 }
 
-test("需求池与甘特图完整包含未排期、未分配和日期轴外需求", async ({ page }) => {
+test("甘特图按日期显示排期及归档需求，并保留未排期和未分配需求", async ({ page }) => {
   await preview(page);
-  await expect.poll(() => rowIds(page)).toEqual([1, 2, 3, 4, 5, 8, 6, 7]);
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 2, 3, 4, 5, 6, 7]);
   await expect(page.getByRole("button", { name: "收起-的 2 条需求", exact: true })).toBeVisible();
-  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
+  await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("显示 8 / 共 9 条需求");
+  const endDate = page.getByLabel("甘特图结束日期", { exact: true });
+  const startDate = page.getByLabel("甘特图开始日期", { exact: true });
+  await endDate.fill("2027-05-12");
+  await startDate.fill("2027-05-10");
+  await expect.poll(() => rowIds(page)).toEqual([3, 4, 8, 6, 7]);
+  await expect(page.locator('tr[data-row="8"] [data-date="2027-05-10"] [data-bar]')).toBeVisible();
   await page.getByRole("tab", { name: "需求池", exact: true }).click();
   await expect.poll(() => rowIds(page)).toEqual([8, 7, 6, 5, 4, 3, 2, 1]);
   await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("8 条需求");
@@ -129,25 +135,26 @@ test("需求池按点击顺序标注优先级，排序开启时连续标注行�
 });
 
 for (const tab of ["甘特图", "需求池"] as const) {
-  test(`${tab}双击编辑、右键编辑归档删除，两个视图同步移除`, async ({ page }) => {
+  test(`${tab}归档后甘特图保留排期和只读详情，删除后移除需求`, async ({ page }) => {
     const { state, mutations } = await preview(page);
     await page.getByRole("tab", { name: tab, exact: true }).click();
-    const name = nameOf(page, "未排期甲");
+    const name = nameOf(page, "已排期甲");
     const editor = page.getByRole("dialog", { name: "编辑需求", exact: true });
     await name.dblclick({ delay: tab === "需求池" ? 280 : 0 });
     await expect(editor).toBeVisible();
-    await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("未排期甲");
+    await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
     await editor.getByRole("button", { name: "收起面板", exact: true }).click();
     await name.click({ button: "right" });
     await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除"]);
     await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
     await expect(editor).toBeVisible();
-    await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("未排期甲");
+    await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
     await editor.getByRole("button", { name: "收起面板", exact: true }).click();
     await name.click({ button: "right" });
     await page.getByRole("menuitem", { name: "归档", exact: true }).click();
-    await expect(name).toHaveCount(0);
-    expect(state.requests.find((row) => row.id === 3)?.archived).toBe(true);
+    await expect(page.getByText("已归档，可在需求归档中查看", { exact: true })).toBeVisible();
+    expect(state.requests.find((row) => row.id === 1)?.archived).toBe(true);
+    if (tab === "需求池") await expect(name).toHaveCount(0);
     await nameOf(page, "未排期乙").click({ button: "right" });
     await page.getByRole("menuitem", { name: "删除", exact: true }).click();
     const confirm = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "删除需求", exact: true }) });
@@ -159,13 +166,25 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await page.getByRole("menuitem", { name: "删除", exact: true }).click();
     await confirm.getByRole("button", { name: "确认删除", exact: true }).click();
     await expect(nameOf(page, "未排期乙")).toHaveCount(0);
-    await page.getByRole("tab", { name: tab === "甘特图" ? "需求池" : "甘特图", exact: true }).click();
-    await expect(nameOf(page, "未排期甲")).toHaveCount(0);
+    await page.getByRole("tab", { name: "甘特图", exact: true }).click();
+    const archivedRow = page.locator('tr[data-row="1"][data-archived]');
+    await expect(name).toBeVisible();
+    await expect(archivedRow.locator('[data-date="2026-11-16"] [data-bar]')).toBeVisible();
+    await expect(archivedRow.locator("[data-resize]")).toHaveCount(0);
+    await name.click({ button: "right" });
+    await expect(page.getByRole("menuitem")).toHaveText(["查看详情"]);
+    await page.keyboard.press("Escape");
+    await name.dblclick();
+    const details = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "需求详情", exact: true }) });
+    await expect(details.getByText("已归档 · 只读", { exact: true })).toBeVisible();
+    await details.getByRole("button", { name: "关闭", exact: true }).click();
+    await page.getByRole("tab", { name: "需求池", exact: true }).click();
+    await expect(name).toHaveCount(0);
     await expect(nameOf(page, "未排期乙")).toHaveCount(0);
     await expect(page.getByLabel("需求数量", { exact: true })).toHaveText("6 条需求");
     await page.getByRole("tab", { name: "已归档", exact: true }).click();
-    await expect(nameOf(page, "未排期甲")).toBeVisible();
-    expect(mutations).toEqual([{ method: "POST", id: 3 }, { method: "DELETE", id: 4 }]);
+    await expect(name).toBeVisible();
+    expect(mutations).toEqual([{ method: "POST", id: 1 }, { method: "DELETE", id: 4 }]);
   });
 
   test(`${tab}名称拖动排序、刷新保留与 Escape 取消，不修改业务数据`, async ({ page }, testInfo) => {
@@ -179,7 +198,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await expect(hint).toHaveText(`在「未排期甲」${edge === "before" ? "前" : "后"}`);
     await page.screenshot({ path: testInfo.outputPath(`${tab}-reorder.png`) });
     await page.mouse.up();
-    const expected = tab === "甘特图" ? [1, 2, 4, 3, 5, 8, 6, 7] : [8, 7, 6, 5, 3, 4, 2, 1];
+    const expected = tab === "甘特图" ? [1, 9, 2, 4, 3, 5, 6, 7] : [8, 7, 6, 5, 3, 4, 2, 1];
     await expect.poll(() => rowIds(page)).toEqual(expected);
     await expect(hint).toHaveCount(0);
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -210,7 +229,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await expect.poll(() => rowIds(page)).toEqual(expected);
     expect(state.requests).toEqual(before);
     expect(mutations).toEqual([]);
-    expect(orderWrites.map((item) => item.orders)).toEqual(tab === "甘特图" ? [[{ developer: "u1", requestIds: [1, 2, 4, 3] }]] : []);
+    expect(orderWrites.map((item) => item.orders)).toEqual(tab === "甘特图" ? [[{ developer: "u1", requestIds: [1, 9, 2, 4, 3] }]] : []);
     expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
   });
 }
@@ -253,7 +272,7 @@ test("甘特需求格的两侧空白、优先级短竖线和状态标签均可�
     await page.mouse.up();
   }
 
-  const expected = [1, 2, 4, 3, 5, 8, 6, 7];
+  const expected = [1, 9, 2, 4, 3, 5, 6, 7];
   await expect.poll(() => rowIds(page)).toEqual(expected);
   await expect(separator).toHaveAttribute("aria-valuenow", width!);
   await page.reload();
@@ -266,7 +285,7 @@ test("甘特需求格的两侧空白、优先级短竖线和状态标签均可�
   await expect(page.locator("[data-request-name] [data-priority]")).toHaveCount(0);
   expect(state.requests).toEqual(before);
   expect(mutations).toEqual([]);
-  expect(orderWrites.map((item) => item.orders)).toEqual([[{ developer: "u1", requestIds: [1, 2, 4, 3] }]]);
+  expect(orderWrites.map((item) => item.orders)).toEqual([[{ developer: "u1", requestIds: [1, 9, 2, 4, 3] }]]);
 });
 
 test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右键仍有需求操作", async ({ page }) => {
@@ -275,11 +294,12 @@ test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右�
   await expect(page.locator('[data-slot="request-reorder-hint"]')).toContainText("未排期需求保持在分组末尾");
   await expect(page.locator("[data-reorder-edge]")).toHaveCount(0);
   await page.mouse.up();
-  await expect.poll(() => rowIds(page)).toEqual([1, 2, 3, 4, 5, 8, 6, 7]);
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 2, 3, 4, 5, 6, 7]);
   await dragTo(page, nameOf(page, "未分配乙"), nameOf(page, "未分配甲"), "before");
-  await expect.poll(() => rowIds(page)).toEqual([1, 2, 3, 4, 5, 8, 7, 6]);
+  await expect.poll(() => rowIds(page)).toEqual([1, 9, 2, 3, 4, 5, 7, 6]);
   await nameOf(page, "已排期甲").click();
-  await nameOf(page, "已排期乙").click({ modifiers: ["Meta"] });
+  await nameOf(page, "已排期乙").click({ modifiers: ["Shift"] });
+  await expect(nameOf(page, "归档需求")).toHaveAttribute("aria-pressed", "false");
   await nameOf(page, "已排期甲").click({ button: "right" });
   await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
   await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
@@ -287,7 +307,7 @@ test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右�
   await expect(dialog.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
   await dialog.getByRole("button", { name: "收起面板", exact: true }).click();
   await dragTo(page, nameOf(page, "已排期甲"), nameOf(page, "其他人员需求"), "after");
-  await expect.poll(() => rowIds(page)).toEqual([2, 3, 4, 5, 1, 8, 7, 6]);
+  await expect.poll(() => rowIds(page)).toEqual([9, 2, 3, 4, 5, 1, 7, 6]);
   expect(state.requests.find((row) => row.id === 1)?.developer).toBe("u2");
   expect(orderWrites.map(({ orders, move }) => ({ orders, move }))).toEqual([
     { orders: [{ developer: "", requestIds: [7, 6] }], move: undefined },
@@ -462,7 +482,7 @@ for (const theme of ["light", "dark"] as const) {
     state.users = state.users.map((user) => user.id === "u2" ? { ...user, username: longName } : user);
     await page.reload();
     const table = page.getByRole("table", { name: "按天显示的人员需求排期", exact: true });
-    const group = page.getByRole("button", { name: `收起${longName}的 2 条需求`, exact: true });
+    const group = page.getByRole("button", { name: `收起${longName}的 1 条需求`, exact: true });
     for (const [width, height] of [[1440, 900], [1366, 768], [390, 844], [320, 568]]) {
       await page.setViewportSize({ width, height });
       await expect(group).toBeVisible();
@@ -503,7 +523,7 @@ for (const theme of ["light", "dark"] as const) {
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await group.locator("xpath=ancestor::tr").locator("td").click({ position: { x: 90, y: 18 } });
-    await expect(page.getByRole("button", { name: `展开${longName}的 2 条需求`, exact: true })).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("button", { name: `展开${longName}的 1 条需求`, exact: true })).toHaveAttribute("aria-expanded", "false");
     await expect(nameOf(page, "其他人员需求")).toHaveCount(0);
     await page.getByRole("tab", { name: "需求池", exact: true }).click();
     const header = page.getByRole("columnheader", { name: "需求名称", exact: true });

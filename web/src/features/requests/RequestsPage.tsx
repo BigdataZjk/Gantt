@@ -5,7 +5,7 @@ import { useNotice } from "../../ui/Notice";
 import { isDraftMeaningful } from "../../lib/draft";
 import { Archive, ChartNoAxesGantt, List } from "lucide-react";
 import type { ApiRequest, State } from "../../api/types";
-import { useUiState } from "../../app/uiState";
+import { useUiState, type UiState } from "../../app/uiState";
 import { PageTabs } from "../../ui/Tabs";
 import { Dialog } from "../../ui/Dialog";
 import { Button } from "../../ui/Button";
@@ -38,16 +38,16 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
   const notice = useNotice();
   const [deleteTarget, setDeleteTarget] = useState<ApiRequest | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
-  const [ganttFitDays, setGanttFitDays] = useState(1);
+  const [ganttRange, setGanttRange] = useState<UiState["ganttRange"] | null>(null);
 
   const scoped = useMemo(() => scopeRequests(state.requests, ui.requirementTab), [state.requests, ui.requirementTab]);
   const filtered = useMemo(() => filterRequests(scoped, ui.filters, { applyDates: ui.requirementTab !== "gantt" }), [scoped, ui.filters, ui.requirementTab]);
   const draftHint = isDraftMeaningful(ui.newDraft);
 
   const openRequest = useCallback((id: number) => {
-    if (permissions.canEdit) onEditorChange({ mode: "edit", id });
+    if (permissions.canEdit && state.requests.some((row) => row.id === id && !row.archived)) onEditorChange({ mode: "edit", id });
     else setDetailsId(id);
-  }, [permissions.canEdit, onEditorChange]);
+  }, [permissions.canEdit, state.requests, onEditorChange]);
   const archiveRow = async (row: ApiRequest) => {
     const result = await runner((baseRevision) => api.archiveRequest(baseRevision, row.id, true));
     if (result) notice.notify("已归档，可在需求归档中查看");
@@ -68,7 +68,7 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
         state={state}
         scopeRows={scoped}
         tab={ui.requirementTab}
-        ganttFitDays={ganttFitDays}
+        ganttRange={ganttRange}
         navigation={
           <PageTabs
             ariaLabel="需求视图"
@@ -84,7 +84,7 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
       />
       <div className={styles.content} data-scroll-container="requests-content">
         {ui.requirementTab === "gantt" ? (
-          <GanttView undo={ganttUndo} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onFitDaysChange={setGanttFitDays} />
+          <GanttView undo={ganttUndo} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onDateRangeChange={setGanttRange} />
         ) : (
           <RequestTable
             state={state}

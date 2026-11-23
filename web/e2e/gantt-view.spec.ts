@@ -49,7 +49,7 @@ async function openGantt(page: Page, theme: "light" | "dark" = "light", density:
     users: options.multiplePeople ? [...state.users, otherUser] : state.users,
     requests: [
       ...Array.from({ length: count }, (_, index) => ({ ...request, id: index + 1, name: index === count - 1 && options.lastName ? options.lastName : `并行排期 ${index + 1}`, developer: options.multiplePeople && index % 2 ? otherUser.id : request.developer })),
-      { ...request, id: 100, name: "归档只读需求", archived: true },
+      { ...request, id: 100, name: "归档只读需求", archived: true, start: addDays(request.start, -90), delivery: addDays(request.start, -88) },
     ],
     preferences: { ...state.preferences, theme, density, domainColors: editable ? { [request.domain]: "#d05d44" } : state.preferences.domainColors },
   };
@@ -513,7 +513,13 @@ for (const theme of ["light", "dark"] as const) {
   });
 
   test(`初始日期适配屏宽且无横轴，缩放及自定义日期范围可滚动（${theme}）`, async ({ page }, testInfo) => {
-    const wrap = await openGantt(page, theme, "compact", false, { autoRange: true, count: 2 });
+    const futureStart = addDays(today, 110);
+    const wrap = await openGantt(page, theme, "compact", false, {
+      autoRange: true,
+      count: 2,
+      fixture: (state, row) => ({ requests: [...state.requests, { ...row, id: 101, name: "缩放范围内归档需求", archived: true, start: futureStart, delivery: addDays(futureStart, 6) }] }),
+    });
+    const future = wrap.getByRole("button", { name: "缩放范围内归档需求", exact: true });
     const ranges = new Map<number, number>();
     for (const [width, height] of [[1440, 900], [1366, 768], [1024, 768], [736, 620], [390, 844], [320, 568], [1920, 1080], [2560, 1440]]) {
       await page.setViewportSize({ width, height });
@@ -533,21 +539,31 @@ for (const theme of ["light", "dark"] as const) {
     expect(ranges.get(1440)).toBeGreaterThan(ranges.get(390)!);
     await page.setViewportSize({ width: 1440, height: 900 });
     const start = addDays(today, 21);
+    const endDate = page.getByLabel("甘特图结束日期", { exact: true });
     await page.getByLabel("甘特图开始日期", { exact: true }).fill(start);
     await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
-    await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(start, ranges.get(1440)! - 1));
+    await expect(endDate).toHaveValue(addDays(start, ranges.get(1440)! - 1));
     const bounds = (await wrap.boundingBox())!;
-    await page.mouse.move(bounds.x + 260, bounds.y + 70);
-    await page.keyboard.down("Control");
-    await page.mouse.wheel(0, 160);
-    await page.keyboard.up("Control");
+    const zoomOut = async () => {
+      await page.mouse.move(bounds.x + 260, bounds.y + 70);
+      await page.keyboard.down("Control");
+      await page.mouse.wheel(0, 1600);
+      await page.keyboard.up("Control");
+    };
+    await zoomOut();
     await expect(page.getByRole("button", { name: "重置比例", exact: true })).toBeVisible();
+    await expect(future).toBeVisible();
+    await expect.poll(async () => diffDays(futureStart, await endDate.inputValue())).toBeGreaterThanOrEqual(0);
     await page.getByRole("button", { name: "重置比例", exact: true }).click();
     await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
-    const end = addDays(start, 90);
-    await page.getByLabel("甘特图结束日期", { exact: true }).fill(end);
+    await expect(future).toHaveCount(0);
+    const end = addDays(start, 60);
+    await endDate.fill(end);
     await expect.poll(() => wrap.evaluate((el) => el.scrollWidth > el.clientWidth)).toBeTruthy();
-    await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(end);
+    await zoomOut();
+    await expect(page.getByRole("button", { name: "重置比例", exact: true })).toBeVisible();
+    await expect(endDate).toHaveValue(end);
+    await expect(future).toHaveCount(0);
   });
 }
 
