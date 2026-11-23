@@ -25,7 +25,7 @@ import { Button } from "../../../ui/Button";
 import { ContextMenu, contextMenuPoint, isContextMenuKey, type ContextMenuItem } from "../../../ui/ContextMenu";
 import { Drawer } from "../../../ui/Drawer";
 import { useNotice } from "../../../ui/Notice";
-import { PriorityTag } from "../../../ui/Tag";
+import { StatusTag } from "../../../ui/Tag";
 import {
   admissionSortOrderForRows,
   adjustSupportSegment,
@@ -139,7 +139,36 @@ const DEFAULT_NAME_COLUMN_WIDTH = 192;
 const PERSON_ROW_HEIGHT = 28;
 const SUPPORT_LANE_GAP = 2;
 const ROW_HEIGHT = { compact: 38, comfortable: 50 } as const;
+const RIPPLE_CELL_SIZE = 2;
+const RIPPLE_PERIOD = 176;
+const RIPPLE_SLOPE = Math.tan(78 * Math.PI / 180);
+const RIPPLE_BRIGHTNESS = [0, 9, 18, 31, 44, 27, 11, 0];
 type MarkerMode = "icon" | "tick" | "hidden";
+
+function rippleTexture(height: number): CSSProperties {
+  const sampleSpacing = 8;
+  const stops = Array.from({ length: (RIPPLE_BRIGHTNESS.length - 1) * sampleSpacing / RIPPLE_CELL_SIZE }, (_, index) => {
+    const x = index * RIPPLE_CELL_SIZE;
+    const sample = (x + RIPPLE_CELL_SIZE / 2) / sampleSpacing;
+    const left = Math.floor(sample);
+    const from = RIPPLE_BRIGHTNESS[left]!;
+    const to = RIPPLE_BRIGHTNESS[left + 1]!;
+    const weight = from + (to - from) * (sample - left);
+    return `color-mix(in srgb, transparent, var(--ripple-ink) ${weight.toFixed(2)}%) ${x}px ${x + RIPPLE_CELL_SIZE}px`;
+  });
+  const bands = Math.ceil(height / RIPPLE_CELL_SIZE);
+  const positions = Array.from({ length: bands }, (_, index) => {
+    const y = index * RIPPLE_CELL_SIZE;
+    return `${(-y / RIPPLE_SLOPE).toFixed(4)}px ${y}px`;
+  });
+  return {
+    "--ripple-cell-size": `${RIPPLE_CELL_SIZE}px`,
+    "--ripple-period": `${RIPPLE_PERIOD}px`,
+    "--ripple-wave": `linear-gradient(90deg, ${stops.join(", ")}, transparent 0)`,
+    "--ripple-images": positions.map(() => "var(--ripple-wave)").join(", "),
+    "--ripple-positions": positions.join(", "),
+  } as CSSProperties;
+}
 
 export const GanttView = memo(function GanttView({ state, permissions, rows, totalCount, draftHint, onOpen, onDelete, onArchive, onFitDaysChange, undo }: Props) {
   const { ui, patch } = useUiState();
@@ -178,6 +207,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
   const availableWidth = Math.max(1, viewport.width - nameColumnWidth);
   const rowHeight = ROW_HEIGHT[density];
   const ganttRowHeight = Math.max(24, rowHeight - 14);
+  const rippleStyle = useMemo(() => rippleTexture(ganttRowHeight), [ganttRowHeight]);
   const preferredDayWidth = ganttRowHeight * 1.125;
   const fitDays = Math.max(1, Math.floor(availableWidth / preferredDayWidth));
   const baseDayWidth = ui.ganttRange.end ? preferredDayWidth : availableWidth / fitDays;
@@ -977,12 +1007,17 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
           "--gantt-viewport-height": `${viewport.height}px`,
         } as CSSProperties}>
           <div ref={nameMeasureRef} className={styles.nameMeasure} aria-hidden="true">
-            <div className={styles.nameContent}><PriorityTag value="P0" /><span className={styles.requestName} data-name-measure-label /></div>
+            <div className={styles.nameContent}>
+              <span className={styles.priorityMark} />
+              <StatusTag value="待评审" />
+              <span className={styles.requestName} data-name-measure-label />
+            </div>
           </div>
           <div ref={wrapRef} className={`${styles.calendarWrap} ${reorder.className}`} data-scroll-container="gantt"
             onWheel={zoomFromWheel} onContextMenu={onContextMenu} onPointerDown={beginPointer} {...nameResize.pointerHandlers}
             onClickCapture={reorder.onClickCapture} onDoubleClickCapture={reorder.onDoubleClickCapture} onScroll={onScroll}>
             <table className={styles.calendar} aria-label="按天显示的人员需求排期" data-marker-mode={markerMode} style={{
+              ...rippleStyle,
               width: tableWidth,
               "--day-width": `${dayWidth}px`,
               "--gantt-row-height": `${ganttRowHeight}px`,
@@ -1105,7 +1140,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows, tot
       <div className={styles.legend} aria-label="甘特图图例" data-testid="gantt-legend">
         <span className={styles.summary} aria-label="需求数量">{rows.length === totalCount ? `${totalCount} 条需求` : `显示 ${rows.length} / 共 ${totalCount} 条需求`}</span>
         <span data-legend-icon="estimated" data-tooltip="尚未预估开发人天，暂按 3 个工作日占位"><Hourglass aria-hidden="true" />待估人天</span>
-        <span data-legend-icon="hold" data-tooltip="需求名右侧表示 HOLD 状态，时间轴中表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
+        <span data-legend-icon="hold" data-tooltip="时间轴中的标记表示两段排期之间的手动暂停"><CirclePause aria-hidden="true" />HOLD</span>
         <span data-tooltip="同一开发人的连续交叠区域只显示一组箭头，需求保持原色"><span className={styles.parallelSymbol}><ArrowBigUp className={styles.arrowUp} preserveAspectRatio="none" aria-hidden="true" /><ArrowBigDown className={styles.arrowDown} preserveAspectRatio="none" aria-hidden="true" /></span>需求并行</span>
         <span data-legend-icon="support" data-tooltip="协助需求的排期，悬停线段可查看需求名"><CellMarker kind="support" mode="icon" />补位</span>
         <span data-legend-icon="overtime" data-tooltip="非工作日手动安排开发"><AlarmClockPlus aria-hidden="true" />加班</span>
@@ -1206,7 +1241,6 @@ const GanttRequestRow = memo(function GanttRequestRow({
   today, suppressClickRef, selectRow, onOpen, onNameMenu, onDayMenu, setHovered,
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
-  const isOnHold = row.status === "HOLD";
   const estimated = (Number(row.days) || 0) === 0;
   const hovered = hoveredPhase >= 0 ? { rowId: row.id, phaseIndex: hoveredPhase } : null;
   const isHovered = Boolean(hovered);
@@ -1232,10 +1266,8 @@ const GanttRequestRow = memo(function GanttRequestRow({
     const mask = runs.length > 1 ? runs.map(({ start, end }) => (
       `transparent ${offset(start)}, black ${offset(start)} ${offset(end)}, transparent ${offset(end)}`
     )).join(", ") : null;
-    const cellsPerDay = Math.max(1, Math.round(dayWidth / (markerMode === "tick" ? 11 : 9)));
-    const phaseDays = diffDays(liveRange.start, liveRange.end) + 1;
     // Keep the wave and its grid fixed to the segment during horizontal scrolling.
-    const phaseOffset = diffDays(liveRange.start, visibleDates[first.start]!) * dayWidth;
+    const phaseOffset = diffDays(liveRange.start, visibleDates[first.start]!) * dayWidth % RIPPLE_PERIOD;
     return {
       atStart: visibleDates[first.start] === liveRange.start,
       atEnd: visibleDates[last.end - 1] === liveRange.end,
@@ -1244,9 +1276,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
         width: offset(last.end),
         maskImage: mask ? `linear-gradient(to right, ${mask})` : undefined,
         "--ripple-origin": `${-phaseOffset}px`,
-        "--ripple-cell-width": `${dayWidth / cellsPerDay}px`,
-        "--ripple-columns": Math.min(18, Math.max(8, phaseDays * cellsPerDay + 2)),
-        "--ripple-delay": `${-(row.id % 11) * 137}ms`,
+        "--ripple-delay": `${-(row.id % 31) * 213}ms`,
       } as CSSProperties,
     };
   }, [visibleDays, visibleDates, live, liveRange, markerMode, dayWidth, leftHidden, row.id]);
@@ -1262,13 +1292,14 @@ const GanttRequestRow = memo(function GanttRequestRow({
       }}>
         <span className={styles.groupGuide} data-slot="gantt-group-guide" data-group-end={groupEnd ? "" : undefined} aria-hidden="true" />
         <div className={styles.nameContent} data-request-name>
-          <PriorityTag value={row.priority} />
+          <span className={styles.priorityMark} data-priority={row.priority} data-tooltip={`优先级 ${row.priority}`} aria-hidden="true" />
+          <StatusTag value={row.status} />
           <button
             type="button"
             className={styles.requestName}
             data-name
             data-tooltip={`${row.name}　${state.activeDays}人天`}
-            aria-description={isOnHold ? "状态为 HOLD" : undefined}
+            aria-description={`优先级 ${row.priority}，状态 ${row.status}`}
             aria-pressed={rowSelected}
             aria-haspopup="menu"
             onClick={(event) => { if (performance.now() < suppressClickRef.current) return; selectRow(row.id, event); }}
@@ -1287,7 +1318,6 @@ const GanttRequestRow = memo(function GanttRequestRow({
           >
             {row.name}
           </button>
-          {isOnHold ? <CirclePause className={styles.requestHoldIcon} data-request-hold aria-hidden="true" /> : null}
         </div>
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}

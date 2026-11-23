@@ -59,9 +59,9 @@ for (const theme of ["light", "dark"] as const) {
     test(`HOLD 居中连接排期，所有标记按缩放简化并恢复（${theme}/${density}）`, async ({ page }, testInfo) => {
       const { wrap, writes, errors } = await openMarkers(page, theme, density);
       const table = wrap.locator("table");
-      const requestHold = wrap.locator('tr[data-row="9"] [data-request-select] [data-request-hold]');
+      const requestHold = wrap.locator('tr[data-row="9"] [data-dict-field="status"][data-value="HOLD"]');
       await expect(requestHold).toBeVisible();
-      await expect(wrap.locator("[data-request-hold]")).toHaveCount(1);
+      await expect(requestHold).toHaveText("HOLD");
       const checkHold = async (id: number) => {
         const row = wrap.locator(`tr[data-row="${id}"]`);
         const left = (await row.locator('[data-bar][data-phase="0"]').last().boundingBox())!;

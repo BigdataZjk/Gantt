@@ -103,10 +103,13 @@
   left: 0;
   border-bottom: 1px solid currentColor;
 }
-.nameContent { --request-hold-icon-size: 14px; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.nameContent { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.priorityMark { flex: none; width: 3px; height: 14px; border-radius: 2px; background: color-mix(in srgb, var(--rsm-priority-p2) 36%, transparent); }
+.priorityMark[data-priority="P0"] { background: var(--rsm-priority-p0); }
+.priorityMark[data-priority="P1"] { background: var(--rsm-priority-p1); }
+.nameContent > [data-dict-field="status"] { flex: none; width: 44px; height: 18px; padding: 0 4px; font-size: 11px; }
 .requestName { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--rsm-text); text-align: left; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .requestName:hover { color: var(--rsm-accent); text-decoration: underline; }
-.requestHoldIcon { flex: none; width: var(--request-hold-icon-size); height: var(--request-hold-icon-size); color: var(--rsm-muted); stroke-width: 1.7; }
 .personRow { cursor: pointer; }
 .personRow > th, .personRow > td { height: var(--person-row-height); background: var(--rsm-person-fill); border-top: 1px solid color-mix(in srgb, var(--rsm-person-ink) 24%, var(--rsm-border)); border-bottom: 1px solid var(--rsm-border); }
 .personRow > th { position: sticky; left: 0; z-index: 3; padding: 3px 10px !important; text-align: left; font-weight: 600; color: var(--rsm-person-ink); border-right: 1px solid var(--rsm-border); box-shadow: inset 3px 0 color-mix(in srgb, var(--rsm-accent) 42%, var(--rsm-person-fill)); }
@@ -248,26 +251,11 @@
 .holdCenter { position: absolute; top: 50%; display: flex; transform: translate(-50%, -50%); }
 .holdCenter .cellMarker { border-radius: 50%; background: var(--rsm-gantt-surface); box-shadow: 0 0 0 2px var(--rsm-gantt-surface); }
 .holdCenter .cellMarker[data-marker-mode="tick"] { border-radius: 0; box-shadow: none; }
-.liveRipple {
-  --ripple-fill: var(--task-fill, var(--rsm-accent));
+.calendar {
   --ripple-ink: color-mix(in srgb, currentColor 82%, #60efff);
-  --ripple-period: calc(var(--ripple-cell-width) * var(--ripple-columns));
-  --ripple-step: max(110ms, calc(1.5s / var(--ripple-columns)));
-  --ripple-duration: calc(var(--ripple-step) * var(--ripple-columns));
-  --ripple-bands: 3;
-  --ripple-band-height: calc(100% / var(--ripple-bands));
-  --ripple-band-shift: calc(var(--gantt-row-height) / var(--ripple-bands) / tan(78deg));
-  --ripple-wave: linear-gradient(90deg,
-    var(--ripple-fill) 0 var(--ripple-cell-width),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 9%) 0 calc(2 * var(--ripple-cell-width)),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 18%) 0 calc(3 * var(--ripple-cell-width)),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 31%) 0 calc(4 * var(--ripple-cell-width)),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 44%) 0 calc(5 * var(--ripple-cell-width)),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 27%) 0 calc(6 * var(--ripple-cell-width)),
-    color-mix(in srgb, var(--ripple-fill), var(--ripple-ink) 11%) 0 calc(7 * var(--ripple-cell-width)),
-    var(--ripple-fill) 0
-  );
-  --ripple-middle-wave: var(--ripple-wave);
+}
+.liveRipple {
+  --ripple-travel: calc(3 * var(--ripple-period));
   position: absolute;
   z-index: 0;
   top: 0;
@@ -277,7 +265,6 @@
   color: var(--task-ink, var(--rsm-on-accent));
 }
 .liveRipple[data-estimated] {
-  --ripple-fill: var(--task-estimated-fill);
   color: #101828;
   color: light-dark(#101828, white);
 }
@@ -286,35 +273,37 @@
 }
 .liveRipple::before,
 .liveRipple::after {
-  --ripple-offset: var(--ripple-origin);
   content: "";
   position: absolute;
-  inset: 0 0 0 calc(-1 * var(--ripple-period));
-  background-image: var(--ripple-wave), var(--ripple-middle-wave), var(--ripple-wave);
-  background-size: var(--ripple-period) var(--ripple-band-height);
-  background-position:
-    var(--ripple-offset) top,
-    calc(var(--ripple-offset) - var(--ripple-band-shift)) center,
-    calc(var(--ripple-offset) - (var(--ripple-bands) - 1) * var(--ripple-band-shift)) bottom;
+  inset: 0 0 0 calc(var(--ripple-origin) - var(--ripple-travel));
+  background-image: var(--ripple-images);
+  background-size: var(--ripple-period) var(--ripple-cell-size);
+  background-position: var(--ripple-positions);
   background-repeat: repeat-x;
-  animation:
-    gantt-ripple-right var(--ripple-duration) steps(var(--ripple-columns)) var(--ripple-delay) infinite,
-    none var(--ripple-step) ease-in-out var(--ripple-delay) infinite;
+  animation: gantt-ripple-right 6.8s linear var(--ripple-delay) infinite;
+  /* Travel three tiles per loop, with different acceleration intervals for each wave. */
+  animation-timing-function: linear(
+    0, .0147, .0389, .0822, .1355, .1895, .235, .2628,
+    .2775, .2922, .3069, .3312, .369, .4165, .4696, .5243,
+    .5766, .6224, .6579, .6791, .6937, .7084, .7231, .7378,
+    .7669, .8172, .8731, .919, .9413, .9559, .9706, .9853, 1
+  );
 }
-/* Crossfade the next position so each cell changes color without sliding. */
 .liveRipple::after {
-  --ripple-offset: calc(var(--ripple-origin) + var(--ripple-cell-width));
-  animation-name: gantt-ripple-right, gantt-ripple-fade;
+  opacity: 0.6;
+  animation-duration: 8.9s;
+  animation-delay: calc(var(--ripple-delay) - 1.65s);
+  animation-timing-function: linear(
+    0, .0159, .0319, .0494, .0789, .1191, .1662, .2161,
+    .265, .3087, .3434, .3653, .3812, .3972, .4131, .4293,
+    .4611, .5088, .5592, .599, .6187, .6347, .6519, .6814,
+    .7221, .7699, .8205, .8698, .9135, .9476, .9681, .9841, 1
+  );
 }
-@keyframes gantt-ripple-right { to { transform: translateX(var(--ripple-period)); } }
-@keyframes gantt-ripple-fade { from { opacity: 0; } }
-.calendar[data-marker-mode="tick"] .liveRipple {
-  --ripple-bands: 2;
-  --ripple-middle-wave: none;
-}
+@keyframes gantt-ripple-right { to { transform: translateX(var(--ripple-travel)); } }
 @media (prefers-reduced-motion: reduce) {
   .liveRipple::before {
-    inset: 0;
+    left: var(--ripple-origin);
     animation: none;
   }
   .liveRipple::after { content: none; }

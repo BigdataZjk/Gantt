@@ -215,7 +215,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
   });
 }
 
-test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排序", async ({ page }, testInfo) => {
+test("甘特需求格的两侧空白、优先级短竖线和状态标签均可拖动排序", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 800, height: 900 });
   const { state, mutations, orderWrites } = await preview(page, {
     rows: requests.map((row) => row.id === 4 || row.id === 9 ? { ...row, status: "HOLD" } : row),
@@ -230,18 +230,18 @@ test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排�
   await expect.poll(() => wrap.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
 
   const cell = (await source.boundingBox())!;
-  const badge = (await source.getByText("P1", { exact: true }).boundingBox())!;
-  const holdIcon = source.locator("[data-request-hold]");
-  await expect(holdIcon).toBeVisible();
-  const icon = (await holdIcon.boundingBox())!;
+  const priority = (await source.locator('[data-priority="P1"]').boundingBox())!;
+  const hold = source.locator('[data-dict-field="status"]');
+  await expect(hold).toHaveText("HOLD");
+  const badge = (await hold.boundingBox())!;
   const destination = (await target.boundingBox())!;
   const centerY = cell.y + cell.height / 2;
   const positions = [
     { x: cell.x + 2, y: centerY },
     { x: cell.x + cell.width / 2, y: cell.y + 1 },
-    { x: badge.x + badge.width / 2, y: badge.y + badge.height / 2 },
+    { x: priority.x + priority.width / 2, y: priority.y + priority.height / 2 },
     { x: cell.x + cell.width - 2, y: centerY },
-    { x: icon.x + icon.width / 2, y: icon.y + icon.height / 2 },
+    { x: badge.x + badge.width / 2, y: badge.y + badge.height / 2 },
   ];
   for (const [index, { x, y }] of positions.entries()) {
     await page.mouse.move(x, y);
@@ -249,7 +249,7 @@ test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排�
     await page.mouse.move(x, destination.y + destination.height / 4, { steps: 4 });
     await expect(target).toHaveAttribute("data-reorder-edge", "before");
     if (index < positions.length - 1) await page.keyboard.press("Escape");
-    else await wrap.screenshot({ path: testInfo.outputPath("gantt-reorder-from-hold-icon.png") });
+    else await wrap.screenshot({ path: testInfo.outputPath("gantt-reorder-from-status.png") });
     await page.mouse.up();
   }
 
@@ -260,10 +260,10 @@ test("甘特需求格的两侧空白、优先级和 HOLD 图标均可拖动排�
   await expect.poll(() => rowIds(page)).toEqual(expected);
   await page.getByRole("tab", { name: "需求池", exact: true }).click();
   await expect(nameOf(page, "未排期乙")).toBeVisible();
-  await expect(page.locator("[data-request-hold]")).toHaveCount(0);
+  await expect(page.locator("[data-request-name] [data-priority]")).toHaveCount(0);
   await page.getByRole("tab", { name: "已归档", exact: true }).click();
   await expect(nameOf(page, "归档需求")).toBeVisible();
-  await expect(page.locator("[data-request-hold]")).toHaveCount(0);
+  await expect(page.locator("[data-request-name] [data-priority]")).toHaveCount(0);
   expect(state.requests).toEqual(before);
   expect(mutations).toEqual([]);
   expect(orderWrites.map((item) => item.orders)).toEqual([[{ developer: "u1", requestIds: [1, 2, 4, 3] }]]);

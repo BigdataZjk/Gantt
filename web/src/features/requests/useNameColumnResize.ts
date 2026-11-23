@@ -35,7 +35,7 @@ export function useNameColumnResize({ rows, viewportWidth, defaultWidth, savedWi
   useLayoutEffect(() => {
     const measure = measureRef.current;
     const label = measure?.querySelector("[data-name-measure-label]");
-    if (!rows.length || !measure || !label?.parentElement) {
+    if (!rows.length || !measure || !label) {
       setContentWidth(null);
       return;
     }
@@ -43,13 +43,10 @@ export function useNameColumnResize({ rows, viewportWidth, defaultWidth, savedWi
     if (!context) return;
     const style = getComputedStyle(label);
     context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    const holdSize = parseFloat(style.getPropertyValue("--request-hold-icon-size")) || 0;
-    const holdWidth = holdSize ? holdSize + parseFloat(getComputedStyle(label.parentElement).columnGap) : 0;
     let widest = 0;
     for (const row of rows) {
       const name = row.name.replace(/[ \t\n\r\f]+/g, " ").trim();
-      const textWidth = context.measureText(name).width;
-      widest = Math.max(widest, textWidth + (row.status === "HOLD" ? holdWidth : 0));
+      widest = Math.max(widest, context.measureText(name).width);
     }
     setContentWidth(widest + measure.getBoundingClientRect().width);
   }, [rows, defaultWidth, measureRef]);

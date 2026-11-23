@@ -122,7 +122,7 @@ test("日期预设支持键盘展开和选择，焦点边框完整位于按钮�
   await expect(presets).toHaveCSS("opacity", "0");
 });
 
-test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染的需求及 HOLD", async ({ page }) => {
+test("甘特需求列拖动和双击均调整时间轴，量宽包含短竖线、状态和未渲染的需求", async ({ page }) => {
   const name = "验证列宽和时间轴联动的较长需求名称".repeat(3);
   const wrap = await openGantt(page, "light", "compact", false, {
     autoRange: true,
@@ -136,20 +136,24 @@ test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染�
   const firstRow = wrap.locator('tr[data-row="1"]');
   const cell = firstRow.locator("[data-request-select]");
   const date = firstRow.locator("[data-date]").first();
-  const icon = cell.locator("[data-request-hold]");
-  await expect(icon).toBeVisible();
-  const iconFits = () => cell.evaluate((element) => {
+  await expect(cell.locator('[data-dict-field="status"]')).toHaveText("HOLD");
+  const labelsFit = () => cell.evaluate((element) => {
     const text = element.querySelector("[data-name]")!.getBoundingClientRect();
-    const icon = element.querySelector("[data-request-hold]")!.getBoundingClientRect();
-    const { paddingRight, borderRightWidth } = getComputedStyle(element);
-    const innerRight = element.getBoundingClientRect().right - parseFloat(paddingRight) - parseFloat(borderRightWidth);
-    return icon.width === 14 && text.right < icon.left && Math.abs(icon.right - innerRight) < 1;
+    const status = element.querySelector('[data-dict-field="status"]')!.getBoundingClientRect();
+    const priority = element.querySelector("[data-priority]")!.getBoundingClientRect();
+    const { paddingLeft, paddingRight, borderRightWidth } = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    const innerRight = box.right - parseFloat(paddingRight) - parseFloat(borderRightWidth);
+    return priority.width === 3 && priority.height === 14 && status.width === 44 && status.height === 18
+      && Math.abs(priority.left - box.left - parseFloat(paddingLeft)) < 1
+      && priority.right < status.left && status.right < text.left && Math.abs(text.right - innerRight) < 1;
   });
-  expect(await iconFits()).toBe(true);
+  expect(await labelsFit()).toBe(true);
   await expect(wrap.getByText(name, { exact: true })).toHaveCount(0);
   const contentWidth = await cell.evaluate((element, title) => {
     const name = element.querySelector<HTMLButtonElement>("[data-name]")!;
-    const priority = name.previousElementSibling!;
+    const priority = element.querySelector("[data-priority]")!;
+    const status = element.querySelector('[data-dict-field="status"]')!;
     const probe = name.cloneNode() as HTMLButtonElement;
     probe.textContent = title;
     probe.style.cssText = "position:absolute; width:max-content; visibility:hidden";
@@ -157,8 +161,7 @@ test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染�
     const style = getComputedStyle(element);
     const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth);
     const gap = parseFloat(getComputedStyle(name.parentElement!).columnGap);
-    const iconWidth = element.querySelector("[data-request-hold]")!.getBoundingClientRect().width;
-    const width = probe.getBoundingClientRect().width + priority.getBoundingClientRect().width + iconWidth + 2 * gap + padding;
+    const width = probe.getBoundingClientRect().width + priority.getBoundingClientRect().width + status.getBoundingClientRect().width + 2 * gap + padding;
     probe.remove();
     return width;
   }, name);
@@ -174,7 +177,7 @@ test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染�
   await expect(separator).toHaveAttribute("aria-valuenow", String(initialWidth + 64));
   const expanded = (await cell.boundingBox())!;
   expect(expanded.width).toBe(initialWidth + 64);
-  expect(await iconFits()).toBe(true);
+  expect(await labelsFit()).toBe(true);
   expect((await date.boundingBox())!.x).toBeCloseTo(expanded.x + expanded.width, 0);
   await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   await page.mouse.move(1390, y);
@@ -184,7 +187,7 @@ test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染�
 
   await page.setViewportSize({ width: 320, height: 640 });
   await expect.poll(() => separator.getAttribute("aria-valuenow").then(Number)).toBeLessThan(maxWidth);
-  expect(await iconFits()).toBe(true);
+  expect(await labelsFit()).toBe(true);
   expect(await wrap.evaluate((el) => el.clientWidth - Number(el.querySelector('[role="separator"]')?.getAttribute("aria-valuenow")))).toBeGreaterThanOrEqual(80);
   await expect.poll(() => wrap.evaluate((el) => el.scrollWidth - el.clientWidth)).toBe(0);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -198,7 +201,7 @@ test("甘特需求列拖动和双击均调整时间轴，量宽包含未渲染�
   await separator.press("Home");
   const minWidth = await separator.getAttribute("aria-valuemin");
   await expect(separator).toHaveAttribute("aria-valuenow", minWidth!);
-  expect(await iconFits()).toBe(true);
+  expect(await labelsFit()).toBe(true);
   await expect(page.getByLabel("甘特图结束日期", { exact: true })).toHaveValue(addDays(today, 90));
 
   const fitWidth = String(Math.ceil(contentWidth));
@@ -576,7 +579,7 @@ test("整块左上表头切换全部折叠，部分展开时仍执行全部收�
 });
 
 for (const theme of ["light", "dark"] as const) {
-  test(`当前开发段方格铺满线段并斜向右流动（${theme}）`, async ({ page }, testInfo) => {
+  test(`当前开发段 2px 方格铺满线段并变速向右流动（${theme}）`, async ({ page }, testInfo) => {
     const start = addDays(today, -4);
     const end = addDays(today, 36);
     const leave = addDays(today, 3);
@@ -584,7 +587,7 @@ for (const theme of ["light", "dark"] as const) {
     const overtime = addDays(today, 7);
     const nextStart = addDays(today, 50);
     const nextEnd = addDays(today, 53);
-    const wrap = await openGantt(page, theme, "compact", false, {
+    const wrap = await openGantt(page, theme, theme === "light" ? "compact" : "comfortable", false, {
       fixture: (state, base) => {
         const blue = { id: "e2e-blue", name: "深蓝色", color: "#2457b8" };
         const green = { id: "e2e-green", name: "浅绿色", color: "#4fc788" };
@@ -624,52 +627,70 @@ for (const theme of ["light", "dark"] as const) {
     await expect(wrap.locator('[data-row="3"] [data-live-ripple]')).toHaveCSS("color", theme === "light" ? "rgb(0, 0, 0)" : "rgb(255, 255, 255)");
 
     const pausedTime = 1160;
-    const motion = await ripple.evaluate((element, time) => {
+    const motion = await ripple.evaluate(async (element, time) => {
       const animations = element.getAnimations({ subtree: true });
-      const running = animations.length === 3 && animations.every((animation) => animation.playState === "running");
+      const running = animations.length === 2 && animations.every((animation) => animation.playState === "running");
       animations.forEach((animation) => animation.pause());
-      const position = (time: number) => {
-        animations.forEach((animation) => { animation.currentTime = time; });
-        return new DOMMatrixReadOnly(getComputedStyle(element, "::before").transform);
-      };
-      const before = position(240);
-      const after = position(time);
+      await Promise.all(animations.map((animation) => animation.ready));
       const style = getComputedStyle(element, "::before");
+      const [period, cellHeight] = style.backgroundSize.split(" ").map(parseFloat);
+      const layers = ["::before", "::after"].map((pseudo, index) => {
+        const animation = animations[index]!;
+        const { delay = 0, duration } = animation.effect!.getComputedTiming();
+        const milliseconds = Number(duration);
+        const samples = Array.from({ length: 32 }, (_, sample) => {
+          animation.currentTime = milliseconds * (1 + (sample + 0.5) / 32) + delay;
+          const transform = new DOMMatrixReadOnly(getComputedStyle(element, pseudo).transform);
+          return { x: transform.m41, y: transform.m42 };
+        });
+        const steps = samples.slice(1).map(({ x }, i) => x - samples[i]!.x);
+        const passes = [0, 1, 2].map((pass) => {
+          const next = samples.findIndex(({ x }) => x >= (pass + 0.2) * period!);
+          return steps[next - 1]!;
+        });
+        return { duration: milliseconds, steps, passes, movesOnlyRight: samples.every(({ y }) => y === 0) };
+      });
+      animations.forEach((animation) => { animation.currentTime = time; });
       return {
         running,
-        step: parseFloat(style.getPropertyValue("--ripple-cell-width")),
-        offsets: style.backgroundPositionX.split(",").map(parseFloat),
-        bandHeight: parseFloat(style.backgroundSize.split(" ")[1]!),
-        fade: Number(getComputedStyle(element, "::after").opacity),
-        x: after.m41 - before.m41,
-        y: after.m42 - before.m42,
+        period: period!,
+        cellHeight,
+        stops: style.backgroundImage.match(/\d+px/g)?.slice(0, 6),
+        columns: style.backgroundPositionX.split(",").map(parseFloat),
+        bands: style.backgroundPositionY.split(",").map(parseFloat),
+        layers,
       };
     }, pausedTime);
     expect(motion.running).toBe(true);
-    expect(motion.bandHeight).toBeCloseTo(100 / 3);
-    const [topOffset, middleOffset, bottomOffset] = motion.offsets;
-    const bandHeight = barBox.height / 3;
-    const angle = (shift: number) => Math.atan2(bandHeight, shift) * 180 / Math.PI;
-    expect(angle(topOffset! - middleOffset!)).toBeCloseTo(78);
-    expect(angle(middleOffset! - bottomOffset!)).toBeCloseTo(78);
-    expect(motion.fade).toBeGreaterThan(0);
-    expect(motion.fade).toBeLessThan(1);
-    expect(motion.x).toBeGreaterThan(barBox.width);
-    expect(motion.x / motion.step).toBeCloseTo(Math.round(motion.x / motion.step));
-    expect(motion.y).toBe(0);
+    expect(motion.stops).toEqual(["0px", "2px", "2px", "4px", "4px", "6px"]);
+    expect(motion.cellHeight).toBe(2);
+    expect(motion.bands).toEqual(Array.from({ length: barBox.height / 2 }, (_, i) => i * 2));
+    const horizontalShift = motion.columns[0]! - motion.columns.at(-1)!;
+    expect(Math.atan2(barBox.height - 2, horizontalShift) * 180 / Math.PI).toBeCloseTo(78);
+    expect(motion.layers[0]!.duration).not.toBe(motion.layers[1]!.duration);
+    for (const layer of motion.layers) {
+      expect(layer.movesOnlyRight).toBe(true);
+      expect(Math.min(...layer.steps)).toBeGreaterThan(0);
+      expect(Math.max(...layer.steps)).toBeGreaterThan(2 * Math.min(...layer.steps));
+      expect(Math.max(...layer.passes) - Math.min(...layer.passes)).toBeGreaterThan(5);
+    }
     await wrap.screenshot({ path: testInfo.outputPath("live-ripple.png") });
 
     const origin = () => ripple.evaluate((element) => {
       const left = element.getBoundingClientRect().left + element.closest('[data-scroll-container="gantt"]')!.scrollLeft;
-      return left + parseFloat(getComputedStyle(element, "::before").backgroundPositionX);
+      const layer = getComputedStyle(element, "::before");
+      return left + parseFloat(layer.left) + parseFloat(layer.backgroundPositionX);
     });
     const initialOrigin = await origin();
     await wrap.evaluate((element, width) => { element.scrollLeft = width * 15; }, barBox.width);
     await expect(firstBar).toHaveCount(0);
     await expect(ripple).toHaveCount(1);
-    expect(await origin()).toBeCloseTo(initialOrigin, 0);
-    expect(await ripple.evaluate((element) => element.getAnimations({ subtree: true }).map((animation) => animation.currentTime))).toEqual([pausedTime, pausedTime, pausedTime]);
-    await wrap.evaluate((element) => { element.scrollLeft = element.scrollWidth; });
+    const repeatOffset = ((await origin()) - initialOrigin) / motion.period;
+    expect(repeatOffset).toBeCloseTo(Math.round(repeatOffset), 2);
+    expect(await ripple.evaluate((element) => element.getAnimations({ subtree: true }).map((animation) => animation.currentTime))).toEqual([pausedTime, pausedTime]);
+    const axisStart = await page.getByLabel("甘特图开始日期", { exact: true }).inputValue();
+    const nextPhaseOffset = (diffDays(axisStart, nextStart) - 2) * barBox.width;
+    await wrap.evaluate((element, offset) => { element.scrollLeft = offset; }, nextPhaseOffset);
     await expect(row.locator(`[data-date="${nextStart}"] [data-bar]`)).toBeInViewport();
     await expect(ripple).toHaveCount(0);
     await wrap.evaluate((element) => { element.scrollLeft = 0; });
@@ -687,7 +708,7 @@ for (const theme of ["light", "dark"] as const) {
     await zoomOut(300);
     await expect(wrap.getByRole("table")).toHaveAttribute("data-marker-mode", "tick");
     expect((await ripple.boundingBox())!.height).toBe(barBox.height);
-    expect(await ripple.evaluate((element) => getComputedStyle(element, "::before").backgroundSize)).toContain("50%");
+    expect(await ripple.evaluate((element) => getComputedStyle(element, "::before").backgroundSize)).toBe(`${motion.period}px 2px`);
     await zoomOut(1000);
     await expect(reset).toBeVisible();
     await expect(ripple).toHaveCount(0);
