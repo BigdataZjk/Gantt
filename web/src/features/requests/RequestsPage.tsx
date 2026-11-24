@@ -1,6 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../../api/client";
-import { useMutationRunner } from "../../api/hooks";
 import { useNotice } from "../../ui/Notice";
 import { isDraftMeaningful } from "../../lib/draft";
 import { Archive, ChartNoAxesGantt, List } from "lucide-react";
@@ -13,7 +12,7 @@ import type { RequestPermissions, EditorRequest } from "./types";
 export type { EditorRequest };
 import { filterRequests, scopeRequests } from "./filtering";
 import { FilterBar } from "./FilterBar";
-import type { GanttUndo } from "./gantt/useGanttUndo";
+import { requestHistoryShortcut, type RequestHistory } from "./useRequestHistory";
 import { GanttView } from "./gantt/GanttView";
 import { RequestTable } from "./table/RequestTable";
 import { RequestDrawer } from "./form/RequestDrawer";
@@ -22,7 +21,7 @@ import styles from "./RequestsPage.module.css";
 
 export interface RequestsPageProps {
   state: State;
-  ganttUndo: GanttUndo;
+  requestHistory: RequestHistory;
   permissions: RequestPermissions;
   onLogin: () => void;
   onLogout: () => void;
@@ -32,13 +31,22 @@ export interface RequestsPageProps {
   onEditorChange: (editor: EditorRequest | null) => void;
 }
 
-export function RequestsPage({ state, permissions, onEditorChange, editor, ganttUndo }: RequestsPageProps) {
+export function RequestsPage({ state, permissions, onEditorChange, editor, requestHistory }: RequestsPageProps) {
   const { ui, patch } = useUiState();
-  const runner = useMutationRunner();
   const notice = useNotice();
   const [deleteTarget, setDeleteTarget] = useState<ApiRequest | null>(null);
   const [detailsId, setDetailsId] = useState<number | null>(null);
   const [ganttRange, setGanttRange] = useState<UiState["ganttRange"] | null>(null);
+
+  useEffect(() => {
+    if (!permissions.canEdit) return;
+    const onKey = (event: KeyboardEvent) => {
+      const direction = requestHistoryShortcut(event);
+      if (direction && requestHistory.replay(direction)) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [permissions.canEdit, requestHistory]);
 
   const scoped = useMemo(() => scopeRequests(state.requests, ui.requirementTab), [state.requests, ui.requirementTab]);
   const filtered = useMemo(() => filterRequests(scoped, ui.filters, { applyDates: ui.requirementTab !== "gantt" }), [scoped, ui.filters, ui.requirementTab]);
@@ -49,15 +57,15 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
     else setDetailsId(id);
   }, [permissions.canEdit, state.requests, onEditorChange]);
   const archiveRow = async (row: ApiRequest) => {
-    const result = await runner((baseRevision) => api.archiveRequest(baseRevision, row.id, true));
+    const result = await requestHistory.save((baseRevision) => api.archiveRequest(baseRevision, row.id, true));
     if (result) notice.notify("已归档，可在需求归档中查看");
   };
   const restoreRow = async (row: ApiRequest) => {
-    const result = await runner((baseRevision) => api.archiveRequest(baseRevision, row.id, false));
+    const result = await requestHistory.save((baseRevision) => api.archiveRequest(baseRevision, row.id, false));
     if (result) notice.notify("已恢复到需求池");
   };
   const deleteRow = async (row: ApiRequest) => {
-    const result = await runner((baseRevision) => api.deleteRequest(baseRevision, row.id));
+    const result = await requestHistory.save((baseRevision) => api.deleteRequest(baseRevision, row.id));
     if (result) notice.notify("需求已删除");
   };
   const openDetails = (id: number) => setDetailsId(id);
@@ -84,10 +92,11 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
       />
       <div className={styles.content} data-scroll-container="requests-content">
         {ui.requirementTab === "gantt" ? (
-          <GanttView undo={ganttUndo} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onDateRangeChange={setGanttRange} />
+          <GanttView requestHistory={requestHistory} state={state} permissions={permissions} rows={filtered} totalCount={scoped.length} draftHint={draftHint} onOpen={openRequest} onDelete={setDeleteTarget} onArchive={(row) => void archiveRow(row)} onDateRangeChange={setGanttRange} />
         ) : (
           <RequestTable
             state={state}
+            save={requestHistory.save}
             permissions={permissions}
             rows={filtered}
             totalCount={scoped.length}
@@ -103,6 +112,7 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, gantt
       </div>
 
       <RequestDrawer
+        save={requestHistory.save}
         state={state}
         permissions={permissions}
         editor={editor && editor.mode !== "archive" ? editor : null}

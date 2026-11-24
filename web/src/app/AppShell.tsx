@@ -18,7 +18,7 @@ import { useNotice } from "../ui/Notice";
 import { LoginDialog, PasswordDialog, type PasswordMode } from "../features/auth/AuthFlows";
 import { RequestsPage, type EditorRequest } from "../features/requests/RequestsPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
-import { useGanttUndo } from "../features/requests/gantt/useGanttUndo";
+import { useRequestHistory } from "../features/requests/useRequestHistory";
 import styles from "./AppShell.module.css";
 
 export interface Permissions {
@@ -49,7 +49,7 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
   const canEdit = isAdmin || me?.role === "collaborator";
   const permissions = useMemo<Permissions>(() => ({ isSuper, isAdmin, canEdit, guest }), [isSuper, isAdmin, canEdit, guest]);
 
-  const ganttUndo = useGanttUndo(me?.id);
+  const requestHistory = useRequestHistory(me?.id);
 
   const showCreate = ui.mainView === "requirements";
 
@@ -127,7 +127,7 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
               onOpenProfile={openProfile}
               editor={editor}
               onEditorChange={setEditor}
-              ganttUndo={ganttUndo}
+              requestHistory={requestHistory}
             />
           ) : (
             <SettingsPage

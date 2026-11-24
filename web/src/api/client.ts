@@ -21,6 +21,12 @@ export class P0DeliveryConfirmationError extends ApiError {
   }
 }
 
+const requestOperationIds = new WeakMap<object, string>();
+
+export function requestOperationId(state: State): string | undefined {
+  return requestOperationIds.get(state);
+}
+
 async function parse<T>(response: Response, retry?: (token: string) => Promise<Response>): Promise<T> {
   if (!response.ok) {
     let payload: { error?: string; code?: string; confirmation?: P0DeliveryConfirmation } | null = null;
@@ -40,7 +46,10 @@ async function parse<T>(response: Response, retry?: (token: string) => Promise<R
   if (response.status === 204) return undefined as T;
   const text = await response.text();
   if (!text) return undefined as T;
-  return JSON.parse(text) as T;
+  const value = JSON.parse(text) as T;
+  const id = response.headers.get("X-RSM-Request-Operation");
+  if (id && value && typeof value === "object") requestOperationIds.set(value, id);
+  return value;
 }
 
 async function send<T>(path: string, method: string, body?: unknown, options: RequestInit = {}): Promise<T> {
@@ -92,6 +101,9 @@ export const api = {
     send<State>("/api/requests/gantt-order", "PUT", { baseRevision, orders, move, ...context }),
   rankRequests: (baseRevision: number, requestId?: number): Promise<State> => send<State>("/api/requests/priority", "POST", { baseRevision, action: requestId === undefined ? "clear" : "toggle", requestId }),
   archiveRequest: (baseRevision: number, id: number, archived: boolean): Promise<State> => send<State>(`/api/requests/${id}/archive`, "POST", { baseRevision, archived }),
+
+  reverseRequestOperation: (baseRevision: number, id: string, redo: boolean): Promise<State> =>
+    send<State>(`/api/requests/operations/${encodeURIComponent(id)}/reverse`, "POST", { baseRevision, redo }),
 
   createDomain: (baseRevision: number, name: string, color: string): Promise<State> => send<State>("/api/domains", "POST", { baseRevision, name, color }),
   updateDomain: (baseRevision: number, id: string, name: string, color: string): Promise<State> => send<State>(`/api/domains/${encodeURIComponent(id)}`, "PUT", { baseRevision, name, color }),

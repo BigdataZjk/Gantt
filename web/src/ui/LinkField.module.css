@@ -20,5 +20,3 @@
 }
 .actions button:not(:disabled):hover { background: var(--rsm-soft); color: var(--rsm-accent); }
 .actions svg { width: 11px; height: 11px; stroke-width: 1.7; }
-.feedback { color: var(--rsm-muted); font-size: 11px; min-height: 0; }
-.feedback:empty { display: none; }

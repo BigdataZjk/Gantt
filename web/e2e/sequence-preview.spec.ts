@@ -1,3 +1,4 @@
+import { mockRequestHistory, operationToReverse } from "./request-history-fixture";
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
 import { diffDays } from "../src/lib/dates";
@@ -19,21 +20,25 @@ async function open(page: Page, options: { theme?: "light" | "dark"; guest?: boo
   const state: State = { ...original, me: options.guest ? null : users[0], setupRequired: false, users, domains, calendar, requests: structuredClone(options.rows ?? rows), ganttRowOrder: options.order ? { u1: options.order } : {}, preferences: { ...original.preferences, theme: options.theme ?? "light", density: "compact" } };
   const writes: ApiRequest[][] = [];
   let failure = 0;
+  const history = mockRequestHistory(state, (changes) => {
+    writes.push(structuredClone(changes));
+    state.requests = state.requests.map((row) => {
+      const update = changes.find((item) => item.id === row.id);
+      return update ? { ...update, revision: row.revision + 1 } : row;
+    });
+    state.revision += 1;
+  });
   await page.route((url) => url.pathname.startsWith("/api/"), (route) => {
     const path = new URL(route.request().url()).pathname;
+    const operation = operationToReverse(path);
+    if (operation) return history.reverse(route, operation);
     if (path === "/api/state") return route.fulfill({ json: state });
     if (path === "/api/presence") return route.fulfill({ json: { users: [], guests: 0 } });
     if ((path === "/api/requests/batch" && route.request().method() === "POST") || (/^\/api\/requests\/\d+$/.test(path) && route.request().method() === "PUT")) {
       if (failure) return route.fulfill({ status: failure, json: { error: failure === 409 ? "资料已更新，请刷新后重试" : "保存失败，请重试" } });
       const body = route.request().postDataJSON() as { requests?: ApiRequest[]; request?: ApiRequest };
       const updates = body.requests ?? [body.request!];
-      writes.push(structuredClone(updates));
-      state.requests = state.requests.map((row) => {
-        const update = updates.find((item) => item.id === row.id);
-        return update ? { ...update, revision: row.revision + 1 } : row;
-      });
-      state.revision += 1;
-      return route.fulfill({ json: state });
+      return history.save(route, updates);
     }
     return route.abort();
   });
@@ -129,13 +134,13 @@ for (const theme of ["light", "dark"] as const) {
         const bounds = (await cell(page, id).boundingBox())!;
         const position = { x: edge === "right" ? bounds.width - 2 : edge === "left" ? 2 : 25, y: bounds.height / 2 };
         await cell(page, id).click({ button: "right", position });
-        await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
+        await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "复制需求名", "复制PRD地址", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
         await expect.poll(() => selected(page)).toEqual([1, 2, 3]);
         await page.keyboard.press("Escape");
       }
     }
     await name(page, 4).click({ button: "right" });
-    await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "复制需求名", "复制PRD地址", "删除"]);
     await expect.poll(() => selected(page)).toEqual([]);
     await page.keyboard.press("Escape");
     await name(page, 1).click();
@@ -310,11 +315,11 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("游客右键名称格边缘只显示查看详情，不出现多选和顺排", async ({ page }) => {
+test("游客右键名称格边缘可查看详情和复制，不出现多选和顺排", async ({ page }) => {
   await open(page, { guest: true });
   await selectRange(page);
   await expect.poll(() => selected(page)).toEqual([]);
   const bounds = (await cell(page, 1).boundingBox())!;
   await cell(page, 1).click({ button: "right", position: { x: bounds.width - 2, y: bounds.height / 2 } });
-  await expect(page.getByRole("menuitem")).toHaveText(["查看详情"]);
+  await expect(page.getByRole("menuitem")).toHaveText(["查看详情", "复制需求名", "复制PRD地址"]);
 });

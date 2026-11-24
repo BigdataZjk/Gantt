@@ -361,14 +361,19 @@ func DecodeData(raw string) (requests.Data, error) {
 }
 
 func (s *Store) Change(ctx context.Context, actorID string, base *int64, permission, action string, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
-	return s.change(ctx, actorID, base, permission, action, nil, reversible, fn)
+	return s.change(ctx, actorID, base, permission, action, nil, reversible, nil, fn)
 }
 
 func (s *Store) ChangeLogged(ctx context.Context, actorID string, base *int64, permission string, detail *history.Detail, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
-	return s.change(ctx, actorID, base, permission, "", detail, reversible, fn)
+	return s.change(ctx, actorID, base, permission, "", detail, reversible, nil, fn)
 }
 
-func (s *Store) change(ctx context.Context, actorID string, base *int64, permission, action string, detail *history.Detail, reversible bool, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
+func (s *Store) ChangeRequests(ctx context.Context, actorID string, base *int64, permission string, detail *history.Detail, fn func(*sql.Tx, *requests.Data, auth.User) error) (revision, operationID int64, err error) {
+	revision, err = s.change(ctx, actorID, base, permission, "", detail, true, &operationID, fn)
+	return
+}
+
+func (s *Store) change(ctx context.Context, actorID string, base *int64, permission, action string, detail *history.Detail, reversible bool, operationID *int64, fn func(*sql.Tx, *requests.Data, auth.User) error) (int64, error) {
 	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return 0, e
@@ -433,7 +438,19 @@ func (s *Store) change(ctx context.Context, actorID string, base *int64, permiss
 	if reversible {
 		beforeValue = string(before)
 	}
-	if e = insertHistory(ctx, tx, who.Username, action, now(), reversible, beforeValue, detail); e != nil {
+	var operation *requestOperation
+	if operationID != nil {
+		previous, err := DecodeData(string(before))
+		if err != nil {
+			return 0, err
+		}
+		operation, e = captureRequestOperation(ctx, tx, who, previous, data)
+		if e != nil {
+			return 0, e
+		}
+	}
+	logID, e := insertHistory(ctx, tx, who.Username, action, now(), reversible, beforeValue, detail, operation)
+	if e != nil {
 		return 0, e
 	}
 	if _, e = tx.ExecContext(ctx, "delete from history where id not in (select id from history order by id desc limit 200)"); e != nil {
@@ -441,6 +458,9 @@ func (s *Store) change(ctx context.Context, actorID string, base *int64, permiss
 	}
 	if e = tx.Commit(); e != nil {
 		return 0, e
+	}
+	if operation != nil {
+		*operationID = logID
 	}
 	return revision + 1, nil
 }

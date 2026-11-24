@@ -504,7 +504,7 @@ func (s *Store) MaintainLogs(ctx context.Context, at time.Time) (revision int64,
 		if run.Error != "" {
 			detail.Tags = append(detail.Tags, history.Text(run.Error))
 		}
-		if e = insertHistory(ctx, tx, "系统", "", run.CheckedAt, false, nil, &detail); e != nil {
+		if _, e = insertHistory(ctx, tx, "系统", "", run.CheckedAt, false, nil, &detail, nil); e != nil {
 			return 0, false, e
 		}
 		if _, e = tx.ExecContext(ctx, "delete from history where id not in (select id from history order by id desc limit 200)"); e != nil {

@@ -80,6 +80,31 @@ async function dragTo(page: Page, source: Locator, target: Locator, edge: "befor
   if (release) await page.mouse.up();
 }
 
+test("需求编辑面板在缺少 Clipboard 写入 API 时仍能复制链接并原位显示勾号", async ({ page }) => {
+  await preview(page);
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.getByRole("tab", { name: "需求池", exact: true }).click();
+  await nameOf(page, "已排期甲").dblclick();
+  const editor = page.getByRole("dialog", { name: "编辑需求", exact: true });
+  const link = "https://example.com/request?id=42#details";
+  await editor.getByRole("textbox", { name: "PRD 链接", exact: true }).fill(link);
+  await page.evaluate(async () => {
+    await navigator.clipboard.writeText("原剪贴板内容");
+    Object.defineProperty(navigator.clipboard, "writeText", { value: undefined });
+  });
+
+  const copy = editor.getByRole("button", { name: "复制PRD 链接", exact: true });
+  await copy.hover();
+  const bounds = await copy.boundingBox();
+  await copy.click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+  const copied = editor.getByRole("button", { name: "已复制PRD 链接", exact: true });
+  await expect(copied.locator("svg.lucide-check")).toBeVisible();
+  expect(await copied.boundingBox()).toEqual(bounds);
+  await expect(editor.getByText("已复制", { exact: true })).toHaveCount(0);
+  await expect(copy.locator("svg.lucide-copy")).toBeVisible({ timeout: 2000 });
+});
+
 test("甘特图按日期显示排期，未分配遵循日期范围，隐藏无排期的历史需求", async ({ page }) => {
   await preview(page, { rows: [
     ...requests,
@@ -212,7 +237,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
     await editor.getByRole("button", { name: "收起面板", exact: true }).click();
     await name.click({ button: "right" });
-    await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "复制需求名", "复制PRD地址", "删除"]);
     await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
     await expect(editor).toBeVisible();
     await expect(editor.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
@@ -239,7 +264,7 @@ for (const tab of ["甘特图", "需求池"] as const) {
     await expect(archivedRow.locator('[data-date="2026-11-16"] [data-bar]')).toBeVisible();
     await expect(archivedRow.locator("[data-resize]")).toHaveCount(0);
     await name.click({ button: "right" });
-    await expect(page.getByRole("menuitem")).toHaveText(["查看详情"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["查看详情", "复制需求名", "复制PRD地址"]);
     await page.keyboard.press("Escape");
     await name.dblclick();
     const details = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "需求详情", exact: true }) });
@@ -416,7 +441,7 @@ test("甘特拖动支持跨组换人并保留未排期末尾规则，多选右�
   await nameOf(page, "已排期乙").click({ modifiers: ["Shift"] });
   await expect(nameOf(page, "归档需求")).toHaveAttribute("aria-pressed", "false");
   await nameOf(page, "已排期甲").click({ button: "right" });
-  await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
+  await expect(page.getByRole("menuitem")).toHaveText(["编辑", "归档", "复制需求名", "复制PRD地址", "删除", "顺排预览", "按准入日期排序", "取消选中"]);
   await page.getByRole("menuitem", { name: "编辑", exact: true }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel("需求名", { exact: false })).toHaveValue("已排期甲");
@@ -492,7 +517,7 @@ test("游客可看需求详情和优先级，无法修改优先级", async ({ pa
     await page.getByRole("tab", { name: tab, exact: true }).click();
     const name = nameOf(page, "未排期甲");
     await name.click({ button: "right" });
-    await expect(page.getByRole("menuitem")).toHaveText(["查看详情"]);
+    await expect(page.getByRole("menuitem")).toHaveText(["查看详情", "复制需求名", "复制PRD地址"]);
     await page.getByRole("menuitem", { name: "查看详情", exact: true }).click();
     await expect(page.getByRole("dialog").locator("input, textarea, select")).toHaveCount(0);
     await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
@@ -671,5 +696,63 @@ for (const theme of ["light", "dark"] as const) {
     const header = page.getByRole("columnheader", { name: "需求名称", exact: true });
     await expect(header).toBeVisible();
     if (theme === "light") await page.screenshot({ path: testInfo.outputPath("pool-hierarchy.png") });
+  });
+}
+
+test("甘特图、需求池及归档的右键复制可写入剪贴板，空链接不提供选项", async ({ page }) => {
+  const prd = "https://example.com/req/prd";
+  const wangyue = "https://example.com/req/wangyue";
+  const active = request({ id: 1, name: "有链接的需求", prd, wangyue });
+  const archived = request({ id: 2, name: "已归档的需求", archived: true, prd, wangyue });
+  const withoutLinks = request({ id: 3, name: "无链接的归档需求", archived: true, prd: "", wangyue: "" });
+  const { mutations } = await preview(page, { guest: true, rows: [active, archived, withoutLinks] });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const copy = async (rowName: string, label: string, value: string) => {
+    await nameOf(page, rowName).click({ button: "right" });
+    await page.getByRole("menuitem", { name: label, exact: true }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(value);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  };
+  for (const tab of ["甘特图", "需求池", "已归档"]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    if (tab === "需求池") {
+      await page.evaluate(() => Object.defineProperty(navigator.clipboard, "writeText", { value: undefined }));
+    }
+    const row = tab === "已归档" ? archived : active;
+    await copy(row.name, "复制需求名", row.name);
+    await copy(row.name, "复制PRD地址", row.prd);
+    await copy(row.name, "复制望岳地址", row.wangyue);
+  }
+  await nameOf(page, withoutLinks.name).click({ button: "right" });
+  await expect(page.getByRole("menuitem")).toHaveText(["查看详情", "复制需求名"]);
+  expect(mutations).toHaveLength(0);
+});
+
+for (const theme of ["light", "dark"] as const) {
+  test(`甘特图优先级序号仅在所悬停的名称格内滑入（${theme}）`, async ({ page }, testInfo) => {
+    await preview(page, { theme, rows: [
+      request({ id: 1, name: "第一项需求", requesterRank: 1 }),
+      request({ id: 2, name: "第二项需求", requesterRank: 2 }),
+      request({ id: 3, name: "尚未标记优先级" }),
+    ] });
+    const cell = (id: number) => page.locator(`tr[data-row="${id}"] [data-request-select]`);
+    const badge = (id: number) => cell(id).locator('[data-slot="gantt-requester-rank"]');
+    await expect(badge(1)).toHaveCSS("opacity", "0");
+    await cell(1).hover({ position: { x: 5, y: 8 } });
+    await expect(badge(1)).toHaveText("1");
+    await expect(badge(1)).toHaveCSS("opacity", "1");
+    await expect(badge(1)).toHaveCSS("right", "7px");
+    await expect(badge(2)).toHaveCSS("opacity", "0");
+    const box = (await cell(1).boundingBox())!;
+    const marker = (await badge(1).boundingBox())!;
+    expect(marker.x + marker.width).toBeLessThan(box.x + box.width);
+    expect(marker.y).toBeGreaterThanOrEqual(box.y);
+    await page.locator('[data-scroll-container="gantt"]').screenshot({ path: testInfo.outputPath("gantt-rank.png"), animations: "disabled" });
+    await cell(2).hover();
+    await expect(badge(1)).toHaveCSS("opacity", "0");
+    await expect(badge(2)).toHaveCSS("opacity", "1");
+    await cell(3).hover();
+    await expect(badge(2)).toHaveCSS("opacity", "0");
+    await expect(badge(3)).toHaveCount(0);
   });
 }

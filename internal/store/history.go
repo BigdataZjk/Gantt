@@ -23,29 +23,34 @@ func (s *Store) HistoryDetail(ctx context.Context, id int64) (history.Detail, er
 	return detail, err
 }
 
-func insertHistory(ctx context.Context, tx *sql.Tx, actor, action, createdAt string, reversible bool, before any, detail *history.Detail) error {
+func insertHistory(ctx context.Context, tx *sql.Tx, actor, action, createdAt string, reversible bool, before any, detail *history.Detail, operation *requestOperation) (int64, error) {
 	if detail != nil {
 		action = detail.Action()
 	}
 	result, err := tx.ExecContext(ctx, "insert into history(actor,action,created_at,reversible,before_data) values (?,?,?,?,?)", actor, action, createdAt, reversible, before)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if detail != nil {
 		id, err := result.LastInsertId()
 		if err != nil {
-			return err
+			return 0, err
 		}
 		compact, err := json.Marshal(detail.Preview())
 		if err != nil {
-			return err
+			return 0, err
 		}
-		full, err := json.Marshal(detail)
+		full, err := json.Marshal(storedHistoryDetail{Detail: *detail, Operation: operation})
 		if err != nil {
-			return err
+			return 0, err
 		}
 		_, err = tx.ExecContext(ctx, "insert into history_details(history_id,preview,payload) values (?,?,?)", id, string(compact), string(full))
-		return err
+		return id, err
 	}
-	return nil
+	return 0, nil
+}
+
+type storedHistoryDetail struct {
+	history.Detail
+	Operation *requestOperation `json:"requestOperation,omitempty"`
 }

@@ -3,7 +3,7 @@ import { getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, ListX, RotateCcw } from "lucide-react";
 import { api } from "../../../api/client";
-import { useMutationRunner } from "../../../api/hooks";
+import type { RequestHistory } from "../useRequestHistory";
 import type { ApiRequest, State } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
@@ -22,6 +22,7 @@ import { newestRequests, sortRequests, toggleTableSort, type TableSort } from ".
 import styles from "./RequestTable.module.css";
 
 interface Props {
+  save: RequestHistory["save"];
   state: State;
   permissions: RequestPermissions;
   rows: ApiRequest[];
@@ -65,10 +66,9 @@ const WIDTHS: Record<string, number> = {
 
 const HEADERS = Object.fromEntries(COLUMN_CATALOG.map(({ key, label }) => [key, label]));
 
-export function RequestTable({ state, permissions, rows: incomingRows, totalCount, draftHint, archive, onOpen, onOpenDetails, onDelete, onArchive, onRestore }: Props) {
+export function RequestTable({ save, state, permissions, rows: incomingRows, totalCount, draftHint, archive, onOpen, onOpenDetails, onDelete, onArchive, onRestore }: Props) {
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
-  const runner = useMutationRunner();
   const notice = useNotice();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -95,7 +95,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
       patch({ poolSorting: [], poolRowOrder: ordered.map(({ id }) => id) });
     }
     rankQueue.current = rankQueue.current.then(async () => {
-      const saved = await runner((base) => api.rankRequests(base, id));
+      const saved = await save((base) => api.rankRequests(base, id));
       if (saved && id === undefined) notice.notify("已清除需求池优先级");
     });
   };
@@ -251,9 +251,7 @@ export function RequestTable({ state, permissions, rows: incomingRows, totalCoun
   const menuItems = menu?.priority
     ? canRank && hasRanks ? [{ key: "clearPriority", label: "清除优先级", icon: ListX, onSelect: () => changeRank() }] : []
     : menuRow
-    ? archive && canEdit
-      ? [{ key: "restore", label: "恢复到需求池", icon: RotateCcw, onSelect: () => onRestore(menuRow) }]
-      : requestMenuItems(menuRow, { canEdit: canEdit && !archive, onOpen: openRow, onDelete, onArchive })
+    ? requestMenuItems(menuRow, { canEdit, onOpen: openRow, onDelete, onArchive, onRestore })
     : [];
 
   return (

@@ -290,8 +290,10 @@ test("游客在甘特图、需求池和归档都能打开无表单的只读详�
     await expect(dialog.locator("input, textarea, select, [contenteditable=true]")).toHaveCount(0);
     await expect(dialog.getByRole("heading")).toHaveText(["需求详情", "基本信息", "开发信息", "分段排期", "补充信息"]);
     await expect(dialog.getByRole("link", { name: "https://example.com/gantt-regression" })).toHaveAttribute("href", "https://example.com/gantt-regression");
+    await page.evaluate(() => navigator.clipboard.writeText("原剪贴板内容"));
     await dialog.getByRole("button", { name: "复制PRD 链接", exact: true }).click();
-    await expect(dialog.getByRole("status")).toHaveText("已复制");
+    await expect(dialog.getByRole("button", { name: "已复制PRD 链接", exact: true }).locator("svg.lucide-check")).toBeVisible();
+    await expect(dialog.getByText("已复制", { exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("https://example.com/gantt-regression");
     if (tab === "甘特图") await page.screenshot({ path: testInfo.outputPath("guest-details.png") });
     await dialog.getByRole("button", { name: "关闭", exact: true }).click();

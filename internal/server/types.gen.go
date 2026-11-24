@@ -849,6 +849,18 @@ type PostApiRequestsBatchParams struct {
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
+// ReverseRequestOperationJSONBody defines parameters for ReverseRequestOperation.
+type ReverseRequestOperationJSONBody struct {
+	BaseRevision int64 `json:"baseRevision"`
+	Redo         *bool `json:"redo,omitempty"`
+}
+
+// ReverseRequestOperationParams defines parameters for ReverseRequestOperation.
+type ReverseRequestOperationParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
 // PutApiRequestsIdParams defines parameters for PutApiRequestsId.
 type PutApiRequestsIdParams struct {
 	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
@@ -911,6 +923,9 @@ type PostApiRequestsBatchJSONRequestBody = BatchMutation
 
 // PutGanttOrderJSONRequestBody defines body for PutGanttOrder for application/json ContentType.
 type PutGanttOrderJSONRequestBody = GanttOrderInput
+
+// ReverseRequestOperationJSONRequestBody defines body for ReverseRequestOperation for application/json ContentType.
+type ReverseRequestOperationJSONRequestBody ReverseRequestOperationJSONBody
 
 // PostRequesterRankJSONRequestBody defines body for PostRequesterRank for application/json ContentType.
 type PostRequesterRankJSONRequestBody = RequesterRankInput

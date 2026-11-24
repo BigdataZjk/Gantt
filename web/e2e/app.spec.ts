@@ -533,9 +533,9 @@ test("右键日标记：工作日休假/取消休假、休息日加班/取消加
   await page.getByRole("menuitem", { name: "取消加班", exact: true }).click();
   expect((await put).ok()).toBeTruthy();
   await expect(dayMarker("2026-12-12", "overtime")).toHaveCount(0);
-  put = waitPut();
+  const undo = page.waitForResponse((response) => /\/api\/requests\/operations\/\d+\/reverse$/.test(response.url()));
   await page.keyboard.press("Control+z");
-  expect((await put).ok()).toBeTruthy();
+  expect((await undo).ok()).toBeTruthy();
   await expect(dayMarker("2026-12-12", "overtime")).toBeVisible();
   expect((await readRow()).overtime).toContain("2026-12-12");
 });

@@ -82,6 +82,20 @@ test("P0 交付日期确认覆盖需求编辑、甘特拖拽、撤回和顺排�
   await confirm.click();
   await expect.poll(() => savedDelivery(secondP0!.id)).toBe("2026-11-23");
 
+  await page.keyboard.press("Control+Shift+z");
+  await assertDates(secondP0!.id, "2026-11-23", "2026-11-24");
+  await cancel.click();
+  await expect(confirmation).toBeHidden();
+  expect(await savedDelivery(secondP0!.id)).toBe("2026-11-23");
+  await page.keyboard.press("Control+Shift+z");
+  await assertDates(secondP0!.id, "2026-11-23", "2026-11-24");
+  await confirm.click();
+  await expect.poll(() => savedDelivery(secondP0!.id)).toBe("2026-11-24");
+  await page.keyboard.press("Control+z");
+  await assertDates(secondP0!.id, "2026-11-24", "2026-11-23");
+  await confirm.click();
+  await expect.poll(() => savedDelivery(secondP0!.id)).toBe("2026-11-23");
+
   await page.emulateMedia({ colorScheme: "dark" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await nameButton(anchor!.name).click();

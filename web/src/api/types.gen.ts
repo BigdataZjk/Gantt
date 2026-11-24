@@ -263,6 +263,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/requests/operations/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 撤回或重做本人需求操作，保留其他用户的后续变更 */
+        post: operations["reverseRequestOperation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests/gantt-order": {
         parameters: {
             query?: never;
@@ -1035,7 +1052,10 @@ export interface components {
         P0DeliveryConfirmationHeader: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description 本次需求变更的操作编号。有数据变化时返回，可用于撤回或重做。 */
+        RequestOperation: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -1666,6 +1686,7 @@ export interface operations {
             /** @description 成功 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1723,6 +1744,7 @@ export interface operations {
             /** @description 成功 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1778,6 +1800,7 @@ export interface operations {
             /** @description 成功 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1833,6 +1856,7 @@ export interface operations {
             /** @description 成功 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1870,6 +1894,70 @@ export interface operations {
             428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
+    reverseRequestOperation: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
+            path: {
+                /** @description 需求变更响应头 X-RSM-Request-Operation 中的操作编号 */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    baseRevision: number;
+                    redo?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description 更新后的共享数据 */
+            200: {
+                headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["State"];
+                };
+            };
+            /** @description 操作无法恢复或相关数据已变化 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 权限不足或操作属于其他用户 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 数据版本冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
+        };
+    };
     putGanttOrder: {
         parameters: {
             query?: never;
@@ -1886,6 +1974,7 @@ export interface operations {
             /** @description 更新后的共享数据 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -1945,6 +2034,7 @@ export interface operations {
             /** @description 更新后的共享数据 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {
@@ -2006,6 +2096,7 @@ export interface operations {
             /** @description 成功 */
             200: {
                 headers: {
+                    "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
                     [name: string]: unknown;
                 };
                 content: {

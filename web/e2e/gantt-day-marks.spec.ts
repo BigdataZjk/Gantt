@@ -1,3 +1,4 @@
+import { mockRequestHistory, operationToReverse } from "./request-history-fixture";
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
 import { request } from "../src/test/fixtures";
@@ -12,17 +13,21 @@ async function openDayMarks(page: Page, overrides: Partial<ApiRequest> = {}, the
   };
   const writes: ApiRequest[] = [];
   let failure = 0;
+  const history = mockRequestHistory(state, (changes) => {
+    writes.push(changes[0]!);
+    state.requests = [{ ...changes[0]!, revision: state.requests[0]!.revision + 1 }];
+    state.revision += 1;
+  });
   await page.route((url) => url.pathname.startsWith("/api/"), (route) => {
     const path = new URL(route.request().url()).pathname;
+    const operation = operationToReverse(path);
+    if (operation) return history.reverse(route, operation);
     if (path === "/api/state") return route.fulfill({ json: state });
     if (path === "/api/presence") return route.fulfill({ json: { users: [], guests: 0 } });
     if (path === "/api/requests/1" && route.request().method() === "PUT") {
       if (failure) return route.fulfill({ status: failure, json: { error: failure === 409 ? "资料已更新，请刷新后重试" : "保存失败，请重试" } });
       const body = route.request().postDataJSON() as { request: ApiRequest };
-      writes.push(body.request);
-      state.requests = [{ ...body.request, revision: state.requests[0]!.revision + 1 }];
-      state.revision += 1;
-      return route.fulfill({ json: state });
+      return history.save(route, [body.request]);
     }
     return route.abort();
   });

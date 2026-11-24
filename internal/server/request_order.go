@@ -46,7 +46,7 @@ func (s *Server) orderGantt(w http.ResponseWriter, r *http.Request) {
 	if in.SortByAdmission {
 		detail.Label = "按准入日期排序"
 	}
-	rev, err := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(tx *sql.Tx, data *requests.Data, user auth.User) error {
+	rev, op, err := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(tx *sql.Tx, data *requests.Data, user auth.User) error {
 		if in.SortByAdmission && !user.Admin() {
 			return store.ErrForbidden
 		}
@@ -145,7 +145,7 @@ func (s *Server) orderGantt(w http.ResponseWriter, r *http.Request) {
 		detail.Tags = append(detail.Tags, history.Text(fmt.Sprintf("%d 条需求", len(detail.Changes))))
 		return nil
 	})
-	s.finish(w, r, rev, err)
+	s.finishRequestOperation(w, r, rev, op, err)
 }
 
 func ganttOrderForLog(data *requests.Data, developer string) []int64 {
@@ -269,7 +269,7 @@ func (s *Server) rankRequests(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, store.Bad("优先级操作无效"))
 		return
 	}
-	rev, err := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(_ *sql.Tx, data *requests.Data, _ auth.User) error {
+	rev, op, err := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(_ *sql.Tx, data *requests.Data, _ auth.User) error {
 		if in.Action == "clear" {
 			for i := range data.Requests {
 				row := &data.Requests[i]
@@ -304,7 +304,7 @@ func (s *Server) rankRequests(w http.ResponseWriter, r *http.Request) {
 		row.Revision++
 		return nil
 	})
-	s.finish(w, r, rev, err)
+	s.finishRequestOperation(w, r, rev, op, err)
 }
 
 func logRankChange(detail *history.Detail, subject string, before, after int) {

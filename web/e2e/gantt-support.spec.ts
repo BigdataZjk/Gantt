@@ -1,3 +1,4 @@
+import { mockRequestHistory, operationToReverse } from "./request-history-fixture";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
 import { request, users } from "../src/test/fixtures";
@@ -25,15 +26,19 @@ async function openGantt(page: Page, theme: "light" | "dark", fixtures: GanttFix
       domainColors: fixtures.sourceColor ? { [source.domain]: fixtures.sourceColor } : {},
     },
   };
+  const history = mockRequestHistory(state, (changes) => {
+    state.requests[0] = { ...changes[0]!, revision: state.requests[0]!.revision + 1 };
+    state.revision += 1;
+  });
   await page.route((url) => url.pathname.startsWith("/api/"), (route) => {
     const path = new URL(route.request().url()).pathname;
+    const operation = operationToReverse(path);
+    if (operation) return history.reverse(route, operation);
     if (path === "/api/state") return route.fulfill({ json: state });
     if (path === "/api/presence") return route.fulfill({ json: { users: [], guests: 0 } });
     if (path === "/api/requests/1" && route.request().method() === "PUT") {
       const { request: next } = route.request().postDataJSON() as { request: ApiRequest };
-      state.requests[0] = { ...next, revision: state.requests[0]!.revision + 1 };
-      state.revision += 1;
-      return route.fulfill({ json: state });
+      return history.save(route, [next]);
     }
     return route.abort();
   });

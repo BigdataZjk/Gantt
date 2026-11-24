@@ -71,6 +71,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/requests/batch", s.batchRequests)
 	s.mux.HandleFunc("PUT /api/requests/gantt-order", s.orderGantt)
 	s.mux.HandleFunc("POST /api/requests/priority", s.rankRequests)
+	s.mux.HandleFunc("POST /api/requests/operations/{id}/reverse", s.reverseRequestOperation)
 	s.mux.HandleFunc("PUT /api/requests/{id}", s.updateRequest)
 	s.mux.HandleFunc("DELETE /api/requests/{id}", s.deleteRequest)
 	s.mux.HandleFunc("POST /api/requests/{id}/archive", s.archiveRequest)

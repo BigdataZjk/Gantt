@@ -40,7 +40,7 @@ func (s *Server) createRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	detail := history.Detail{Label: "新增需求", Subject: in.Request.Name}
-	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
 		item := in.Request
 		if item.Archived {
 			return store.Bad("新增需求不能直接归档")
@@ -84,7 +84,7 @@ func (s *Server) createRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests = append(d.Requests, item)
 		return nil
 	})
-	s.finish(w, r, rev, e)
+	s.finishRequestOperation(w, r, rev, op, e)
 }
 func requestIndex(d *requests.Data, id int64) int {
 	for i, x := range d.Requests {
@@ -114,7 +114,7 @@ func (s *Server) updateRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var detail history.Detail
-	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(tx *sql.Tx, d *requests.Data, u auth.User) error {
 		index := requestIndex(d, id)
 		if index < 0 {
 			return store.ErrNotFound
@@ -161,7 +161,7 @@ func (s *Server) updateRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests[index] = item
 		return nil
 	})
-	s.finish(w, r, rev, e)
+	s.finishRequestOperation(w, r, rev, op, e)
 }
 
 func validateRequestOperation(operation string) error {
@@ -189,7 +189,7 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	detail := history.Detail{Label: "删除需求"}
-	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(_ *sql.Tx, d *requests.Data, _ auth.User) error {
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(_ *sql.Tx, d *requests.Data, _ auth.User) error {
 		index := requestIndex(d, id)
 		if index < 0 {
 			return store.ErrNotFound
@@ -204,7 +204,7 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests = append(d.Requests[:index], d.Requests[index+1:]...)
 		return nil
 	})
-	s.finish(w, r, rev, e)
+	s.finishRequestOperation(w, r, rev, op, e)
 }
 func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -229,7 +229,7 @@ func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 		label = "恢复到需求池"
 	}
 	detail := history.Detail{Label: label}
-	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "edit", &detail, true, func(_ *sql.Tx, d *requests.Data, _ auth.User) error {
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(_ *sql.Tx, d *requests.Data, _ auth.User) error {
 		index := requestIndex(d, id)
 		if index < 0 {
 			return store.ErrNotFound
@@ -254,7 +254,7 @@ func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {
 		d.Requests[index].Revision++
 		return nil
 	})
-	s.finish(w, r, rev, e)
+	s.finishRequestOperation(w, r, rev, op, e)
 }
 func (s *Server) batchRequests(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -282,7 +282,7 @@ func (s *Server) batchRequests(w http.ResponseWriter, r *http.Request) {
 	if in.Operation == "ganttUndo" {
 		detail.Label = "撤回甘特操作"
 	}
-	rev, e := s.Store.ChangeLogged(r.Context(), actor(r).ID, in.Base, "admin", &detail, true, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "admin", &detail, func(tx *sql.Tx, d *requests.Data, _ auth.User) error {
 		calendar, e := store.ReadCalendar(r.Context(), tx)
 		if e != nil {
 			return e
@@ -337,7 +337,7 @@ func (s *Server) batchRequests(w http.ResponseWriter, r *http.Request) {
 		detail.Tags = []history.Value{history.Text(fmt.Sprintf("%d 条需求", changed))}
 		return nil
 	})
-	s.finish(w, r, rev, e)
+	s.finishRequestOperation(w, r, rev, op, e)
 }
 
 type domainInput struct {

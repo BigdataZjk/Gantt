@@ -325,6 +325,9 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -350,6 +353,9 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -383,6 +389,9 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -416,6 +425,9 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -436,6 +448,52 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/BatchMutation'
+  /api/requests/operations/{id}/reverse:
+    post:
+      operationId: reverseRequestOperation
+      summary: 撤回或重做本人需求操作，保留其他用户的后续变更
+      parameters:
+        - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
+        - in: path
+          name: id
+          description: 需求变更响应头 X-RSM-Request-Operation 中的操作编号
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [baseRevision]
+              properties:
+                baseRevision:
+                  type: integer
+                  format: int64
+                redo:
+                  type: boolean
+      responses:
+        '200':
+          description: 更新后的共享数据
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 操作无法恢复或相关数据已变化
+        '401':
+          description: 未登录
+        '403':
+          description: 权限不足或操作属于其他用户
+        '409':
+          description: 数据版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
   /api/requests/gantt-order:
     put:
       operationId: putGanttOrder
@@ -449,6 +507,9 @@ paths:
       responses:
         '200':
           description: 更新后的共享数据
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -476,6 +537,9 @@ paths:
       responses:
         '200':
           description: 更新后的共享数据
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -497,6 +561,9 @@ paths:
       responses:
         '200':
           description: 成功
+          headers:
+            X-RSM-Request-Operation:
+              $ref: '#/components/headers/RequestOperation'
           content:
             application/json:
               schema:
@@ -951,6 +1018,11 @@ paths:
         '200':
           description: 原始图片字节
 components:
+  headers:
+    RequestOperation:
+      description: 本次需求变更的操作编号。有数据变化时返回，可用于撤回或重做。
+      schema:
+        type: string
   parameters:
     P0DeliveryConfirmationHeader:
       in: header

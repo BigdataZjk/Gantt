@@ -24,7 +24,6 @@
 .schedule .hold { color: var(--rsm-muted); font-size: 12px; border-left-style: dashed; }
 .caption { color: var(--rsm-muted); font-size: 12px; }
 .marks { display: flex; flex-wrap: wrap; gap: 6px 12px; color: var(--rsm-text); font-size: 12px; }
-.feedback { color: var(--rsm-muted); font-size: 11px; }
 @media (max-width: 620px) {
   .field { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }

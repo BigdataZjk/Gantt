@@ -1,3 +1,4 @@
+import { mockRequestHistory, operationToReverse } from "./request-history-fixture";
 import { expect, test, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
 import { request } from "../src/test/fixtures";
@@ -10,17 +11,20 @@ async function openPreview(page: Page, theme: "light" | "dark" = "light") {
   let rejectNext = false;
   await page.route("**/api/state", (route) => route.fulfill({ json: state }));
   await page.route("**/api/presence", (route) => route.fulfill({ json: { users: [], guests: 0 } }));
-  await page.route(/\/api\/requests\/(?:\d+|batch)$/, async (route) => {
-    const body = route.request().postDataJSON() as { request?: ApiRequest; requests?: ApiRequest[] };
-    if (rejectNext) { rejectNext = false; await route.fulfill({ status: 503, json: { message: "请重试" } }); return; }
-    const changes = body.requests ?? [body.request!];
+  const history = mockRequestHistory(state, (changes) => {
     mutations.push(changes);
     state.requests = state.requests.map((row) => {
       const next = changes.find((item) => item.id === row.id);
       return next ? { ...next, revision: row.revision + 1 } : row;
     });
     state.revision += 1;
-    await route.fulfill({ json: state });
+  });
+  await page.route(/\/api\/requests\/(?:\d+|batch|operations\/\d+\/reverse)$/, async (route) => {
+    if (rejectNext) { rejectNext = false; await route.fulfill({ status: 503, json: { message: "请重试" } }); return; }
+    const operation = operationToReverse(new URL(route.request().url()).pathname);
+    if (operation) return history.reverse(route, operation);
+    const body = route.request().postDataJSON() as { request?: ApiRequest; requests?: ApiRequest[] };
+    return history.save(route, body.requests ?? [body.request!]);
   });
   await page.addInitScript(({ id, theme }) => {
     localStorage.setItem("rsm.theme", theme);
@@ -141,7 +145,7 @@ test("个人撤回失败可重试，后续同排期变更阻止覆盖", async ({
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
   await expect(page.locator('tr[data-row="1"] td[data-date="2026-11-25"] [data-bar]')).toHaveCount(1);
   await page.keyboard.press("Control+z");
-  await expect(page.getByRole("alert").filter({ hasText: "已跳过撤回" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "保留最新数据" })).toBeVisible();
   expect(mutations.length).toBe(3);
   expect(state.requests[0]!.days).toBe(8);
 });
@@ -223,4 +227,61 @@ test("日历 JSON 先校验和预览，应用后更新列表并支持导出", as
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "导出", exact: true }).click();
   expect((await download).suggestedFilename()).toBe(`${year}.json`);
+});
+
+test("保存人天后，跨需求子页可逐步撤回至沙漏，并用 Ctrl/Command+Shift+Z 重做", async ({ page }) => {
+  const password = process.env.RSM_E2E_PASSWORD || "rsm-e2e-pass-123";
+  const readState = async () => await (await page.request.get("/api/state")).json() as State;
+  const guest = await readState();
+  const login = guest.setupRequired
+    ? await page.request.post("/api/setup", { data: { password } })
+    : await page.request.post("/api/login", { data: { username: "张金科", password } });
+  expect(login.ok()).toBeTruthy();
+  const signedIn = await login.json() as State;
+  const name = `待估撤回-${Date.now().toString(36)}`;
+  const create = await page.request.post("/api/requests", {
+    data: {
+      baseRevision: signedIn.revision,
+      request: request({ name, developer: signedIn.me!.id, domain: signedIn.domains[0]!.name, days: 0, delivery: "" }),
+    },
+  });
+  expect(create.ok()).toBeTruthy();
+  const initial = await create.json() as State;
+  const item = initial.requests.find((row) => row.name === name)!;
+  await page.addInitScript((id) => {
+    localStorage.setItem(`rsm.ui.v2:${id}`, JSON.stringify({ ganttRange: { start: "2026-11-16", end: "2026-11-27" } }));
+  }, signedIn.me!.id);
+  await page.goto("/");
+  const row = page.locator(`tr[data-row="${item.id}"]`);
+  const marker = row.locator('[data-marker="estimated"]');
+  await expect(marker).toBeVisible();
+  const editor = page.getByRole("dialog", { name: "编辑需求", exact: true });
+  const saveDays = async (days: number) => {
+    await page.getByRole("button", { name, exact: true }).dblclick();
+    await editor.getByRole("tab", { name: "开发信息", exact: true }).click();
+    await editor.getByLabel("开发人天", { exact: true }).fill(String(days));
+    await editor.getByRole("button", { name: "保存需求", exact: true }).click();
+    await expect(editor).toBeHidden();
+  };
+  const savedDays = async () => (await readState()).requests.find((request) => request.id === item.id)!.days;
+  await saveDays(4);
+  await expect(marker).toHaveCount(0);
+  await saveDays(5);
+  await page.getByRole("tab", { name: "需求池", exact: true }).click();
+  await page.keyboard.press("Control+z");
+  await expect.poll(savedDays).toBe(4);
+  await page.keyboard.press("Control+z");
+  await expect.poll(savedDays).toBe(0);
+  await page.getByRole("tab", { name: "甘特图", exact: true }).click();
+  await expect(marker).toBeVisible();
+  await page.keyboard.press("Control+Shift+z");
+  await expect.poll(savedDays).toBe(4);
+  await expect(marker).toHaveCount(0);
+  await page.keyboard.press("Meta+Shift+z");
+  await expect.poll(savedDays).toBe(5);
+  await page.keyboard.press("Control+z");
+  await expect.poll(savedDays).toBe(4);
+  await saveDays(6);
+  await page.keyboard.press("Control+Shift+z");
+  await expect.poll(savedDays).toBe(6);
 });

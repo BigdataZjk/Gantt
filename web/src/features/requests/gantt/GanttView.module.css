@@ -110,6 +110,35 @@
 .nameContent > [data-dict-field="status"] { flex: none; width: 44px; height: 18px; padding: 0 4px; font-size: 11px; }
 .requestName { flex: 1; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--rsm-text); text-align: left; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .requestName:hover { color: var(--rsm-accent); text-decoration: underline; }
+.hoverRank {
+  --rank-color: var(--rsm-accent);
+  position: absolute;
+  top: 50%;
+  right: 0;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 18px;
+  padding-inline: 5px;
+  border-radius: 5px;
+  background: linear-gradient(115deg, color-mix(in srgb, var(--rank-color) 13%, var(--rsm-panel)), color-mix(in srgb, var(--rank-color) 31%, var(--rsm-panel)));
+  color: color-mix(in srgb, var(--rank-color) 36%, var(--rsm-text));
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: right 180ms ease-out, opacity 140ms ease-out;
+}
+.hoverRank[data-rank="1"] { --rank-color: #cb941c; }
+.hoverRank[data-rank="2"] { --rank-color: #8a9fb7; }
+.hoverRank[data-rank="3"] { --rank-color: #c37b57; }
+.nameCell:is(:hover, :has(:focus-visible)) .hoverRank { right: 7px; opacity: 1; }
+.nameCell:is(:hover, :has(:focus-visible)) .nameContent[data-has-rank] .requestName { padding-right: 33px; }
+@media (prefers-reduced-motion: reduce) {
+  .hoverRank { transition: none; }
+}
 .personRow { cursor: pointer; }
 .personRow > th, .personRow > td { height: var(--person-row-height); background: var(--rsm-person-fill); border-top: 1px solid color-mix(in srgb, var(--rsm-person-ink) 24%, var(--rsm-border)); border-bottom: 1px solid var(--rsm-border); }
 .personRow > th { position: sticky; left: 0; z-index: 3; padding: 3px 10px !important; text-align: left; font-weight: 600; color: var(--rsm-person-ink); border-right: 1px solid var(--rsm-border); box-shadow: inset 3px 0 color-mix(in srgb, var(--rsm-accent) 42%, var(--rsm-person-fill)); }

@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import type { ApiRequest, Calendar, State, SupportSegment } from "../../../api/types";
 import { api } from "../../../api/client";
-import { useMutationRunner } from "../../../api/hooks";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState, type UiState } from "../../../app/uiState";
 import { addDays, diffDays, enumerateDates, isWorkday, todayISO } from "../../../lib/dates";
@@ -55,8 +54,7 @@ import {
   type Plan as GanttPlan,
   type SequencePlan,
 } from "./ganttMath";
-import type { GanttUndo } from "./useGanttUndo";
-import { isTextUndoTarget } from "./ganttUndo";
+import { requestHistoryShortcut, type RequestHistory } from "../useRequestHistory";
 import type { RequestPermissions } from "../types";
 import { requestMenuItems } from "../requestMenu";
 import { reorderVisibleIds } from "../rowOrder";
@@ -70,7 +68,7 @@ import styles from "./GanttView.module.css";
 
 interface Props {
   state: State;
-  undo: GanttUndo;
+  requestHistory: RequestHistory;
   permissions: RequestPermissions;
   rows: ApiRequest[];
   totalCount: number;
@@ -171,11 +169,10 @@ function rippleTexture(height: number): CSSProperties {
   } as CSSProperties;
 }
 
-export const GanttView = memo(function GanttView({ state, permissions, rows: filteredRows, totalCount, draftHint, onOpen, onDelete, onArchive, onDateRangeChange, undo }: Props) {
+export const GanttView = memo(function GanttView({ state, permissions, rows: filteredRows, totalCount, draftHint, onOpen, onDelete, onArchive, onDateRangeChange, requestHistory }: Props) {
   const { ui, patch } = useUiState();
   const { domainColor, density } = usePreferences();
   const notice = useNotice();
-  const runner = useMutationRunner();
   const calendar = state.calendar;
   const today = todayISO();
   const [viewport, setViewport] = useState({ width: 1200, height: 640 });
@@ -314,12 +311,12 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
         if (target.kind !== "row") return;
         const visible = groups.find((candidate) => candidate.developer === developer)?.rows ?? [];
         const requestIds = reorderVisibleIds(ids, visible.map((row) => row.id), source.id, target.row.id, target.edge);
-        if (requestIds) void runner(() => api.orderGantt(state.revision, [{ developer, requestIds }], undefined, { draggedRequestId: source.id }));
+        if (requestIds) void requestHistory.save(() => api.orderGantt(state.revision, [{ developer, requestIds }], undefined, { draggedRequestId: source.id }));
         return;
       }
       const position = target.kind === "row" ? ids.indexOf(target.row.id) + Number(target.edge === "after") : ids.length;
       ids.splice(position, 0, source.id);
-      void runner(() => api.orderGantt(state.revision, [{ developer, requestIds: ids }], { requestId: source.id, developer })).then((saved) => {
+      void requestHistory.save(() => api.orderGantt(state.revision, [{ developer, requestIds: ids }], { requestId: source.id, developer })).then((saved) => {
         if (saved) notice.notify(developer ? `需求已移至 ${group.name} 的分组` : "需求已移至未分配分组");
       });
     },
@@ -471,8 +468,9 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
   const applyUpdate = async (next: ApiRequest, message: string) => {
     const before = rows.find((row) => row.id === next.id);
     if (!before || before.archived) return false;
-    const saved = await undo.save([{ before, after: next }], message);
-    return saved;
+    const saved = await requestHistory.save((base) => api.updateRequest(base, next));
+    if (saved) notice.notify(message);
+    return Boolean(saved);
   };
 
   const commitPreview = async (gesture: Gesture, current: Preview) => {
@@ -653,22 +651,16 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
 
   useEffect(() => {
     if (!isAdmin) return;
-    const onUndo = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.shiftKey || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
-      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]')) return;
-      if (gestureRef.current) {
-        event.preventDefault();
-        suppressClickRef.current = performance.now() + 350;
-        finishGesture();
-        blankRef.current = null;
-        return;
-      }
-      if (isTextUndoTarget(event.target)) return;
-      if (undo.undo()) event.preventDefault();
+    const cancelGesture = (event: KeyboardEvent) => {
+      if (!gestureRef.current || requestHistoryShortcut(event, true) !== "undo") return;
+      event.preventDefault();
+      suppressClickRef.current = performance.now() + 350;
+      finishGesture();
+      blankRef.current = null;
     };
-    window.addEventListener("keydown", onUndo);
-    return () => window.removeEventListener("keydown", onUndo);
-  }, [isAdmin, undo]);
+    window.addEventListener("keydown", cancelGesture, true);
+    return () => window.removeEventListener("keydown", cancelGesture, true);
+  }, [isAdmin]);
 
   const beginPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
@@ -812,7 +804,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
       notice.notify("已选需求已按准入日期排列");
       return;
     }
-    const saved = await runner(() => api.orderGantt(state.revision, orders, undefined, { sortByAdmission: true }));
+    const saved = await requestHistory.save(() => api.orderGantt(state.revision, orders, undefined, { sortByAdmission: true }));
     if (saved) notice.notify("已按准入日期升序排列");
   };
 
@@ -835,7 +827,11 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
       setSequence(null);
       return;
     }
-    const saved = await undo.save(sequence.plan.changes, `顺排已应用，移动 ${sequence.plan.changes.length} 条需求`, "sequence");
+    const changes = sequence.plan.changes.map(({ after }) => after);
+    const saved = await requestHistory.save((base) => changes.length === 1
+      ? api.updateRequest(base, changes[0]!, "sequence")
+      : api.batchRequests(base, changes, "sequence"));
+    if (saved) notice.notify(`顺排已应用，移动 ${changes.length} 条需求`);
     if (saved) {
       setSequence(null);
       clearSelection();
@@ -1304,7 +1300,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
         if (!(event.target as Element).closest("[data-name]") && performance.now() >= suppressClickRef.current) selectRow(row.id, event);
       }}>
         <span className={styles.groupGuide} data-slot="gantt-group-guide" data-group-end={groupEnd ? "" : undefined} aria-hidden="true" />
-        <div className={styles.nameContent} data-request-name>
+        <div className={styles.nameContent} data-request-name data-has-rank={row.requesterRank ? "" : undefined}>
           <span className={styles.priorityMark} data-priority={row.priority} data-tooltip={`优先级 ${row.priority}`} aria-hidden="true" />
           <StatusTag value={row.status} />
           <button
@@ -1312,7 +1308,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             className={styles.requestName}
             data-name
             data-tooltip={`${row.name}　${state.activeDays}人天`}
-            aria-description={`优先级 ${row.priority}，状态 ${row.status}${row.archived ? "，已归档" : ""}`}
+            aria-description={`优先级 ${row.priority}，状态 ${row.status}${row.requesterRank ? `，需求方优先级 ${row.requesterRank}` : ""}${row.archived ? "，已归档" : ""}`}
             aria-pressed={rowSelected}
             aria-haspopup="menu"
             onClick={(event) => { if (performance.now() < suppressClickRef.current) return; selectRow(row.id, event); }}
@@ -1332,6 +1328,11 @@ const GanttRequestRow = memo(function GanttRequestRow({
             {row.name}
           </button>
         </div>
+        {row.requesterRank ? (
+          <span className={styles.hoverRank} data-slot="gantt-requester-rank" data-rank={row.requesterRank} aria-hidden="true">
+            {row.requesterRank}
+          </span>
+        ) : null}
       </th>
       {leftHidden > 0 ? <td aria-hidden="true" colSpan={leftHidden} style={{ width: leftHidden * dayWidth }} /> : null}
       {visibleDates.map((date, index) => {

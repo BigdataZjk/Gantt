@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { api } from "../../../api/client";
-import { useMutationRunner } from "../../../api/hooks";
+import type { RequestHistory } from "../useRequestHistory";
 import type { ApiRequest, State } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { useUiState } from "../../../app/uiState";
@@ -35,6 +35,7 @@ import {
 import styles from "./RequestDrawer.module.css";
 
 interface Props {
+  save: RequestHistory["save"];
   state: State;
   permissions: RequestPermissions;
   editor: EditorRequest | null;
@@ -72,10 +73,9 @@ function collapseForSubmit(draft: ApiRequest): ApiRequest {
   return { ...draft, start: segment.start, delivery: segment.end, segments: [] };
 }
 
-export function RequestDrawer({ state, permissions, editor, onClose }: Props) {
+export function RequestDrawer({ save, state, permissions, editor, onClose }: Props) {
   const { prefs } = usePreferences();
   const { ui, setDraft: setStoredDraft } = useUiState();
-  const runner = useMutationRunner();
   const notice = useNotice();
   const calendar = state.calendar as Calendar;
   const [draft, setDraft] = useState<ApiRequest | null>(null);
@@ -250,7 +250,7 @@ export function RequestDrawer({ state, permissions, editor, onClose }: Props) {
     setPending(true);
     const isCreate = editor.mode === "create";
     const payload: ApiRequest = isCreate ? { ...candidate, id: 0, revision: 0, archived: false } : { ...candidate, id: editor.id!, revision: originalRevision, archived: false };
-    const result = await runner((baseRevision) => (isCreate ? api.createRequest(baseRevision, payload) : api.updateRequest(baseRevision, payload)));
+    const result = await save((baseRevision) => (isCreate ? api.createRequest(baseRevision, payload) : api.updateRequest(baseRevision, payload)));
     setPending(false);
     if (!result) return;
     const nextHistory: History = {
