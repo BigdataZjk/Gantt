@@ -1,8 +1,23 @@
 import { UsersRound } from "lucide-react";
+import { getPinyinInitial } from "pinyin-initial";
 import type { Presence, User } from "../api/types";
+import { initials } from "../lib/format";
 import { Popover } from "../ui/Popover";
 import { Avatar } from "../ui/Avatar";
 import styles from "./PresenceStack.module.css";
+
+const avatarTones = [
+  styles.coral, styles.sand, styles.lilac, styles.teal, styles.berry,
+  styles.blue, styles.mint, styles.apricot, styles.indigo, styles.olive,
+];
+
+function avatarToneClass(name: string): string {
+  const last = initials(name);
+  const initial = (last.length === 1 ? getPinyinInitial(last) : "") || last;
+  const codePoint = initial.normalize("NFD").toUpperCase().codePointAt(0) ?? 0;
+  const hash = Math.imul(0x811c9dc5 ^ codePoint, 0x01000193) >>> 0;
+  return `${styles.tinted} ${avatarTones[hash % avatarTones.length]}`;
+}
 
 export function PresenceStack({ presence, users }: { presence: Presence; users: User[] }) {
   const members = presence.users
@@ -18,7 +33,7 @@ export function PresenceStack({ presence, users }: { presence: Presence; users: 
       <span className={styles.stack}>
         {visible.map((user) => (
           <span key={user.id} className={styles.avatarButton} data-tooltip={user.username}>
-            <Avatar name={user.username} avatar={user.avatar} online label={`${user.username}，在线`} />
+            <Avatar name={user.username} avatar={user.avatar} className={avatarToneClass(user.username)} online label={`${user.username}，在线`} />
           </span>
         ))}
         {extra.length ? (
@@ -33,7 +48,7 @@ export function PresenceStack({ presence, users }: { presence: Presence; users: 
           >
             {extra.map((user) => (
               <div key={user.id} className={styles.overflowRow} data-tooltip={user.username}>
-                <Avatar name={user.username} avatar={user.avatar} online />
+                <Avatar name={user.username} avatar={user.avatar} className={avatarToneClass(user.username)} online />
                 <span>{user.username}</span>
               </div>
             ))}

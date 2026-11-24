@@ -78,9 +78,7 @@ export function shortcutDate(offset: number): string {
 }
 
 export function initials(name: string): string {
-  const trimmed = (name || "").trim();
-  if (!trimmed) return "?";
-  return trimmed.slice(-1);
+  return Array.from((name || "").trim()).at(-1) ?? "?";
 }
 
 export function compareText(a: string, b: string): number {

@@ -4,6 +4,21 @@
 .stack > * + * { margin-left: -7px; }
 .avatarButton { display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: transparent; }
 .avatarButton:hover, .avatarButton:focus-visible { z-index: 3; }
+.coral { --member-hue: #dc6e61; }
+.sand { --member-hue: #bf871a; }
+.lilac { --member-hue: #9870db; }
+.teal { --member-hue: #299c9f; }
+.berry { --member-hue: #d062a6; }
+.blue { --member-hue: #5285d9; }
+.mint { --member-hue: #41a67a; }
+.apricot { --member-hue: #db8b54; }
+.indigo { --member-hue: #7279d0; }
+.olive { --member-hue: #8da947; }
+.tinted {
+  --member-color-strength: 28%;
+  --rsm-avatar-fill: color-mix(in srgb, var(--member-hue) var(--member-color-strength), var(--rsm-panel));
+}
+:global([data-theme="dark"]) .tinted { --member-color-strength: 42%; }
 .more {
   width: 27px;
   height: 26px;
