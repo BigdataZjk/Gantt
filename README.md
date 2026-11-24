@@ -1,4 +1,4 @@
-# RSM v0.1.5
+# RSM v0.1.6
 
 **Request Schedule Manager**，用于多人协作管理需求与开发排期。
 
@@ -72,7 +72,7 @@ chmod +x rsm.sh scripts/*.sh
 
 后续将新版源码 ZIP 放进运行目录的 `upgrade/`，执行 `./rsm.sh` 或 `./rsm.sh upgrade` 即可。脚本比较包内实际版本，选择最高新版；构建完成后自动停服、备份、切换、启动，失败时回退程序。没有新版则保持当前版本。恢复数据须显式执行 `./rsm.sh restore /path/to/backup.zip --yes`，恢复前再次备份当前数据。
 
-手动备份默认生成 `backups/rsm-backup-v0.1.5-20261119-193015.zip`，文件名为程序版本与北京时间；同一秒重复备份自动追加序号。备份包含需求、归档、账号、密钥和配置，不需要打包整个运行目录。旧版 `.tar.gz` 备份仍可校验及恢复。
+手动备份默认生成 `backups/rsm-backup-v0.1.6-20261124-120000.zip`，文件名为程序版本与北京时间；同一秒重复备份自动追加序号。备份包含需求、归档、账号、密钥和配置，不需要打包整个运行目录。旧版 `.tar.gz` 备份仍可校验及恢复。
 
 ## 项目结构
 
@@ -107,7 +107,7 @@ rsm/
 ./scripts/generate.sh                  # 生成接口类型
 ./scripts/generate.sh --check          # 实际重新生成并核对类型与校验清单
 ./scripts/build.sh                     # 按项目版本构建，产物位于 build/
-./scripts/build.sh --version 0.1.5     # 显式覆盖构建版本
+./scripts/build.sh --version 0.1.6     # 显式覆盖构建版本
 ./scripts/package-source.sh            # 将已提交源码打包到桌面
 ```
 
