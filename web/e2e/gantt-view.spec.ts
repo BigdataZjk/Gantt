@@ -379,6 +379,11 @@ for (const theme of ["light", "dark"] as const) {
     const row = page.locator('tr[data-row="1"]');
     const next = page.locator('tr[data-row="2"]');
     const name = row.locator("[data-name]");
+    const blank = row.locator('td[data-date="2026-11-23"]');
+    await expect(blank.locator("[data-bar]")).toHaveCount(0);
+    await blank.click();
+    await expect(blank).toHaveCSS("caret-color", "rgba(0, 0, 0, 0)");
+    expect(await page.evaluate(() => document.getSelection()?.type)).toBe("None");
     await page.mouse.move(0, 0);
     const background = (target = row) => target.locator(":scope > :not([data-live-ripple])").evaluateAll((cells) => cells.map((cell) => ({
       color: getComputedStyle(cell).backgroundColor,

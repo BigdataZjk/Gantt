@@ -27,7 +27,16 @@
 .returnToStart:hover { color: var(--rsm-accent); background: var(--rsm-panel); }
 .returnToStart svg { width: 16px; height: 16px; stroke-width: 1.8; }
 .resetZoom { composes: returnToStart; top: clamp(8px, 85px, calc(100% - 40px)); left: auto; right: 12px; transform: none; }
-.calendar { border-collapse: separate; border-spacing: 0; width: max-content; table-layout: fixed; font-size: 11px; }
+.calendar {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  table-layout: fixed;
+  font-size: 11px;
+  cursor: default;
+  user-select: none;
+  caret-color: transparent;
+}
 .calendar th { font-weight: 400; color: var(--rsm-muted); }
 .calendar th, .calendar td { padding: 0; }
 .calendar .nameHead {
@@ -78,7 +87,6 @@
   background: var(--rsm-surface-sticky);
   border-bottom: 1px solid color-mix(in srgb, var(--rsm-border) 65%, transparent);
   text-align: left;
-  user-select: none;
 }
 .nameCell, .nameMeasure { padding: 2px 10px 2px 14px !important; border-right: 1px solid var(--rsm-border); }
 .nameMeasure { position: absolute; top: 0; left: 0; width: max-content; visibility: hidden; pointer-events: none; }
@@ -192,7 +200,6 @@
   color: var(--task-ink, var(--rsm-on-accent));
   cursor: default;
   touch-action: pan-y;
-  user-select: none;
 }
 .barPiece.inactive { background: color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 25%, var(--rsm-panel)); color: var(--task-fill, var(--rsm-accent)); }
 .barPiece.estimated { background: var(--task-estimated-fill); color: var(--task-fill, var(--rsm-accent)); }

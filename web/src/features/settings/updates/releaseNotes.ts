@@ -18,6 +18,9 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     improved: [
       { title: "在线成员头像配色", description: "文字头像按姓名末字的拼音首字母固定选色，方便区分在线成员。" },
     ],
+    fixed: [
+      { title: "甘特图单击光标", description: "单击排期格时不再出现闪烁的文本光标。" },
+    ],
   },
   "0.1.5": {
     date: "2026-11-19",
