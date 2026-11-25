@@ -44,7 +44,7 @@ func TestDeleteCompactsScheduleWithConfirmationAndUndo(t *testing.T) {
 	unscheduled := save("待排期需求", "", "", 3, nil)
 
 	path := fmt.Sprintf("/api/requests/%d", deleted.ID)
-	input := map[string]any{"baseRevision": state.Revision}
+	input := map[string]any{"baseRevision": state.Revision, "reflow": true}
 	changes := []store.P0DeliveryChange{{RequestID: moved.ID, Name: moved.Name, Before: "2026-12-03", After: "2026-11-26"}}
 	header := f.requireDeliveryConfirmation("DELETE", path, input, changes)
 	f.assertDeliveryPreviewDidNotSave(state)
@@ -93,6 +93,29 @@ func TestDeleteCompactsScheduleWithConfirmationAndUndo(t *testing.T) {
 	}
 }
 
+func TestDeleteKeepsScheduleUnlessReflowIsRequested(t *testing.T) {
+	for _, explicit := range []bool{false, true} {
+		t.Run(fmt.Sprintf("explicit=%t", explicit), func(t *testing.T) {
+			f := newFixture(t)
+			state := f.state()
+			for i, day := range []string{"2026-11-16", "2026-11-17"} {
+				row := example(fmt.Sprintf("需求 %d", i+1))
+				row.Developer, row.Start, row.Days, row.Priority = state.Me.ID, day, 1, "P0"
+				_, state = f.call("POST", "/api/requests", map[string]any{"baseRevision": state.Revision, "request": row}, 200, true)
+			}
+			path := fmt.Sprintf("/api/requests/%d", state.Requests[0].ID)
+			input := map[string]any{"baseRevision": state.Revision}
+			if explicit {
+				input["reflow"] = false
+			}
+			result, after := f.call("DELETE", path, input, 200, true)
+			if result.Header().Get("X-RSM-Reflowed-Requests") != "0" || !reflect.DeepEqual(after.Requests, state.Requests[1:]) {
+				t.Fatalf("delete moved the remaining P0 request without an explicit choice: %+v", after.Requests)
+			}
+		})
+	}
+}
+
 func TestCollaboratorDeleteDoesNotChangeSchedules(t *testing.T) {
 	f := newFixture(t)
 	state := f.state()
@@ -106,6 +129,8 @@ func TestCollaboratorDeleteDoesNotChangeSchedules(t *testing.T) {
 	path := fmt.Sprintf("/api/requests/%d", state.Requests[0].ID)
 	input := map[string]any{"baseRevision": state.Revision}
 	f.call("DELETE", path, input, 401, false)
+	f.call("DELETE", path, map[string]any{"baseRevision": state.Revision, "reflow": true}, 403, true)
+	f.assertDeliveryPreviewDidNotSave(state)
 	result, after := f.call("DELETE", path, input, 200, true)
 	if result.Header().Get("X-RSM-Reflowed-Requests") != "0" || !reflect.DeepEqual(after.Requests, state.Requests[1:]) {
 		t.Fatal("delete allowed a collaborator to edit another schedule")

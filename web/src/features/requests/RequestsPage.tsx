@@ -67,8 +67,11 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
     const result = await requestHistory.save((baseRevision) => api.archiveRequest(baseRevision, row.id, false));
     if (result) notice.notify("已恢复到需求池");
   };
-  const deleteRow = async (row: ApiRequest) => {
-    const result = await requestHistory.save((baseRevision) => api.deleteRequest(baseRevision, row.id));
+  const deleteRow = async (reflow: boolean) => {
+    const row = deleteTarget;
+    setDeleteTarget(null);
+    if (!row) return;
+    const result = await requestHistory.save((baseRevision) => api.deleteRequest(baseRevision, row.id, reflow));
     if (!result) return;
     const moved = requestReflowCount(result);
     if (moved) notice.notify(`需求已删除，${moved} 条排期已前移`);
@@ -76,6 +79,7 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
     else notice.notify("需求已删除");
   };
   const openDetails = (id: number) => setDetailsId(id);
+  const showReflowChoice = Boolean(deleteTarget && canReflowOnDelete(deleteTarget));
 
   return (
     <div className={styles.page}>
@@ -135,13 +139,20 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
         footer={
           <>
             <Button onClick={() => setDeleteTarget(null)}>取消</Button>
-            <Button variant="danger" onClick={() => { const row = deleteTarget; setDeleteTarget(null); if (row) void deleteRow(row); }}>确认删除</Button>
+            {showReflowChoice ? (
+              <>
+                <Button variant="dangerText" onClick={() => void deleteRow(false)}>删除并保持排期</Button>
+                <Button variant="danger" onClick={() => void deleteRow(true)}>删除并前移排期</Button>
+              </>
+            ) : (
+              <Button variant="danger" onClick={() => void deleteRow(false)}>确认删除</Button>
+            )}
           </>
         }
       >
         <p style={{ color: "var(--rsm-muted)" }}>确认删除“{deleteTarget?.name}”？此需求将从需求池和甘特图移除，操作记录保留。</p>
-        {deleteTarget && canReflowOnDelete(deleteTarget) ? (
-          <p style={{ color: "var(--rsm-muted)" }}>同一开发人的后续排期会尽量前移，并保留并行、HOLD、休假、加班和补位。已完成和已归档的排期保留原日期。</p>
+        {showReflowChoice ? (
+          <p style={{ color: "var(--rsm-muted)" }}>要前移同一开发人的后续排期吗？前移时会保留并行、HOLD、休假、加班和补位。</p>
         ) : null}
       </Dialog>
     </div>

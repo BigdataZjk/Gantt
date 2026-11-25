@@ -175,7 +175,10 @@ func validateRequestOperation(operation string) error {
 }
 
 func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
-	var in revisionInput
+	var in struct {
+		Base   *int64 `json:"baseRevision"`
+		Reflow bool   `json:"reflow"`
+	}
 	if e := decode(w, r, &in); e != nil {
 		s.fail(w, e)
 		return
@@ -199,9 +202,12 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		if d.Requests[index].Archived {
 			return store.Bad("归档需求只能恢复到需求池")
 		}
+		if in.Reflow && !user.Admin() {
+			return store.ErrForbidden
+		}
 		detail.Subject = d.Requests[index].Name
 		detail.Add("位置", history.Text("需求池"), history.Text("已删除"))
-		if user.Admin() && d.Requests[index].Developer != "" {
+		if in.Reflow && d.Requests[index].Developer != "" {
 			calendar, err := store.ReadCalendar(r.Context(), tx)
 			if err != nil {
 				return err

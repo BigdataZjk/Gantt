@@ -17,7 +17,7 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     ],
     improved: [
       { title: "在线成员头像配色", description: "文字头像按姓名末字的拼音首字母固定选色，方便区分在线成员。" },
-      { title: "删除需求联动排期", description: "管理员删除已排期需求时，同一开发人的后续排期可自动前移，保留并行、HOLD、休假、加班和补位。" },
+      { title: "删除需求联动排期", description: "管理员删除已排期需求时，可选择保留原排期或前移同一开发人的后续排期，保留并行、HOLD、休假、加班和补位。" },
     ],
     fixed: [
       { title: "甘特图单击光标", description: "单击排期格时不再出现闪烁的文本光标。" },

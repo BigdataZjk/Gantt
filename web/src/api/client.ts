@@ -104,7 +104,7 @@ export const api = {
 
   createRequest: (baseRevision: number, request: ApiRequest): Promise<State> => send<State>("/api/requests", "POST", { baseRevision, request }),
   updateRequest: (baseRevision: number, request: ApiRequest, operation?: ScheduleOperation): Promise<State> => send<State>(`/api/requests/${encodeURIComponent(String(request.id))}`, "PUT", { baseRevision, request, operation }),
-  deleteRequest: (baseRevision: number, id: number): Promise<State> => send<State>(`/api/requests/${id}`, "DELETE", { baseRevision }),
+  deleteRequest: (baseRevision: number, id: number, reflow: boolean): Promise<State> => send<State>(`/api/requests/${id}`, "DELETE", { baseRevision, reflow }),
   batchRequests: (baseRevision: number, requests: ApiRequest[], operation?: ScheduleOperation): Promise<State> => send<State>("/api/requests/batch", "POST", { baseRevision, requests, operation }),
   orderGantt: (baseRevision: number, orders: GanttOrderInput["orders"], move?: GanttOrderInput["move"], context?: Pick<GanttOrderInput, "draggedRequestId" | "sortByAdmission">): Promise<State> =>
     send<State>("/api/requests/gantt-order", "PUT", { baseRevision, orders, move, ...context }),

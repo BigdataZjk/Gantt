@@ -241,7 +241,7 @@ export interface paths {
         post?: never;
         /**
          * 删除需求
-         * @description 管理员删除已排期需求时，会在保留现有排期关系的前提下尽量前移同一开发人的后续排期。
+         * @description 管理员可在删除已排期需求时选择前移同一开发人的后续排期。
          */
         delete: operations["deleteApiRequestsId"];
         options?: never;
@@ -949,6 +949,12 @@ export interface components {
             baseRevision: number;
             requests: components["schemas"]["Request"][];
             operation?: components["schemas"]["ScheduleOperation"];
+        };
+        RequestDelete: {
+            /** Format: int64 */
+            baseRevision: number;
+            /** @description 为 true 时尝试前移后续排期，仅管理员可用。省略或为 false 时保持原排期。 */
+            reflow?: boolean;
         };
         RevisionInput: {
             /** Format: int64 */
@@ -1799,7 +1805,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RevisionInput"];
+                "application/json": components["schemas"]["RequestDelete"];
             };
         };
         responses: {

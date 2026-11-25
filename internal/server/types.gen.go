@@ -690,6 +690,14 @@ type RequestRequestType string
 // RequestStatus defines model for Request.Status.
 type RequestStatus string
 
+// RequestDelete defines model for RequestDelete.
+type RequestDelete struct {
+	BaseRevision int64 `json:"baseRevision"`
+
+	// Reflow 为 true 时尝试前移后续排期，仅管理员可用。省略或为 false 时保持原排期。
+	Reflow *bool `json:"reflow,omitempty"`
+}
+
 // RequestUpdate defines model for RequestUpdate.
 type RequestUpdate struct {
 	BaseRevision int64 `json:"baseRevision"`
@@ -937,7 +945,7 @@ type ReverseRequestOperationJSONRequestBody ReverseRequestOperationJSONBody
 type PostRequesterRankJSONRequestBody = RequesterRankInput
 
 // DeleteApiRequestsIdJSONRequestBody defines body for DeleteApiRequestsId for application/json ContentType.
-type DeleteApiRequestsIdJSONRequestBody = RevisionInput
+type DeleteApiRequestsIdJSONRequestBody = RequestDelete
 
 // PutApiRequestsIdJSONRequestBody defines body for PutApiRequestsId for application/json ContentType.
 type PutApiRequestsIdJSONRequestBody = RequestUpdate
