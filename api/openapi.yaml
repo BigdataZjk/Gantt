@@ -386,12 +386,18 @@ paths:
     delete:
       operationId: deleteApiRequestsId
       summary: 删除需求
+      description: 管理员删除已排期需求时，会在保留现有排期关系的前提下尽量前移同一开发人的后续排期。
       responses:
         '200':
           description: 成功
           headers:
             X-RSM-Request-Operation:
               $ref: '#/components/headers/RequestOperation'
+            X-RSM-Reflowed-Requests:
+              description: 本次删除联动前移的排期需求数。
+              schema:
+                type: integer
+                minimum: 0
           content:
             application/json:
               schema:
@@ -404,6 +410,8 @@ paths:
           description: 权限不足
         '409':
           description: 版本冲突
+        '428':
+          $ref: '#/components/responses/P0DeliveryConfirmationRequired'
       requestBody:
         required: true
         content:
@@ -411,6 +419,7 @@ paths:
             schema:
               $ref: '#/components/schemas/RevisionInput'
       parameters:
+      - $ref: '#/components/parameters/P0DeliveryConfirmationHeader'
       - name: id
         in: path
         required: true

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "../../api/client";
+import { api, requestReflowCount } from "../../api/client";
 import { useNotice } from "../../ui/Notice";
 import { isDraftMeaningful } from "../../lib/draft";
 import { Archive, ChartNoAxesGantt, List } from "lucide-react";
@@ -56,6 +56,9 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
     if (permissions.canEdit && state.requests.some((row) => row.id === id && !row.archived)) onEditorChange({ mode: "edit", id });
     else setDetailsId(id);
   }, [permissions.canEdit, state.requests, onEditorChange]);
+  const canReflowOnDelete = (row: ApiRequest) => permissions.isAdmin && Boolean(
+    row.developer && (row.start || row.segments?.length || row.supportSegments?.length),
+  );
   const archiveRow = async (row: ApiRequest) => {
     const result = await requestHistory.save((baseRevision) => api.archiveRequest(baseRevision, row.id, true));
     if (result) notice.notify("已归档，可在需求归档中查看");
@@ -66,7 +69,11 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
   };
   const deleteRow = async (row: ApiRequest) => {
     const result = await requestHistory.save((baseRevision) => api.deleteRequest(baseRevision, row.id));
-    if (result) notice.notify("需求已删除");
+    if (!result) return;
+    const moved = requestReflowCount(result);
+    if (moved) notice.notify(`需求已删除，${moved} 条排期已前移`);
+    else if (moved === 0 && canReflowOnDelete(row)) notice.notify("需求已删除，后续排期保持原日期");
+    else notice.notify("需求已删除");
   };
   const openDetails = (id: number) => setDetailsId(id);
 
@@ -133,6 +140,9 @@ export function RequestsPage({ state, permissions, onEditorChange, editor, reque
         }
       >
         <p style={{ color: "var(--rsm-muted)" }}>确认删除“{deleteTarget?.name}”？此需求将从需求池和甘特图移除，操作记录保留。</p>
+        {deleteTarget && canReflowOnDelete(deleteTarget) ? (
+          <p style={{ color: "var(--rsm-muted)" }}>同一开发人的后续排期会尽量前移，并保留并行、HOLD、休假、加班和补位。已完成和已归档的排期保留原日期。</p>
+        ) : null}
       </Dialog>
     </div>
   );

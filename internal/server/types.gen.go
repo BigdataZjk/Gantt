@@ -861,6 +861,12 @@ type ReverseRequestOperationParams struct {
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
+// DeleteApiRequestsIdParams defines parameters for DeleteApiRequestsId.
+type DeleteApiRequestsIdParams struct {
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
+}
+
 // PutApiRequestsIdParams defines parameters for PutApiRequestsId.
 type PutApiRequestsIdParams struct {
 	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。

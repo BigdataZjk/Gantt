@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -189,7 +190,8 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	detail := history.Detail{Label: "删除需求"}
-	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(_ *sql.Tx, d *requests.Data, _ auth.User) error {
+	moved := 0
+	rev, op, e := s.Store.ChangeRequests(r.Context(), actor(r).ID, in.Base, "edit", &detail, func(tx *sql.Tx, d *requests.Data, user auth.User) error {
 		index := requestIndex(d, id)
 		if index < 0 {
 			return store.ErrNotFound
@@ -199,11 +201,44 @@ func (s *Server) deleteRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		detail.Subject = d.Requests[index].Name
 		detail.Add("位置", history.Text("需求池"), history.Text("已删除"))
+		if user.Admin() && d.Requests[index].Developer != "" {
+			calendar, err := store.ReadCalendar(r.Context(), tx)
+			if err != nil {
+				return err
+			}
+			updates := requests.CompactAfterDelete(d.Requests, index, calendar)
+			if len(updates) != 0 {
+				lookup, err := readRequestLogLookup(r.Context(), tx, d)
+				if err != nil {
+					return err
+				}
+				moved = len(updates)
+				detail.Tags = []history.Value{history.Text(fmt.Sprintf("%d 条排期前移", moved))}
+				for i, old := range d.Requests {
+					item, ok := updates[i]
+					if !ok {
+						continue
+					}
+					edit := lookup.describeRequestEdit(old, item, calendar, "sequence")
+					for _, change := range edit.Changes {
+						if change.Subject == "" {
+							change.Subject = old.Name
+						}
+						detail.Changes = append(detail.Changes, change)
+					}
+					item.Revision++
+					d.Requests[i] = item
+				}
+			}
+		}
 		removeGanttOrder(d, d.Requests[index])
 		unrankRequest(d, index, &detail)
 		d.Requests = append(d.Requests[:index], d.Requests[index+1:]...)
 		return nil
 	})
+	if e == nil {
+		w.Header().Set("X-RSM-Reflowed-Requests", strconv.Itoa(moved))
+	}
 	s.finishRequestOperation(w, r, rev, op, e)
 }
 func (s *Server) archiveRequest(w http.ResponseWriter, r *http.Request) {

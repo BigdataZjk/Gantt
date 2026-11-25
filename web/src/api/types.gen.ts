@@ -239,7 +239,10 @@ export interface paths {
         /** 修改需求 */
         put: operations["putApiRequestsId"];
         post?: never;
-        /** 删除需求 */
+        /**
+         * 删除需求
+         * @description 管理员删除已排期需求时，会在保留现有排期关系的前提下尽量前移同一开发人的后续排期。
+         */
         delete: operations["deleteApiRequestsId"];
         options?: never;
         head?: never;
@@ -1785,7 +1788,10 @@ export interface operations {
     deleteApiRequestsId: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
+            };
             path: {
                 id: string;
             };
@@ -1801,6 +1807,8 @@ export interface operations {
             200: {
                 headers: {
                     "X-RSM-Request-Operation": components["headers"]["RequestOperation"];
+                    /** @description 本次删除联动前移的排期需求数。 */
+                    "X-RSM-Reflowed-Requests"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -1835,6 +1843,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            428: components["responses"]["P0DeliveryConfirmationRequired"];
         };
     };
     postApiRequestsBatch: {

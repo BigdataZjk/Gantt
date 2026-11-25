@@ -22,9 +22,14 @@ export class P0DeliveryConfirmationError extends ApiError {
 }
 
 const requestOperationIds = new WeakMap<object, string>();
+const requestReflowCounts = new WeakMap<object, number>();
 
 export function requestOperationId(state: State): string | undefined {
   return requestOperationIds.get(state);
+}
+
+export function requestReflowCount(state: State): number | undefined {
+  return requestReflowCounts.get(state);
 }
 
 async function parse<T>(response: Response, retry?: (token: string) => Promise<Response>): Promise<T> {
@@ -47,8 +52,12 @@ async function parse<T>(response: Response, retry?: (token: string) => Promise<R
   const text = await response.text();
   if (!text) return undefined as T;
   const value = JSON.parse(text) as T;
-  const id = response.headers.get("X-RSM-Request-Operation");
-  if (id && value && typeof value === "object") requestOperationIds.set(value, id);
+  if (value && typeof value === "object") {
+    const id = response.headers.get("X-RSM-Request-Operation");
+    const reflowCount = response.headers.get("X-RSM-Reflowed-Requests");
+    if (id) requestOperationIds.set(value, id);
+    if (reflowCount !== null) requestReflowCounts.set(value, Number(reflowCount));
+  }
   return value;
 }
 
