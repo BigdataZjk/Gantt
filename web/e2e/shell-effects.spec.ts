@@ -21,13 +21,19 @@ async function readGridPixels(page: Page) {
   }));
 }
 
-async function openShell(page: Page, guest = false, theme: "light" | "dark" = "light") {
+async function openShell(page: Page, guest = false, theme: "light" | "dark" = "light", announcement?: string) {
   const response = await page.request.get("/api/state");
   expect(response.ok()).toBeTruthy();
   const original = await response.json() as State;
   const me = original.users.find((user) => user.role === "superadmin" && !user.deleted)!;
   expect(me).toBeTruthy();
-  const state = { ...original, me: guest ? null : me, setupRequired: false, preferences: { ...original.preferences, theme } };
+  const state = {
+    ...original,
+    me: guest ? null : me,
+    setupRequired: false,
+    announcement: announcement ?? original.announcement,
+    preferences: { ...original.preferences, theme },
+  };
   await page.route("**/api/state", (route) => route.fulfill({ json: state }));
   await page.route("**/api/presence", (route) => route.fulfill({ json: { users: guest ? [] : [me.id], guests: 0 } }));
   await page.addInitScript((value) => localStorage.setItem("rsm.theme", value), theme);
@@ -35,6 +41,57 @@ async function openShell(page: Page, guest = false, theme: "light" | "dark" = "l
   await expect(page.getByRole("tab", { name: "甘特图", exact: true })).toBeVisible();
   return me;
 }
+
+test("需求页显示新增、公告和搜索，搜索展开时给公告留出空间", async ({ page }) => {
+  await openShell(page, false, "light", "本周排期公告");
+  const create = page.getByRole("button", { name: "新增需求", exact: true });
+  const announcement = page.getByRole("region", { name: "系统公告", exact: true });
+  const searchToggle = page.getByRole("button", { name: "展开搜索", exact: true });
+  for (const tab of ["需求池", "已归档", "甘特图"]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await expect(create).toBeEnabled();
+    await expect(announcement).toBeVisible();
+    await expect(searchToggle).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "公告设置", exact: true })).toBeVisible();
+  await expect(create).toHaveCount(0);
+  await expect(announcement).toHaveCount(0);
+  await expect(searchToggle).toHaveCount(0);
+
+  await page.getByRole("button", { name: "需求", exact: true }).click();
+  const collapsedAnnouncement = (await announcement.boundingBox())!;
+  await searchToggle.click();
+  const search = page.getByRole("searchbox", { name: "搜索需求", exact: true });
+  await expect(search).toBeFocused();
+  await expect(search).toHaveCSS("width", "280px");
+  const expandedAnnouncement = (await announcement.boundingBox())!;
+  const expandedSearch = (await search.boundingBox())!;
+  expect(expandedAnnouncement.width).toBeLessThan(collapsedAnnouncement.width);
+  expect(expandedAnnouncement.x + expandedAnnouncement.width).toBeLessThan(expandedSearch.x);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(search).toBeInViewport({ ratio: 1 });
+  const mobileSearch = (await search.boundingBox())!;
+  const mobileAnnouncement = (await announcement.boundingBox())!;
+  expect(mobileSearch.y + mobileSearch.height).toBeLessThan(mobileAnnouncement.y);
+});
+
+test("关闭公告后刷新仍隐藏，更新内容后重新展示", async ({ page }) => {
+  const message = "本周排期公告";
+  const me = await openShell(page, false, "light", message);
+  const announcement = page.getByRole("region", { name: "系统公告", exact: true });
+  await announcement.getByRole("button", { name: "关闭公告", exact: true }).press("Enter");
+  await expect(announcement).toHaveCount(0);
+  await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key) || "{}").dismissedAnnouncement, `rsm.ui.v2:${me.id}`)).toBe(message);
+  await page.reload();
+  await expect(page.getByRole("tab", { name: "甘特图", exact: true })).toBeVisible();
+  await expect(announcement).toHaveCount(0);
+
+  await openShell(page, false, "light", "下周排期公告");
+  await expect(announcement).toHaveText("下周排期公告");
+});
 
 test("侧栏展开与固定覆盖正文，刷新保留固定状态且取消后可收起", async ({ page }) => {
   const me = await openShell(page);

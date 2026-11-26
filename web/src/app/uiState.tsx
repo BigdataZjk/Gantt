@@ -25,6 +25,7 @@ export interface UiState {
   sidebarPinned: boolean;
   requirementTab: RequirementTab;
   settingsTab: SettingsTab;
+  dismissedAnnouncement: string;
   filters: UiFilters;
   columnOrder: string[];
   visibleColumns: string[];
@@ -70,6 +71,7 @@ function normalize(value: unknown): UiState {
     sidebarPinned: raw.sidebarPinned === true,
     requirementTab: REQUIREMENT_TABS.includes(raw.requirementTab as RequirementTab) ? (raw.requirementTab as RequirementTab) : "gantt",
     settingsTab: SETTINGS_TABS.includes(raw.settingsTab as SettingsTab) ? (raw.settingsTab as SettingsTab) : "roles",
+    dismissedAnnouncement: typeof raw.dismissedAnnouncement === "string" ? raw.dismissedAnnouncement : "",
     filters: {
       domain: asStringArray(rawFilters.domain),
       requestType: asStringArray(rawFilters.requestType),

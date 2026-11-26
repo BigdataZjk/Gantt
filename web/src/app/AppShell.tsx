@@ -1,6 +1,6 @@
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarRange, LogIn, Megaphone } from "lucide-react";
+import { CalendarRange, LogIn, Megaphone, X } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import { createStateWriter } from "../api/stateCache";
 import type { Presence, State, User } from "../api/types";
@@ -36,7 +36,7 @@ export interface CredentialAction {
 const announcementGap = 48;
 const announcementSpeed = 44;
 
-function AnnouncementBanner({ text }: { text: string }) {
+function AnnouncementBanner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [duration, setDuration] = useState(0);
@@ -71,6 +71,9 @@ function AnnouncementBanner({ text }: { text: string }) {
           {duration ? <span aria-hidden="true">{text}</span> : null}
         </div>
       </div>
+      <Button variant="quiet" size="sm" iconOnly aria-label="关闭公告" onClick={onDismiss}>
+        <X aria-hidden="true" />
+      </Button>
     </div>
   );
 }
@@ -93,7 +96,12 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
 
   const requestHistory = useRequestHistory(me?.id);
 
-  const showCreate = ui.mainView === "requirements";
+  const inRequirements = ui.mainView === "requirements";
+  const announcement = state.announcement ?? "";
+  const dismissedAnnouncement = ui.dismissedAnnouncement;
+  useEffect(() => {
+    if (dismissedAnnouncement && dismissedAnnouncement !== announcement) patch({ dismissedAnnouncement: "" });
+  }, [announcement, dismissedAnnouncement, patch]);
 
   const logout = async () => {
     const writeState = createStateWriter(client, true);
@@ -124,7 +132,7 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
           <span title="Request Schedule Manager">RSM</span>
         </div>
         <div className={styles.topActions}>
-          {showCreate ? (
+          {inRequirements ? (
             <CyberButton
               disabled={!canEdit}
               onClick={() => setEditor({ mode: "create" })}
@@ -134,12 +142,14 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
             </CyberButton>
           ) : null}
         </div>
-        {state.announcement ? <AnnouncementBanner text={state.announcement} /> : null}
+        {inRequirements && announcement && announcement !== dismissedAnnouncement ? (
+          <AnnouncementBanner text={announcement} onDismiss={() => patch({ dismissedAnnouncement: announcement })} />
+        ) : null}
         <div className={styles.topEnd}>
           <SearchBox
             value={ui.filters.query}
             onChange={(query) => patchFilters({ query })}
-            visible={ui.mainView === "requirements"}
+            visible={inRequirements}
           />
           <PresenceStack presence={presence} users={state.users} />
           <Button
@@ -160,7 +170,7 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
       <div className={styles.shell}>
         <Sidebar />
         <main className={styles.main}>
-          {ui.mainView === "requirements" ? (
+          {inRequirements ? (
             <RequestsPage
               state={state}
               permissions={permissions}
