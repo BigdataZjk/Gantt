@@ -12,12 +12,18 @@ export function SearchBox({ value, onChange, visible, placeholder = "搜索需�
   }, [value]);
 
   useEffect(() => {
-    const onPointer = (event: PointerEvent) => {
-      if (!slot.current?.contains(event.target as Node) && !value.trim()) setExpanded(false);
+    if (!visible || !expanded || value.trim()) return;
+    const onOutsideInteraction = (event: MouseEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent && event.key !== "Tab") return;
+      if (!slot.current?.contains(event.target as Node)) setExpanded(false);
     };
-    document.addEventListener("pointerdown", onPointer, true);
-    return () => document.removeEventListener("pointerdown", onPointer, true);
-  }, [value]);
+    document.addEventListener("click", onOutsideInteraction, true);
+    document.addEventListener("keyup", onOutsideInteraction, true);
+    return () => {
+      document.removeEventListener("click", onOutsideInteraction, true);
+      document.removeEventListener("keyup", onOutsideInteraction, true);
+    };
+  }, [expanded, value, visible]);
 
   if (!visible) return null;
   return (
@@ -25,9 +31,6 @@ export function SearchBox({ value, onChange, visible, placeholder = "搜索需�
       ref={slot}
       className={styles.slot}
       data-expanded={expanded}
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget) && !value.trim()) setExpanded(false);
-      }}
     >
       <span className={styles.capsule}>
         <Search className={styles.leading} aria-hidden="true" />

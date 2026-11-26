@@ -76,6 +76,8 @@ test("需求页显示新增、公告和搜索，搜索展开时给公告留出�
   const mobileSearch = (await search.boundingBox())!;
   const mobileAnnouncement = (await announcement.boundingBox())!;
   expect(mobileSearch.y + mobileSearch.height).toBeLessThan(mobileAnnouncement.y);
+  await announcement.getByRole("button", { name: "关闭公告", exact: true }).click();
+  await expect(announcement).toHaveCount(0);
 });
 
 test("关闭公告后刷新仍隐藏，更新内容后重新展示", async ({ page }) => {
