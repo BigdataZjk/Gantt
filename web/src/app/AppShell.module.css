@@ -49,12 +49,18 @@
 }
 .announcement > svg { flex: none; width: 14px; height: 14px; color: var(--rsm-accent); }
 .announcementViewport { flex: 1; min-width: 0; overflow: hidden; }
+.announcementLink { color: var(--rsm-accent); text-decoration: underline; text-underline-offset: 2px; }
+.announcementLink:hover { color: var(--rsm-text); }
 .announcementTrack { display: flex; width: max-content; white-space: nowrap; }
 .announcementTrack[data-scrolling] {
   gap: var(--announcement-gap);
   padding-inline-end: var(--announcement-gap);
   animation: announcement-scroll linear infinite;
 }
+.announcementViewport:is(:hover, :active) .announcementTrack[data-scrolling]:has(a) { animation-play-state: paused; }
+.announcementViewport:is(:focus-visible, :has(:focus-visible)) { overflow-x: auto; scrollbar-width: thin; }
+.announcementViewport:is(:focus-visible, :has(:focus-visible)) .announcementTrack[data-scrolling] { animation: none; padding-inline-end: 0; }
+.announcementViewport:is(:focus-visible, :has(:focus-visible)) .announcementTrack > [aria-hidden="true"] { display: none; }
 @keyframes announcement-scroll {
   to { transform: translate3d(-50%, 0, 0); }
 }

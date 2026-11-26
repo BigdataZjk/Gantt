@@ -41,7 +41,7 @@ export function AnnouncementPanel({ announcement }: { announcement: string }) {
             aria-describedby="announcement-help"
             required
           />
-          <p id="announcement-help" className={styles.caption}>保存后，公告会立即显示在所有用户的页面顶部。</p>
+          <p id="announcement-help" className={styles.caption}>公告显示在需求页顶部。添加文字链接可写为 <code>[查看排期说明](https://example.com/guide)</code>。</p>
         </div>
         <Button type="submit" variant="primary" disabled={!canSave}>{pending ? "保存中…" : "保存公告"}</Button>
       </form>

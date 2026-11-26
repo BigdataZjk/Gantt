@@ -14,7 +14,7 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     title: "设置页新增更新日志",
     added: [
       { title: "按版本查看更新", description: "设置页新增时间轴。同一版本发布多次时，新增、优化和修复会汇总到同一个节点。" },
-      { title: "顶部公告", description: "超级管理员可在设置页发布公告。所有用户实时可见，超出宽度时匀速向左播报。" },
+      { title: "顶部公告", description: "超级管理员可在设置页发布带文字链接的公告。公告实时显示在需求页顶部，超出宽度时匀速向左播报。" },
     ],
     improved: [
       { title: "在线成员头像配色", description: "文字头像按姓名末字的拼音首字母固定选色，方便区分在线成员。" },

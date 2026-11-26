@@ -36,10 +36,43 @@ export interface CredentialAction {
 const announcementGap = 48;
 const announcementSpeed = 44;
 
+function parseAnnouncement(text: string) {
+  const parts: { text: string; href?: string }[] = [];
+  let offset = 0;
+  for (const match of text.matchAll(/\[([^\[\]\r\n]+)\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/gi)) {
+    const [markup, label, address] = match;
+    if (!label.trim()) continue;
+    let href: string;
+    try {
+      href = new URL(address).href;
+    } catch {
+      continue;
+    }
+    parts.push({ text: text.slice(offset, match.index) }, { text: label, href });
+    offset = match.index + markup.length;
+  }
+  parts.push({ text: text.slice(offset) });
+  return parts;
+}
+
 function AnnouncementBanner({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [duration, setDuration] = useState(0);
+  const parts = useMemo(() => parseAnnouncement(text), [text]);
+  const renderContent = (duplicate = false) => parts.map((part, index) => part.href ? (
+    <a
+      key={index}
+      className={styles.announcementLink}
+      href={part.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      tabIndex={duplicate ? -1 : undefined}
+      onMouseDown={duplicate ? (event) => event.preventDefault() : undefined}
+    >
+      {part.text}
+    </a>
+  ) : part.text);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -60,15 +93,22 @@ function AnnouncementBanner({ text, onDismiss }: { text: string; onDismiss: () =
   return (
     <div className={styles.announcement} role="region" aria-label="系统公告">
       <Megaphone aria-hidden="true" />
-      <div ref={viewportRef} className={styles.announcementViewport} tabIndex={duration ? 0 : undefined}>
+      <div
+        ref={viewportRef}
+        className={styles.announcementViewport}
+        tabIndex={duration ? 0 : undefined}
+        onBlur={({ currentTarget, relatedTarget }) => {
+          if (!currentTarget.contains(relatedTarget)) currentTarget.scrollLeft = 0;
+        }}
+      >
         <div
           key={text}
           className={styles.announcementTrack}
           data-scrolling={duration ? "" : undefined}
           style={duration ? { "--announcement-gap": `${announcementGap}px`, animationDuration: `${duration}s` } as CSSProperties : undefined}
         >
-          <span ref={textRef}>{text}</span>
-          {duration ? <span aria-hidden="true">{text}</span> : null}
+          <span ref={textRef}>{renderContent()}</span>
+          {duration ? <span aria-hidden="true">{renderContent(true)}</span> : null}
         </div>
       </div>
       <Button variant="quiet" size="sm" iconOnly aria-label="关闭公告" onClick={onDismiss}>

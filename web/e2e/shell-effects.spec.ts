@@ -95,6 +95,41 @@ test("关闭公告后刷新仍隐藏，更新内容后重新展示", async ({ pa
   await expect(announcement).toHaveText("下周排期公告");
 });
 
+test("滚动公告中的文字链接可用鼠标和键盘打开", async ({ page }) => {
+  const guide = "https://example.com/rsm/guide";
+  const details = "http://example.com/rsm/details_(v1)?view=week#dates";
+  const context = page.context();
+  await context.route(/https?:\/\/example\.com\/rsm\//, (route) => route.fulfill({ body: "公告链接" }));
+  const overflow = "本周计划请以需求页排期为准。".repeat(12);
+  await openShell(page, false, "light", `本周排期 [查看说明](${guide}) · ${overflow} [调整明细](${details}) [无效地址](javascript:alert(1))`);
+  const announcement = page.getByRole("region", { name: "系统公告", exact: true });
+  const guideLink = announcement.getByRole("link", { name: "查看说明", exact: true });
+  const detailsLink = announcement.getByRole("link", { name: "调整明细", exact: true });
+  const track = guideLink.locator("../..");
+  const viewport = track.locator("..");
+  await expect(track).toHaveAttribute("data-scrolling", "");
+  await expect(announcement.getByRole("link", { name: "无效地址", exact: true })).toHaveCount(0);
+
+  await viewport.hover();
+  await expect(track).toHaveCSS("animation-play-state", "paused");
+  const guidePopup = page.waitForEvent("popup");
+  await guideLink.click();
+  const openedGuide = await guidePopup;
+  await openedGuide.waitForURL(guide);
+  await openedGuide.close();
+
+  await viewport.press("Tab");
+  await expect(guideLink).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(detailsLink).toBeFocused();
+  await expect(detailsLink).toBeInViewport({ ratio: 1 });
+  const detailsPopup = page.waitForEvent("popup");
+  await page.keyboard.press("Enter");
+  const openedDetails = await detailsPopup;
+  await openedDetails.waitForURL(details);
+  await openedDetails.close();
+});
+
 test("侧栏展开与固定覆盖正文，刷新保留固定状态且取消后可收起", async ({ page }) => {
   const me = await openShell(page);
   const nav = page.getByRole("navigation", { name: "主导航", exact: true });
