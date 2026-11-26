@@ -226,8 +226,15 @@
 .supportPiece.barEnd::before { border-right-width: 1px; }
 .barStart { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
 .barEnd { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
-.dayGrid::after { content: ""; position: absolute; inset: 0; z-index: 2; border: solid var(--day-edge, color-mix(in srgb, var(--task-ink, #fff) 42%, transparent)); border-width: 1px 1px 1px 0; border-radius: inherit; pointer-events: none; }
-.dayGrid.barStart::after { border-left-width: 1px; }
+.dayDivider::after {
+  content: "";
+  position: absolute;
+  inset-block: 2px;
+  inset-inline-end: 0;
+  z-index: 2;
+  border-inline-end: 1px dashed color-mix(in srgb, var(--task-ink, #fff) 36%, transparent);
+  pointer-events: none;
+}
 .barHandle { position: absolute; top: 3px; bottom: 3px; width: 6px; display: flex; align-items: center; justify-content: center; cursor: ew-resize; opacity: 0; z-index: 3; }
 .barHandle::before { content: ""; width: 1px; height: 8px; background: currentColor; opacity: 0.7; }
 .barHandle[data-edge="start"] { left: 0; }

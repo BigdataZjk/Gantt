@@ -500,12 +500,12 @@ export function RequestDrawer({ save, state, permissions, editor, onClose }: Pro
             {error.tab && error.tab !== tab ? <button type="button" className={styles.errorLink} onClick={() => setTab(error.tab!)}>前往{error.tab === "schedule" ? "开发信息" : error.tab === "extra" ? "补充信息" : "必填信息"}修正</button> : null}
           </p>
         ) : null}
-        <div className={styles.footer} style={{ marginTop: 22, paddingTop: 18, borderTop: "1px solid var(--rsm-border)" }}>
-          <span className={styles.help}>{mode === "create" ? "收起后可继续填写" : "正式保存后才记录变更"}{developerName ? ` · 开发人 ${developerName}` : ""}</span>
+        <div className={styles.footer}>
           <div className={styles.footerActions}>
-            <Button onClick={() => handleOpenChange(false)}>{mode === "create" ? "收起" : "取消"}</Button>
             <Button type="submit" variant="primary" disabled={pending}>{pending ? "保存中…" : mode === "create" ? "创建需求" : "保存需求"}</Button>
+            <Button onClick={() => handleOpenChange(false)}>{mode === "create" ? "收起" : "取消"}</Button>
           </div>
+          <span className={styles.help}>{mode === "create" ? "收起后可继续填写" : "正式保存后才记录变更"}{developerName ? ` · 开发人 ${developerName}` : ""}</span>
         </div>
       </form>
     </Drawer>

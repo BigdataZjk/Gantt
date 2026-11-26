@@ -318,6 +318,44 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/Preferences'
+  /api/announcement:
+    put:
+      operationId: putApiAnnouncement
+      summary: 更新顶栏系统公告
+      description: 仅超级管理员可更新。已发布的公告会随共享状态同步给所有访客。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - baseRevision
+              - text
+              properties:
+                baseRevision:
+                  type: integer
+                  format: int64
+                text:
+                  type: string
+                  minLength: 1
+                  description: 纯文本，去除首尾空白后须包含内容。
+              additionalProperties: false
+      responses:
+        '200':
+          description: 公告已更新
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/State'
+        '400':
+          description: 校验失败
+        '401':
+          description: 未登录
+        '403':
+          description: 仅超级管理员可更新
+        '409':
+          description: 版本冲突
   /api/requests:
     post:
       operationId: postApiRequests
@@ -1706,6 +1744,9 @@ components:
           nullable: true
         preferences:
           $ref: '#/components/schemas/Preferences'
+        announcement:
+          type: string
+          description: 顶栏公告正文，首次发布前省略。
         logs:
           type: array
           items:

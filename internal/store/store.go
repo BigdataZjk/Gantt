@@ -51,6 +51,7 @@ type Snapshot struct {
 	Users         []auth.User          `json:"users"`
 	Me            *auth.User           `json:"me"`
 	Preferences   settings.Preferences `json:"preferences"`
+	Announcement  string               `json:"announcement,omitempty"`
 	Logs          []history.Entry      `json:"logs"`
 	LogPolicy     history.LogPolicy    `json:"logPolicy"`
 	Versions      []history.Version    `json:"versions"`
@@ -215,6 +216,9 @@ func (s *Store) Snapshot(ctx context.Context, actorID string) (Snapshot, error) 
 	}
 	out.LogPolicy, e = readLogPolicy(ctx, tx)
 	if e != nil {
+		return out, e
+	}
+	if e = readSetting(ctx, tx, announcementKey, &out.Announcement); e != nil {
 		return out, e
 	}
 	out.SetupRequired = len(out.Users) == 0

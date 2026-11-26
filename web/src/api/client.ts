@@ -89,6 +89,7 @@ export const api = {
   createUser: (input: { username: string; password: string; role: string }): Promise<State> => send<State>("/api/users", "POST", input),
   updateUser: (id: string, patch: UserPatch): Promise<State> => send<State>(`/api/users/${encodeURIComponent(id)}`, "PATCH", patch),
   savePreferences: (preferences: Preferences): Promise<State> => send<State>("/api/preferences", "PUT", preferences),
+  saveAnnouncement: (baseRevision: number, text: string): Promise<State> => send<State>("/api/announcement", "PUT", { baseRevision, text }),
   uploadAvatar: async (file: File): Promise<State> => {
     const response = await fetch("/api/avatar", {
       method: "POST",

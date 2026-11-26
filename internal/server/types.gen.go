@@ -741,8 +741,10 @@ type SetupInput struct {
 
 // State defines model for State.
 type State struct {
-	Calendar Calendar `json:"calendar"`
-	Domains  []Domain `json:"domains"`
+	// Announcement 顶栏公告正文，首次发布前省略。
+	Announcement *string  `json:"announcement,omitempty"`
+	Calendar     Calendar `json:"calendar"`
+	Domains      []Domain `json:"domains"`
 
 	// GanttRowOrder 各开发人分组已保存的甘特顺序，空字符串键表示未分配组
 	GanttRowOrder *GanttRowOrder `json:"ganttRowOrder,omitempty"`
@@ -813,6 +815,14 @@ type P0DeliveryConfirmationHeader = string
 
 // P0DeliveryConfirmationRequired defines model for P0DeliveryConfirmationRequired.
 type P0DeliveryConfirmationRequired = P0DeliveryConfirmationError
+
+// PutApiAnnouncementJSONBody defines parameters for PutApiAnnouncement.
+type PutApiAnnouncementJSONBody struct {
+	BaseRevision int64 `json:"baseRevision"`
+
+	// Text 纯文本，去除首尾空白后须包含内容。
+	Text string `json:"text"`
+}
 
 // PostApiCalendarImportJSONBody defines parameters for PostApiCalendarImport.
 type PostApiCalendarImportJSONBody struct {
@@ -886,6 +896,9 @@ type PostApiVersionsIdRestoreParams struct {
 	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
+
+// PutApiAnnouncementJSONRequestBody defines body for PutApiAnnouncement for application/json ContentType.
+type PutApiAnnouncementJSONRequestBody PutApiAnnouncementJSONBody
 
 // PostApiAuthPasswordJSONRequestBody defines body for PostApiAuthPassword for application/json ContentType.
 type PostApiAuthPasswordJSONRequestBody = PasswordInput

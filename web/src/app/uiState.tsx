@@ -7,7 +7,7 @@ import { normalizeTableSort, type TableSort } from "../features/requests/table/s
 
 export type RequirementTab = "gantt" | "pool" | "archive";
 export type MainView = "requirements" | "settings";
-export type SettingsTab = "roles" | "fields" | "personal" | "logs" | "versions" | "calendar" | "updates";
+export type SettingsTab = "roles" | "fields" | "personal" | "logs" | "versions" | "calendar" | "announcement" | "updates";
 
 export interface UiFilters {
   domain: string[];
@@ -43,7 +43,7 @@ export interface UiState {
 }
 
 const REQUIREMENT_TABS: RequirementTab[] = ["gantt", "pool", "archive"];
-const SETTINGS_TABS: SettingsTab[] = ["roles", "fields", "personal", "logs", "versions", "calendar", "updates"];
+const SETTINGS_TABS: SettingsTab[] = ["roles", "fields", "personal", "logs", "versions", "calendar", "announcement", "updates"];
 
 export const EMPTY_FILTERS: UiFilters = { domain: [], requestType: [], status: [], developer: [], priority: [], start: "", end: "", query: "" };
 

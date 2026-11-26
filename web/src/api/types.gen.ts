@@ -211,6 +211,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/announcement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 更新顶栏系统公告
+         * @description 仅超级管理员可更新。已发布的公告会随共享状态同步给所有访客。
+         */
+        put: operations["putApiAnnouncement"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests": {
         parameters: {
             query?: never;
@@ -884,6 +904,8 @@ export interface components {
             users: components["schemas"]["User"][];
             me: components["schemas"]["User"] | null;
             preferences: components["schemas"]["Preferences"];
+            /** @description 顶栏公告正文，首次发布前省略。 */
+            announcement?: string;
             logs: components["schemas"]["Log"][];
             logPolicy?: components["schemas"]["LogPolicy"];
             versions: components["schemas"]["Version"][];
@@ -1664,6 +1686,63 @@ export interface operations {
                 content?: never;
             };
             /** @description 权限不足 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 版本冲突 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    putApiAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: int64 */
+                    baseRevision: number;
+                    /** @description 纯文本，去除首尾空白后须包含内容。 */
+                    text: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 公告已更新 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["State"];
+                };
+            };
+            /** @description 校验失败 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 仅超级管理员可更新 */
             403: {
                 headers: {
                     [name: string]: unknown;

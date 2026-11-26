@@ -1251,8 +1251,6 @@ const GanttRequestRow = memo(function GanttRequestRow({
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
   const estimated = (Number(row.days) || 0) === 0;
-  const hovered = hoveredPhase >= 0 ? { rowId: row.id, phaseIndex: hoveredPhase } : null;
-  const isHovered = Boolean(hovered);
   const holds = useMemo(() => holdLayout(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const estimates = useMemo(() => estimateCenters(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const visibleDays = useMemo(() => visibleDates.map(resolve), [visibleDates, resolve]);
@@ -1340,8 +1338,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const phase = info.phaseIndex;
         const segment = plan.segments[phase];
         const fill = state.fillBounds[phase];
-        const filled = Boolean(fill && date >= fill.start && date <= fill.end);
-        const showDelivery = (rowSelected || (isHovered && hovered?.phaseIndex === phase)) && date === delivery && phase >= 0;
+        const filled = !!fill && date >= fill.start && date <= fill.end;
+        const showDayDivider = filled && hoveredPhase === phase && date < fill.end && index + 1 < visibleDates.length;
+        const showDelivery = (rowSelected || hoveredPhase === phase) && date === delivery && phase >= 0;
         const bar = phase >= 0;
         const working = isWorkday(date, calendar);
         const available = info.dayType !== "leave" && (working || info.overtime);
@@ -1385,7 +1384,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 role="button"
                 tabIndex={0}
                 data-tooltip={`${row.name}　${state.activeDays}人天`}
-                className={[styles.barPiece, info.active ? "" : styles.inactive, !filled ? styles.unfilled : "", info.active && estimated ? styles.estimated : "", date === fill?.start ? styles.barStart : "", date === fill?.end ? styles.barEnd : "", filled && hovered?.rowId === row.id && hovered?.phaseIndex === phase ? styles.dayGrid : ""].filter(Boolean).join(" ")}
+                className={[styles.barPiece, info.active ? "" : styles.inactive, !filled ? styles.unfilled : "", info.active && estimated ? styles.estimated : "", date === fill?.start ? styles.barStart : "", date === fill?.end ? styles.barEnd : "", showDayDivider ? styles.dayDivider : ""].filter(Boolean).join(" ")}
                 aria-label={`${row.name}，${date}${info.active ? "，开发排期" : "，非开发日"}`}
                 onPointerOver={() => setHovered((current) => current?.rowId === row.id && current.phaseIndex === phase ? current : { rowId: row.id, phaseIndex: phase })}
                 onPointerOut={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.("[data-bar]")) setHovered(null); }}

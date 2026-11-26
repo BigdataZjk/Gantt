@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarRange, LogIn } from "lucide-react";
+import { CalendarRange, LogIn, Megaphone } from "lucide-react";
 import { api, ApiError } from "../api/client";
 import { createStateWriter } from "../api/stateCache";
 import type { Presence, State, User } from "../api/types";
@@ -31,6 +31,48 @@ export interface Permissions {
 export interface CredentialAction {
   mode: PasswordMode;
   user?: User | null;
+}
+
+const announcementGap = 48;
+const announcementSpeed = 44;
+
+function AnnouncementBanner({ text }: { text: string }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [duration, setDuration] = useState(0);
+
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    const content = textRef.current;
+    if (!viewport || !content) return;
+
+    const measure = () => {
+      const width = content.getBoundingClientRect().width;
+      setDuration(width > viewport.getBoundingClientRect().width ? (width + announcementGap) / announcementSpeed : 0);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <div className={styles.announcement} role="region" aria-label="系统公告">
+      <Megaphone aria-hidden="true" />
+      <div ref={viewportRef} className={styles.announcementViewport} tabIndex={duration ? 0 : undefined}>
+        <div
+          key={text}
+          className={styles.announcementTrack}
+          data-scrolling={duration ? "" : undefined}
+          style={duration ? { "--announcement-gap": `${announcementGap}px`, animationDuration: `${duration}s` } as CSSProperties : undefined}
+        >
+          <span ref={textRef}>{text}</span>
+          {duration ? <span aria-hidden="true">{text}</span> : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export function AppShell({ state, presence }: { state: State; presence: Presence }) {
@@ -92,6 +134,7 @@ export function AppShell({ state, presence }: { state: State; presence: Presence
             </CyberButton>
           ) : null}
         </div>
+        {state.announcement ? <AnnouncementBanner text={state.announcement} /> : null}
         <div className={styles.topEnd}>
           <SearchBox
             value={ui.filters.query}

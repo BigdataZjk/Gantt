@@ -39,27 +39,6 @@ type archivedLog struct {
 	info     os.FileInfo
 }
 
-func readSetting(ctx context.Context, q queryer, key string, target any) error {
-	var raw string
-	e := q.QueryRowContext(ctx, "select payload from system_settings where key=?", key).Scan(&raw)
-	if errors.Is(e, sql.ErrNoRows) {
-		return nil
-	}
-	if e != nil {
-		return e
-	}
-	return json.Unmarshal([]byte(raw), target)
-}
-
-func writeSetting(ctx context.Context, tx *sql.Tx, key string, value any) error {
-	raw, e := json.Marshal(value)
-	if e != nil {
-		return e
-	}
-	_, e = tx.ExecContext(ctx, "insert into system_settings(key,payload) values (?,?) on conflict(key) do update set payload=excluded.payload", key, string(raw))
-	return e
-}
-
 func readLogPolicy(ctx context.Context, q queryer) (history.LogPolicy, error) {
 	var policy history.LogPolicy
 	e := readSetting(ctx, q, logPolicyKey, &policy)

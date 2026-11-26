@@ -46,8 +46,9 @@
 .segmentFields label { display: grid; gap: 5px; font-size: 11px; }
 .segmentAdd { justify-self: start; }
 .holdNote { display: flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 4px; background: var(--rsm-soft); color: var(--rsm-muted); font-size: 11px; }
-.footer { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.footer { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--rsm-border); }
 .footerActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.footer > .help { margin-inline-start: auto; text-align: end; }
 .deliveryDisplay { min-height: var(--rsm-control-height); padding: 5px 9px; display: flex; align-items: center; border-radius: var(--rsm-control-radius); background: var(--rsm-bg); font-variant-numeric: tabular-nums; }
 @media (max-width: 620px) {
   .titleRow { grid-template-columns: minmax(0, 1fr) 140px; }

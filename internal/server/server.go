@@ -63,6 +63,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/users", s.createUser)
 	s.mux.HandleFunc("PATCH /api/users/{id}", s.updateUser)
 	s.mux.HandleFunc("PUT /api/preferences", s.preferences)
+	s.mux.HandleFunc("PUT /api/announcement", s.saveAnnouncement)
 	s.mux.HandleFunc("POST /api/calendar/refresh", s.refreshCalendar)
 	s.mux.HandleFunc("POST /api/calendar/import", s.importCalendar)
 	s.mux.HandleFunc("POST /api/avatar", s.uploadAvatar)
