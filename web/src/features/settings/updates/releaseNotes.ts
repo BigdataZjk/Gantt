@@ -9,17 +9,27 @@ interface ReleaseNote {
 }
 
 export const releaseNotes: Record<string, ReleaseNote> = {
+  "0.1.7": {
+    date: "2026-11-26",
+    title: "需求页公告与排期调整",
+    added: [
+      { title: "需求页公告", description: "超级管理员可发布带文字链接的公告。需求页实时显示，内容超出宽度时滚动播报，用户可关闭公告。" },
+    ],
+    improved: [
+      { title: "删除需求联动排期", description: "管理员删除已排期需求时，可选择保留原排期或前移同一开发人的后续排期。前移保留并行、HOLD、休假、加班和补位。" },
+      { title: "需求页顶部布局", description: "搜索框展开时，公告随可用空间调整宽度，新增需求按钮保持固定位置。" },
+      { title: "甘特图日期分隔", description: "悬停排期线段时，仅在日期格之间显示细竖虚线。" },
+      { title: "需求编辑面板", description: "保存和取消按钮移到面板底部左侧。" },
+    ],
+  },
   "0.1.6": {
     date: "2026-11-24",
     title: "设置页新增更新日志",
     added: [
       { title: "按版本查看更新", description: "设置页新增时间轴。同一版本发布多次时，新增、优化和修复会汇总到同一个节点。" },
-      { title: "顶部公告", description: "超级管理员可在设置页发布带文字链接的公告。公告实时显示在需求页顶部，超出宽度时匀速向左播报。" },
     ],
     improved: [
       { title: "在线成员头像配色", description: "文字头像按姓名末字的拼音首字母固定选色，方便区分在线成员。" },
-      { title: "甘特图日期分隔", description: "悬停排期线段时，仅在日期格之间显示细竖虚线。" },
-      { title: "删除需求联动排期", description: "管理员删除已排期需求时，可选择保留原排期或前移同一开发人的后续排期，保留并行、HOLD、休假、加班和补位。" },
     ],
     fixed: [
       { title: "甘特图单击光标", description: "单击排期格时不再出现闪烁的文本光标。" },
