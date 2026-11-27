@@ -159,11 +159,11 @@ export function UpgradePanel() {
             <h2 id="upgrade-heading" className={styles.sectionTitle}>上传源码并更新</h2>
             <p className={styles.caption}>{data ? `当前版本 v${data.currentVersion}` : "正在读取当前版本…"}</p>
           </div>
+          {/* macOS 的文件筛选可能将 ZIP 置灰，选择后再校验格式。 */}
           <input
             ref={fileInput}
             hidden
             type="file"
-            accept=".zip,application/zip"
             aria-label="源码 ZIP 文件"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];

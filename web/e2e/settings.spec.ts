@@ -78,6 +78,7 @@ test("网页升级重连时保留当前页和进度，完成后只刷新一次",
     return disconnected ? route.abort("connectionrefused") : route.fulfill({ json: update });
   });
   await page.route("**/api/upgrade/source", (route) => {
+    expect(route.request().headers()["content-type"]).toBe("application/zip");
     update = { ...update, job: staged };
     return route.fulfill({ json: update });
   });
@@ -90,8 +91,19 @@ test("网页升级重连时保留当前页和进度，完成后只刷新一次",
   const tab = page.getByRole("tab", { name: "系统维护", exact: true });
   await tab.click();
   const panel = page.getByRole("region", { name: "上传源码并更新", exact: true });
-  await expect(panel.getByRole("button", { name: "选择源码 ZIP" })).toBeEnabled();
-  await panel.getByLabel("源码 ZIP 文件").setInputFiles({ name: "rsm-source-0.1.8.zip", mimeType: "application/zip", buffer: Buffer.from("fixture") });
+  const chooseSource = panel.getByRole("button", { name: "选择源码 ZIP" });
+  await expect(chooseSource).toBeEnabled();
+  await panel.getByLabel("源码 ZIP 文件").setInputFiles({
+    name: "rsm-source.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("fixture"),
+  });
+  await expect(panel.getByRole("alert")).toHaveText("请选择发布的源码 ZIP 文件");
+  expect(update.job).toBeUndefined();
+
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), chooseSource.click()]);
+  expect(await chooser.element().getAttribute("accept")).toBeNull();
+  await chooser.setFiles({ name: "rsm-source-0.1.8.zip", mimeType: "application/octet-stream", buffer: Buffer.from("fixture") });
   await page.getByRole("dialog", { name: "确认同版本覆盖更新" }).getByRole("button", { name: "开始更新" }).click();
   const progress = panel.getByRole("progressbar", { name: "升级进度" });
   await expect(progress).toHaveAttribute("aria-valuenow", "0");
