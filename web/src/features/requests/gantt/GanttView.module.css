@@ -185,6 +185,23 @@
 .square.supportPreview.dropValid::after { background: var(--gantt-support-fill); box-shadow: inset 0 0 0 1px var(--gantt-support-edge); opacity: 0.86; }
 .square.previewStart::after { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
 .square.previewEnd::after { border-top-right-radius: 5px; border-bottom-right-radius: 5px; }
+.square.movePreview::after {
+  border: solid color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 58%, var(--task-ink, var(--rsm-on-accent)));
+  border-width: 1px 0;
+}
+.square.movePreview.dropValid::after {
+  background: color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 65%, var(--rsm-panel));
+  opacity: 1;
+}
+.square.movePreview.dropValid.supportPreview::after {
+  background: color-mix(in srgb, var(--rsm-purple) 22%, var(--rsm-panel));
+  border-color: var(--rsm-purple);
+  box-shadow: none;
+}
+.square.movePreview.dropInvalid::after { border-color: var(--rsm-p0); }
+.square.movePreview.previewStart::after { border-left-width: 2px; }
+.square.movePreview.previewEnd::after { border-right-width: 2px; }
+.square.movePreview > .barPiece { isolation: isolate; }
 .barPiece {
   position: relative;
   width: 100%;

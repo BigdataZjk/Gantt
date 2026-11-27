@@ -1363,6 +1363,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
           cellPreview && date === preview?.start ? styles.previewStart : "",
           cellPreview && date === preview?.end ? styles.previewEnd : "",
           cellPreview === "valid" && preview?.kind === "add" ? styles.addPreview : "",
+          cellPreview && preview?.kind === "move" ? styles.movePreview : "",
           cellPreview && preview?.support ? styles.supportPreview : "",
         ].filter(Boolean).join(" ");
         const badge = groupBadges.get(`${row.id}|${date}`);

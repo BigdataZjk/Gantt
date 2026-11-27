@@ -412,6 +412,46 @@ for (const theme of ["light", "dark"] as const) {
     expect(await background()).toEqual(original);
   });
 
+  test(`右键移位时与原线段重叠的目标仍有可见填充和起止线（${theme}）`, async ({ page }, testInfo) => {
+    await page.clock.setFixedTime(new Date("2026-11-18T12:00:00+08:00"));
+    await openGantt(page, theme, "compact", true, { count: 1 });
+    const row = page.locator('tr[data-row="1"]');
+    const cell = (date: string) => row.locator(`td[data-date="${date}"]`);
+    const original = cell("2026-11-18").locator("[data-bar]");
+    await expect(row.locator("[data-live-ripple]")).toBeVisible();
+    const bounds = (await original.boundingBox())!;
+    const x = bounds.x + bounds.width / 2;
+    const y = bounds.y + bounds.height / 2;
+    const hint = page.locator('[data-slot="gantt-drag-hint"]');
+    const styleOf = (date: string) => cell(date).evaluate((el) => {
+      const overlay = getComputedStyle(el, "::after");
+      return {
+        fill: overlay.backgroundColor, opacity: overlay.opacity, border: overlay.borderTopWidth,
+        start: overlay.borderLeftWidth, end: overlay.borderRightWidth,
+      };
+    });
+    const originalFill = await original.evaluate((el) => getComputedStyle(el).backgroundColor);
+    for (const [direction, start, middle, end] of [
+      [-1, "2026-11-16", "2026-11-17", "2026-11-18"],
+      [1, "2026-11-18", "2026-11-19", "2026-11-20"],
+    ] as const) {
+      await page.mouse.move(x, y);
+      await page.mouse.down({ button: "right" });
+      await page.mouse.move(x + direction * bounds.width, y, { steps: 4 });
+      await expect(hint).toHaveText(`${start} 至 ${end}`);
+      const startStyle = await styleOf(start);
+      expect(startStyle.fill).not.toBe(originalFill);
+      expect(startStyle).toMatchObject({ opacity: "1", border: "1px", start: "2px", end: "0px" });
+      expect(await styleOf(middle)).toMatchObject({ fill: startStyle.fill, border: "1px", start: "0px", end: "0px" });
+      expect(await styleOf(end)).toMatchObject({ fill: startStyle.fill, border: "1px", start: "0px", end: "2px" });
+      await page.screenshot({ path: testInfo.outputPath(`move-${theme}-${direction}.png`) });
+      await page.keyboard.press("Control+z");
+      await page.mouse.up({ button: "right" });
+      await expect(hint).not.toBeVisible();
+      expect(await cell(middle).evaluate((el) => getComputedStyle(el, "::after").content)).toBe("none");
+    }
+  });
+
   test(`左右端拖拽的边界和中间格使用需求色，覆盖行高亮并正确提交（${theme}）`, async ({ page }, testInfo) => {
     await openGantt(page, theme, "compact", true);
     const row = page.locator('tr[data-row="1"]');
