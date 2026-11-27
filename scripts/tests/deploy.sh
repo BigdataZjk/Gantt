@@ -389,6 +389,29 @@ resolve_home
 [ "$RSM_HOME" = "$(abs_path "$RSM_HOME_ARG")" ] || fail 'explicit target was ignored'
 pass 'explicit instance directory still overrides the portable default'
 
+for start_mode in managed background; do
+  (
+    RSM_ROOT="$RSM_TEST_ROOT"
+    RSM_HOME="$RSM_TEST_TMP/start-$start_mode"
+    RSM_ADDR="$RSM_DEFAULT_ADDR"
+    mkdir -p "$RSM_HOME/releases/test"
+    ln -s releases/test "$RSM_HOME/current"
+    printf '%s\n' '{' '  "version": "1.2.3",' '  "schemaVersion": 1' '}' >"$RSM_HOME/current/release.json"
+    printf '%s\n' '#!/bin/sh' 'printf "1.2.3\n"' >"$RSM_HOME/current/rsm"
+    chmod +x "$RSM_HOME/current/rsm"
+    ensure_port_available() { :; }
+    autostart_enabled() { [ "$start_mode" = managed ]; }
+    service_start() { die "injected service manager startup failure"; }
+    nohup() { return 1; }
+    wait_pidfile() { return 1; }
+    if start_instance; then exit 1; fi
+  ) >"$RSM_TEST_TMP/start-$start_mode.log" 2>&1 || {
+    cat "$RSM_TEST_TMP/start-$start_mode.log"
+    fail "$start_mode startup failure aborted the caller or returned success"
+  }
+  pass "$start_mode startup failure returns control for rollback"
+done
+
 (
   . "$RSM_TEST_ROOT/scripts/lib/backup.sh"
   RSM_HOME="$RSM_TEST_TMP/backup instance"

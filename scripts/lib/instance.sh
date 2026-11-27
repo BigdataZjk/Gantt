@@ -488,14 +488,23 @@ start_instance() {
   fi
   event_log "start version=$_si_want schema=$_si_schema addr=$RSM_ADDR mode=$_si_mode"
   if autostart_enabled; then
-    service_start
+    # 服务管理器的错误退出不能中断调用方的版本回退。
+    if ! (service_start); then
+      show_start_failure
+      return 1
+    fi
   else
-    ( cd "$RSM_HOME" || exit 1
+    if ! (
+      cd "$RSM_HOME" || exit 1
       nohup "$(home_wrapper_path)" --home "$RSM_HOME" --addr "$RSM_ADDR" >/dev/null 2>&1 &
-    ) || die "启动后台进程失败"
+    ); then
+      warn "启动后台进程失败"
+      return 1
+    fi
     if ! wait_pidfile 8; then
       show_start_failure
-      die "后台进程未写入 run/rsm.pid（启动失败）"
+      warn "后台进程未写入 run/rsm.pid（启动失败）"
+      return 1
     fi
   fi
   if wait_healthy "$_si_want" "$_si_schema"; then
