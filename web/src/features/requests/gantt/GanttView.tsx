@@ -1115,7 +1115,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
                     color={domainColors.get(row.domain) ?? DEFAULT_COLOR}
                     groupBadges={badgeMap.get(item.group.developer) ?? EMPTY_BADGES}
                     preview={preview?.rowId === row.id ? preview : null}
-                    hoveredPhase={hovered?.rowId === row.id ? hovered.phaseIndex : -1}
+                    hoveredPhase={!preview && !menu && hovered?.rowId === row.id ? hovered.phaseIndex : -1}
                     rowSelected={!row.archived && selectedIds.has(row.id)}
                     isAdmin={isAdmin && !row.archived}
                     canEdit={permissions.canEdit && !row.archived}
@@ -1342,7 +1342,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const segment = plan.segments[phase];
         const fill = state.fillBounds[phase];
         const filled = !!fill && date >= fill.start && date <= fill.end;
-        const showDayDivider = !archived && filled && hoveredPhase === phase && date < fill.end && index + 1 < visibleDates.length;
+        const hoveredFill = !archived && filled && hoveredPhase === phase;
+        const showDayDivider = hoveredFill && date < fill.end && index + 1 < visibleDates.length;
+        const showSegmentEndGuide = hoveredFill && date === fill.end;
         const showDelivery = !archived && (rowSelected || hoveredPhase === phase) && date === delivery && phase >= 0;
         const bar = phase >= 0;
         const working = isWorkday(date, calendar);
@@ -1405,6 +1407,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 {info.dayType === "leave" ? <CellMarker kind="leave" mode={markerMode} /> : null}
                 {info.active && estimated && estimates.has(date) ? <CellMarker kind="estimated" mode={markerMode} /> : null}
                 {showDelivery ? <span className={styles.deliveryGuide} aria-hidden="true" /> : null}
+                {showSegmentEndGuide ? <span className={styles.segmentEndGuide} data-slot="gantt-segment-end-guide" aria-hidden="true" /> : null}
                 {isAdmin ? (
                   <>
                     {date === segment!.start ? <span className={styles.barHandle} data-resize data-edge="start" data-phase={phase} aria-hidden="true" /> : null}

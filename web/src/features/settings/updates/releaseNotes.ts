@@ -21,6 +21,7 @@ export const releaseNotes: Record<string, ReleaseNote> = {
       { title: "系统维护排版", description: "备份和升级集中显示，更新日志与维护面板对齐，发布日期移入版本标题行。" },
       { title: "更新日志分组与搜索", description: "按主版本分组，可用版本号片段或变更关键词即时搜索。" },
       { title: "归档排期保护", description: "归档需求的线段淡化显示，开发人、排期和开发人天只读，行序可在同组拖动调整。" },
+      { title: "甘特图结束日期引导线", description: "悬停排期线段时，右边界的虚线向上连接日期轴，便于查看该段的结束日期。" },
       { title: "P0 排期变更确认", description: "休假等操作影响 P0 需求的有效开发人天时，保存前会展示变更前后的值并要求确认。" },
       { title: "需求链接", description: "编辑和预览面板可在新标签页打开 PRD、望岳工单和 BRD 链接。" },
     ],

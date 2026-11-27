@@ -273,6 +273,53 @@ test("减少动态效果时悬浮返回直接到达起点", async ({ page }) => 
   expect(await wrap.evaluate((el) => el.scrollLeft)).toBe(0);
 });
 
+test("悬停分段排期时，右边界虚线随滚动和缩放对齐日期轴", async ({ page }, testInfo) => {
+  const segments = [
+    { start: "2026-11-17", end: "2026-11-19", holdBefore: false },
+    { start: "2026-12-08", end: "2026-12-14", holdBefore: true },
+  ];
+  const wrap = await openGantt(page, "light", "compact", true, {
+    fixture: (state) => ({
+      requests: state.requests.map((row) => row.id === 28 ? { ...row, segments, delivery: segments[1]!.end } : row),
+    }),
+  });
+  const row = wrap.locator('tr[data-row="28"]');
+  const bar = (date: string) => row.locator(`[data-date="${date}"] [data-bar]`);
+  const guides = wrap.locator('[data-slot="gantt-segment-end-guide"]');
+  const checkGuide = async (start: string, end: string) => {
+    const startBar = bar(start);
+    const endBar = bar(end);
+    const dateHeader = wrap.locator(`th[aria-label^="${end}"]`);
+    const guide = endBar.locator('[data-slot="gantt-segment-end-guide"]');
+    await startBar.hover();
+    await expect(guide).toBeVisible();
+    await expect(guides).toHaveCount(1);
+    await expect(guide).toHaveCSS("border-right-style", "dashed");
+    await expect(guide).toHaveCSS("pointer-events", "none");
+    expect(await startBar.evaluate((el) => getComputedStyle(el, "::after").borderRightStyle)).toBe("dashed");
+    const line = (await guide.boundingBox())!;
+    const edge = (await endBar.boundingBox())!;
+    const header = (await dateHeader.boundingBox())!;
+    expect(line.x + line.width).toBeCloseTo(edge.x + edge.width, 0);
+    expect(line.x + line.width).toBeCloseTo(header.x + header.width, 0);
+    expect(line.y + line.height).toBeCloseTo(edge.y, 0);
+    expect(line.y).toBeLessThan(header.y + header.height);
+  };
+
+  await wrap.evaluate((el) => { el.scrollTop = 440; });
+  await checkGuide(segments[0]!.start, segments[0]!.end);
+  await wrap.evaluate((el) => { el.scrollLeft = 280; el.scrollTop = 350; });
+  await checkGuide(segments[1]!.start, segments[1]!.end);
+  await page.screenshot({ path: testInfo.outputPath("segment-end-guide.png") });
+  await page.keyboard.down("Control");
+  await page.mouse.wheel(0, 160);
+  await page.keyboard.up("Control");
+  await expect(page.getByRole("button", { name: "重置比例", exact: true })).toBeVisible();
+  await checkGuide(segments[1]!.start, segments[1]!.end);
+  await row.locator("[data-name]").hover();
+  await expect(guides).toHaveCount(0);
+});
+
 test("游客在甘特图、需求池和归档都能打开无表单的只读详情", async ({ page }, testInfo) => {
   const mutations: string[] = [];
   page.on("request", (request) => {
@@ -439,6 +486,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.mouse.down({ button: "right" });
       await page.mouse.move(x + direction * bounds.width, y, { steps: 4 });
       await expect(hint).toHaveText(`${start} 至 ${end}`);
+      await expect(row.locator('[data-slot="gantt-segment-end-guide"]')).toHaveCount(0);
       const startStyle = await styleOf(start);
       expect(startStyle.fill).not.toBe(originalFill);
       expect(startStyle).toMatchObject({ opacity: "1", border: "1px", start: "2px", end: "0px" });

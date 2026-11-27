@@ -253,6 +253,18 @@
   border-inline-end: 1px dashed color-mix(in srgb, var(--task-ink, #fff) 36%, transparent);
   pointer-events: none;
 }
+.segmentEndGuide {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-end: 0;
+  /* The sticky date header covers the guide above the timeline while scrolling. */
+  height: var(--gantt-viewport-height);
+  border-inline-end: 1px dashed color-mix(in srgb, var(--rsm-accent) 68%, transparent);
+  z-index: 1;
+  pointer-events: none;
+  visibility: hidden;
+}
+.calendar tr:has(.dayDivider:hover, .barEnd:hover > .segmentEndGuide) .segmentEndGuide { visibility: visible; }
 .barHandle { position: absolute; top: 3px; bottom: 3px; width: 6px; display: flex; align-items: center; justify-content: center; cursor: ew-resize; opacity: 0; z-index: 3; }
 .barHandle::before { content: ""; width: 1px; height: 8px; background: currentColor; opacity: 0.7; }
 .barHandle[data-edge="start"] { left: 0; }
