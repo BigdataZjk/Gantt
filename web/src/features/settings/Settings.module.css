@@ -154,8 +154,22 @@
 .upgradeDetails > summary:hover { color: var(--rsm-accent); }
 .upgradeDetails svg { flex: none; width: 13px; height: 13px; }
 .upgradeDetails[open] > summary > svg { transform: rotate(180deg); }
-.upgradeStages { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr)); gap: 6px 14px; padding-block: 8px 3px; }
-.upgradeStages li { display: flex; align-items: center; gap: 6px; color: var(--rsm-muted); font-size: 12px; }
+.upgradeStages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding-block: 4px 2px;
+}
+.upgradeStages li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  color: var(--rsm-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 .upgradeStages li[data-stage-status="done"] > svg { color: var(--rsm-online); }
 .upgradeStages li[data-stage-status="running"] { color: var(--rsm-accent); }
 .upgradeStages li[data-stage-status="failed"] { color: var(--rsm-danger); }
