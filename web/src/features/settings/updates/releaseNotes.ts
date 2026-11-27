@@ -9,6 +9,22 @@ interface ReleaseNote {
 }
 
 export const releaseNotes: Record<string, ReleaseNote> = {
+  "0.1.8": {
+    date: "2026-11-27",
+    title: "备份下载与排期保护",
+    added: [
+      { title: "一键下载备份", description: "超级管理员可在设置的「数据备份」中生成并下载经过校验的 ZIP 备份。" },
+    ],
+    improved: [
+      { title: "归档排期保护", description: "归档需求的线段淡化显示，开发人、排期和开发人天只读，行序可在同组拖动调整。" },
+      { title: "P0 排期变更确认", description: "休假等操作影响 P0 需求的有效开发人天时，保存前会展示变更前后的值并要求确认。" },
+      { title: "需求链接", description: "编辑和预览面板可在新标签页打开 PRD、望岳工单和 BRD 链接。" },
+    ],
+    fixed: [
+      { title: "甘特图右键拖动预览", description: "目标与原排期重叠时，也能看清目标的填充和起止边界。" },
+      { title: "悬停提示", description: "提示气泡根据可用宽度展示文本，空间充足时可单行显示。" },
+    ],
+  },
   "0.1.7": {
     date: "2026-11-26",
     title: "需求页公告与排期调整",

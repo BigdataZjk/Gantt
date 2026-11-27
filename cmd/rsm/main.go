@@ -20,7 +20,7 @@ import (
 	webassets "rsm/web"
 )
 
-var version = "0.1.7-dev"
+var version = "0.1.8-dev"
 
 type config struct {
 	Addr string `json:"addr"`
