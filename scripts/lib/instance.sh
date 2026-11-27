@@ -507,6 +507,7 @@ start_instance() {
       return 1
     fi
   fi
+  if [ "${1:-}" = deploy ]; then upgrade_stage health; fi
   if wait_healthy "$_si_want" "$_si_schema"; then
     mark_schema_confirmed "$_si_schema"
     ST_LAST_STARTED_AT=$(now_iso)

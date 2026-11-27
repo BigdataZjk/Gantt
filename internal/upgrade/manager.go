@@ -22,11 +22,12 @@ var (
 )
 
 type Job struct {
-	Version   string `json:"version"`
-	SHA256    string `json:"sha256"`
-	Status    string `json:"status"`
-	Step      int    `json:"step"`
-	StartedAt string `json:"startedAt,omitempty"`
+	Version   string    `json:"version"`
+	SHA256    string    `json:"sha256"`
+	Status    string    `json:"status"`
+	Step      int       `json:"step"`
+	StartedAt string    `json:"startedAt,omitempty"`
+	Progress  *Progress `json:"progress,omitempty"`
 }
 
 type Manager struct{ Home string }

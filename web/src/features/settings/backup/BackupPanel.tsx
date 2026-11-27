@@ -41,7 +41,7 @@ export function BackupPanel() {
   };
 
   return (
-    <section className={`${styles.personalSettings} ${styles.maintenanceCard}`} aria-labelledby="backup-heading">
+    <section className={styles.maintenanceCard} aria-labelledby="backup-heading">
       <div className={styles.maintenanceCardHeader}>
         <div className={styles.maintenanceCardHeading}>
           <h2 id="backup-heading" className={styles.sectionTitle}>实例备份</h2>

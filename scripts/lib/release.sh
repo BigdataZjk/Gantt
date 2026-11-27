@@ -194,10 +194,12 @@ deploy_activate() {
     die "拒绝升级：目标版本 schemaVersion=$_da_new_schema 低于当前已确认的数据库 schema（${ST_SCHEMA_VERSION}）。请使用 rollback（回退程序）或显式 restore（恢复备份）"
   fi
 
+  upgrade_stage scripts
   step "安装管理脚本（不影响当前运行的服务）"
   ensure_layout
   install_management_scripts "$PKG_ROOT"
 
+  upgrade_stage stop
   step "保护现有数据（按需停服并备份）"
   if [ "$_da_was_running" = "1" ]; then
     info "短暂停止当前服务"
@@ -206,6 +208,7 @@ deploy_activate() {
     info "当前没有运行中的实例"
   fi
 
+  upgrade_stage backup
   _da_backup=""
   if data_present; then
     info "切换前创建一致性备份（保留数据可回滚）"
@@ -221,11 +224,14 @@ deploy_activate() {
     info "尚无业务数据，跳过切换前备份"
   fi
 
+  upgrade_stage switch
   step "切换到新版本并检查服务健康状态"
   info "目标版本: $(basename "$_da_candidate")"
   switch_current_link "$_da_candidate"
 
-  if start_instance; then
+  upgrade_stage start
+  if start_instance deploy; then
+    upgrade_stage finalize
     record_active_release "$_da_candidate"
     ST_LAST_DEPLOYED_AT=$(now_iso)
     state_save
@@ -272,6 +278,7 @@ deploy_from_source() {
   if [ ! -f "$_dfs_repo/cmd/rsm/main.go" ]; then
     die "源码缺少 cmd/rsm/main.go，无法构建（当前源码树可能尚未完成）"
   fi
+  upgrade_stage toolchain
   step "准备源码构建工具链（固定版本；缺失时联网下载到 .tools，不替换系统工具）"
   RSM_BUILD_ROOT="$RSM_HOME" "$_dfs_repo/scripts/bootstrap.sh" --ensure-build || die "构建依赖准备失败，未做任何部署变更"
   step "生成接口类型并构建发行包"
@@ -279,6 +286,7 @@ deploy_from_source() {
   _dfs_pkg=$(cat "$_dfs_repo/build/package.path" 2>/dev/null | head -n1)
   [ -n "$_dfs_pkg" ] || die "构建未产生发行包（build/package.path 缺失）"
   [ -f "$_dfs_pkg" ] || die "构建输出的发行包不存在: $_dfs_pkg"
+  upgrade_stage verify
   step "校验发行包"
   resolve_package "$_dfs_pkg"
   _dfs_mode=deploy
@@ -359,8 +367,10 @@ upgrade_cmd() {
   case "$_uc_pkg" in
     *.zip)
       progress_plan 8
+      upgrade_stage source
       step "校验并解压源码包（保持当前服务运行）"
       prepare_source_zip "$_uc_pkg"
+      upgrade_stage version
       if [ "$SOURCE_VERSION" = "$_uc_cur" ] && [ "${RSM_FORCE:-0}" != 1 ]; then
         ok "当前已是 v${_uc_cur}，无需升级；同版本重装可执行 ./rsm.sh upgrade --force"
         persist_addr_if_explicit

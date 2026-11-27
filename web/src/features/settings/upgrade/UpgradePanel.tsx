@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, CircleAlert, FileUp, RefreshCw } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, CircleAlert, FileUp, LoaderCircle, RefreshCw } from "lucide-react";
 import { api, ApiError } from "../../../api/client";
 import type { UpgradeJob, UpgradeState } from "../../../api/types";
 import { Button } from "../../../ui/Button";
@@ -23,6 +23,51 @@ function isActive(job?: UpgradeJob) {
   return job?.status === "starting" || job?.status === "running";
 }
 
+function UpgradeProgress({ job, disconnected }: { job: UpgradeJob; disconnected: boolean }) {
+  if (job.status === "ready") return null;
+  const { stages, total } = job.progress ?? { stages: STEPS.slice(0, job.step), total: STEPS.length };
+  const active = isActive(job);
+  const failed = job.status === "failed";
+  const completed = job.status === "succeeded" ? stages.length : Math.max(0, stages.length - 1);
+  const current = stages.at(-1);
+  const countLabel = `已完成 ${completed}/${total} 步`;
+  const stageLabel = current ? `${disconnected ? "上次记录 · " : "正在"}${current}` : "正在启动升级任务…";
+
+  return (
+    <>
+      {active ? (
+        <>
+          <progress className={styles.upgradeProgress} value={completed} max={total} aria-label="升级进度" aria-valuetext={countLabel} />
+          <div className={styles.upgradeStageLine} role="status">
+            <span>{stageLabel}</span>
+            <span className={styles.caption}>{countLabel}</span>
+          </div>
+        </>
+      ) : null}
+      {failed ? (
+        <p className={styles.caption}>{current ? `「${current}」阶段未完成。` : "升级任务启动失败。"}可查看服务器部署日志。</p>
+      ) : null}
+      {job.progress ? (
+        <details className={styles.upgradeDetails}>
+          <summary><ChevronDown aria-hidden="true" />升级步骤</summary>
+          <ol className={styles.upgradeStages} aria-label="升级步骤" role="list">
+            {stages.map((stage, index) => {
+              const done = index < completed;
+              const Icon = done ? Check : failed ? CircleAlert : LoaderCircle;
+              return (
+                <li key={stage} data-stage-status={done ? "done" : failed ? "failed" : "running"} aria-current={active && !done ? "step" : undefined}>
+                  <Icon aria-label={done ? "已完成" : failed ? "未完成" : "进行中"} role="img" />
+                  {stage}
+                </li>
+              );
+            })}
+          </ol>
+        </details>
+      ) : null}
+    </>
+  );
+}
+
 export function UpgradePanel() {
   const fileInput = useRef<HTMLInputElement>(null);
   const client = useQueryClient();
@@ -35,7 +80,7 @@ export function UpgradePanel() {
     enabled: !action,
     retry: false,
     gcTime: 0,
-    refetchInterval: (query) => isActive(query.state.data?.job) || query.state.status === "error" ? 1500 : 5000,
+    refetchInterval: (query) => isActive(query.state.data?.job) || query.state.status === "error" ? 1000 : 5000,
   });
   const data = status.data;
   const job = data?.job;
@@ -81,7 +126,7 @@ export function UpgradePanel() {
 
   return (
     <>
-      <section className={`${styles.personalSettings} ${styles.maintenanceCard}`} aria-labelledby="upgrade-heading">
+      <section className={styles.maintenanceCard} aria-labelledby="upgrade-heading">
         <div className={styles.maintenanceCardHeader}>
           <div className={styles.maintenanceCardHeading}>
             <h2 id="upgrade-heading" className={styles.sectionTitle}>上传源码并更新</h2>
@@ -110,7 +155,7 @@ export function UpgradePanel() {
           <p className={styles.caption} role="status">
             {status.error instanceof ApiError && [401, 403].includes(status.error.status)
               ? status.error.message
-              : "正在重新连接服务，连接后会继续显示升级状态…"}
+              : active ? "正在重新连接服务，恢复后将补齐升级步骤。" : "正在重新连接服务…"}
           </p>
         ) : null}
         {job ? (
@@ -131,19 +176,7 @@ export function UpgradePanel() {
                 <Button size="sm" onClick={() => location.reload()}><RefreshCw aria-hidden="true" />刷新页面</Button>
               ) : null}
             </div>
-            {active ? (
-              <>
-                <progress className={styles.upgradeProgress} value={job.step} max={STEPS.length} aria-label="升级进度" />
-                <p className={styles.caption} aria-live="polite">
-                  {job.step ? `步骤 ${job.step}/${STEPS.length} · ${STEPS[job.step - 1]}` : "正在启动升级任务…"}
-                </p>
-              </>
-            ) : null}
-            {job.status === "failed" ? (
-              <p className={styles.caption}>
-                {job.step ? `${STEPS[job.step - 1]}阶段未完成。` : "升级任务启动失败。"}可查看服务器的部署日志。
-              </p>
-            ) : null}
+            <UpgradeProgress key={job.startedAt} job={job} disconnected={status.isError} />
           </div>
         ) : null}
       </section>

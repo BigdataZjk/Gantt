@@ -5,16 +5,72 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 )
+
+type Progress struct {
+	Total  int      `json:"total"`
+	Stages []string `json:"stages"`
+}
+
+var upgradeStages = []struct {
+	key, label, legacyHeading string
+}{
+	{"source", "校验并解压源码包", ""},
+	{"version", "检查升级版本", ""},
+	{"toolchain", "准备构建工具链", ""},
+	{"dependencies", "安装前端依赖", "安装前端依赖（"},
+	{"interfaces", "校验接口类型", "校验接口类型（"},
+	{"frontend", "构建前端页面", "构建前端（"},
+	{"backend", "编译服务端程序", "编译 Go 程序（"},
+	{"package", "生成发行包", "解析数据库迁移版本（"},
+	{"verify", "校验发行包", ""},
+	{"scripts", "安装管理脚本", ""},
+	{"stop", "停止旧服务", ""},
+	{"backup", "备份现有数据", ""},
+	{"switch", "切换程序版本", ""},
+	{"start", "启动新服务", ""},
+	{"health", "检查服务健康状态", ""},
+	{"finalize", "保存部署结果", ""},
+}
+
+func (job *Job) recordProgress(line string) bool {
+	if len(line) >= 10 && strings.HasPrefix(line, "==> [") && line[5] >= '1' && line[5] <= '8' && line[6:10] == "/8] " {
+		step := int(line[5] - '0')
+		if step > job.Step {
+			job.Step = step
+			return true
+		}
+	}
+	key, marker := strings.CutPrefix(line, "RSM_UPGRADE_STAGE ")
+	if job.Progress == nil && (!marker || key != "source") {
+		return false
+	}
+	for _, stage := range upgradeStages {
+		// Older source bundles still print a heading at the start of each build stage.
+		legacy := job.Progress != nil && stage.legacyHeading != "" && strings.HasPrefix(line, "==> "+stage.legacyHeading)
+		if !(marker && key == stage.key) && !legacy {
+			continue
+		}
+		if job.Progress == nil {
+			job.Progress = &Progress{Total: len(upgradeStages)}
+		}
+		if slices.Contains(job.Progress.Stages, stage.label) {
+			return false
+		}
+		job.Progress.Stages = append(job.Progress.Stages, stage.label)
+		return true
+	}
+	return false
+}
 
 func (m Manager) launch(startedAt string) error {
 	args := []string{"run-web-upgrade", "--home", m.Home, "--started-at", startedAt}
@@ -87,7 +143,7 @@ func (m Manager) Run(startedAt string) (err error) {
 
 	cmd := exec.Command(filepath.Join(m.Home, "rsm.sh"), "upgrade", path, "--home", m.Home, "--force")
 	cmd.Dir = m.Home
-	cmd.Env = append(os.Environ(), "RSM_NO_SYSTEM_PACKAGES=1", "RSM_VERBOSE=0", "RSM_ADDR=", "RSM_DIE_CODE=1", "NO_COLOR=1")
+	cmd.Env = append(os.Environ(), "RSM_NO_SYSTEM_PACKAGES=1", "RSM_VERBOSE=0", "RSM_ADDR=", "RSM_DIE_CODE=1", "NO_COLOR=1", "RSM_WEB_UPGRADE_PROGRESS=1")
 	output, err := cmd.StdoutPipe()
 	if err != nil {
 		return err
@@ -96,20 +152,17 @@ func (m Manager) Run(startedAt string) (err error) {
 	if err = cmd.Start(); err != nil {
 		return err
 	}
-	scanner := bufio.NewScanner(output)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if len(line) >= 10 && strings.HasPrefix(line, "==> [") && line[5] >= '1' && line[5] <= '8' && line[6:10] == "/8] " {
-			step := int(line[5] - '0')
-			if step > job.Step {
-				job.Step = step
-				_ = m.writeJob(job)
-			}
+	reader := bufio.NewReader(output)
+	longLine := false
+	for {
+		line, partial, readErr := reader.ReadLine()
+		if readErr != nil {
+			break
 		}
-	}
-	// Drain any remaining output when a dependency emits a line larger than the scanner limit.
-	if scanner.Err() != nil {
-		_, _ = io.Copy(io.Discard, output)
+		if !longLine && !partial && job.recordProgress(string(line)) {
+			_ = m.writeJob(job)
+		}
+		longLine = partial
 	}
 	return cmd.Wait()
 }

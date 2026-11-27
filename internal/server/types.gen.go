@@ -811,6 +811,8 @@ type SupportSegment struct {
 
 // UpgradeJob defines model for UpgradeJob.
 type UpgradeJob struct {
+	// Progress Upgrade stages in execution order. The last recorded stage is current until the job ends.
+	Progress  *UpgradeProgress `json:"progress,omitempty"`
 	Sha256    string           `json:"sha256"`
 	StartedAt *time.Time       `json:"startedAt,omitempty"`
 	Status    UpgradeJobStatus `json:"status"`
@@ -820,6 +822,12 @@ type UpgradeJob struct {
 
 // UpgradeJobStatus defines model for UpgradeJob.Status.
 type UpgradeJobStatus string
+
+// UpgradeProgress Upgrade stages in execution order. The last recorded stage is current until the job ends.
+type UpgradeProgress struct {
+	Stages []string `json:"stages"`
+	Total  int      `json:"total"`
+}
 
 // UpgradeState defines model for UpgradeState.
 type UpgradeState struct {

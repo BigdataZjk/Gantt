@@ -1220,6 +1220,22 @@ components:
         startedAt:
           type: string
           format: date-time
+        progress:
+          $ref: '#/components/schemas/UpgradeProgress'
+      additionalProperties: false
+    UpgradeProgress:
+      type: object
+      required: [total, stages]
+      description: Upgrade stages in execution order. The last recorded stage is current until the job ends.
+      properties:
+        total:
+          type: integer
+          minimum: 1
+        stages:
+          type: array
+          minItems: 1
+          items:
+            type: string
       additionalProperties: false
     StartUpgradeInput:
       type: object

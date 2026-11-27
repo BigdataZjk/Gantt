@@ -716,6 +716,12 @@ export interface components {
             step: number;
             /** Format: date-time */
             startedAt?: string;
+            progress?: components["schemas"]["UpgradeProgress"];
+        };
+        /** @description Upgrade stages in execution order. The last recorded stage is current until the job ends. */
+        UpgradeProgress: {
+            total: number;
+            stages: string[];
         };
         StartUpgradeInput: {
             sha256: string;

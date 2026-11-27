@@ -64,6 +64,7 @@ case "$VERSION" in
 esac
 info "构建版本: ${VERSION}（$(os_pretty) $(host_arch)）"
 
+upgrade_stage dependencies
 step "安装前端依赖（按 pnpm 锁文件）"
 _web="$RSM_ROOT/web"
 _need_install=0
@@ -82,13 +83,16 @@ else
   ok "前端依赖已就绪，复用锁文件对应的已安装依赖"
 fi
 
+upgrade_stage interfaces
 step "校验接口类型（变更时重新生成）"
 "$SCRIPT_DIR/generate.sh" --ensure || die "接口类型校验或生成失败"
 
+upgrade_stage frontend
 step "构建前端（pnpm build → web/dist）"
 ( cd "$_web" && run_logged "构建前端页面" "$RSM_PNPM_BIN" run build ) || die "前端构建失败（pnpm run build）"
 [ -f "$_web/dist/index.html" ] || die "前端构建产物缺少 web/dist/index.html"
 
+upgrade_stage backend
 step "编译 Go 程序（CGO + 内嵌前端，ldflags main.version=${VERSION}）"
 BIN="$OUT_DIR/rsm"
 ( cd "$RSM_ROOT" && CGO_ENABLED=1 CC="${CC:-cc}" run_logged "编译服务端程序" "$RSM_GO_BIN" build -trimpath -buildvcs=false \
@@ -97,6 +101,7 @@ BIN="$OUT_DIR/rsm"
 BIN_VERSION=$(binary_version "$BIN" 2>/dev/null || true)
 [ "$BIN_VERSION" = "$VERSION" ] || die "编译后程序版本不一致：期望 ${VERSION}，实际 ${BIN_VERSION:-未知}"
 
+upgrade_stage package
 step "解析数据库迁移版本（release schemaVersion）"
 SCHEMA_VERSION=0
 if [ -d "$RSM_ROOT/internal/store/migrations" ]; then

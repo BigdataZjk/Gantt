@@ -54,6 +54,12 @@ debug() { if [ "${RSM_DEBUG:-0}" = 1 ]; then log_file "[debug] $*"; printf '%sde
 
 progress_plan() { RSM_PROGRESS_TOTAL="$1"; RSM_PROGRESS_CURRENT=0; }
 
+upgrade_stage() {
+  if [ "${RSM_WEB_UPGRADE_PROGRESS:-0}" = 1 ]; then
+    printf 'RSM_UPGRADE_STAGE %s\n' "$1"
+  fi
+}
+
 init_task_log() {
   if [ "$#" -gt 0 ] || [ -z "${RSM_LOG_FILE:-}" ]; then
     RSM_LOG_FILE="${1:-${RSM_ROOT:-$PWD}/.cache/logs/tasks.log}"

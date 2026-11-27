@@ -9,7 +9,7 @@ const categories = [
   { key: "fixed", label: "修复" },
 ] as const;
 
-const dateFormatter = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
 const versionOrder = new Intl.Collator("en", { numeric: true });
 const releaseEntries = Object.entries(releaseNotes).sort(([a], [b]) => versionOrder.compare(b, a));
 const versionKeywordPattern = /^v?\d+(?:\.\d+)*\.?$/;
@@ -107,10 +107,6 @@ export function UpdatesPanel({ serverVersion, scrollRef }: { serverVersion?: str
                 const open = expansion[version] ?? (searching || version === latestVersion);
                 return (
                   <li key={version} className={styles.node} data-current={current || undefined}>
-                    <time className={styles.date} dateTime={note.date}>
-                      <span>{dateFormatter.format(new Date(note.date))}</span>
-                      <span className={styles.year}>{note.date.slice(0, 4)}</span>
-                    </time>
                     <details className={styles.card} open={open}>
                       <summary className={styles.header} onClick={(event) => {
                         event.preventDefault();
@@ -122,6 +118,7 @@ export function UpdatesPanel({ serverVersion, scrollRef }: { serverVersion?: str
                             {current ? <span className={styles.current}>当前版本</span> : null}
                           </span>
                           <span className={styles.noteTitle}>{note.title}</span>
+                          <time className={styles.date} dateTime={note.date}>{dateFormatter.format(new Date(note.date))}</time>
                           <ChevronDown className={styles.chevron} aria-hidden="true" />
                         </h4>
                       </summary>
