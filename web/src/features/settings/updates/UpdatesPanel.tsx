@@ -12,7 +12,7 @@ const categories = [
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
 const versionOrder = new Intl.Collator("en", { numeric: true });
 const releaseEntries = Object.entries(releaseNotes).sort(([a], [b]) => versionOrder.compare(b, a));
-const versionKeywordPattern = /^v?\d+\.\d+\.\d+$/;
+const versionKeywordPattern = /^v?\d+(?:\.\d+)*\.?$/;
 
 function normalizeSearch(text: string) {
   return text.normalize("NFKC").toLowerCase();
@@ -42,7 +42,7 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
   const visibleEntries = releaseEntries.filter(([version]) => !currentVersion || versionOrder.compare(version, currentVersion) <= 0);
   const latestVersion = visibleEntries[0]?.[0];
   const entries = visibleEntries.flatMap(([version, note]) => {
-    if (versionKeywords.some((keyword) => keyword !== version && keyword !== `v${version}`)) return [];
+    if (versionKeywords.some((keyword) => !`v${version}`.includes(keyword))) return [];
     const sections = categories.flatMap((category) => {
       const items = note[category.key];
       const changes = filterChanges ? items?.filter(({ title, description }) => {
