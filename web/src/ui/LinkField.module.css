@@ -4,7 +4,7 @@
 .wrap { display: flex; align-items: stretch; gap: 4px; min-width: 0; }
 .wrap input { flex: 1; width: 0; min-width: 0; }
 .actions { display: flex; flex: none; flex-direction: column; justify-content: center; gap: 4px; width: 22px; height: var(--rsm-control-height); }
-.actions button {
+.actions :is(button, a) {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -18,5 +18,5 @@
   background: transparent;
   color: var(--rsm-muted);
 }
-.actions button:not(:disabled):hover { background: var(--rsm-soft); color: var(--rsm-accent); }
+.actions :is(button:not(:disabled), a):hover { background: var(--rsm-soft); color: var(--rsm-accent); }
 .actions svg { width: 11px; height: 11px; stroke-width: 1.7; }

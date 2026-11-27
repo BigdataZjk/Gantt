@@ -103,6 +103,20 @@ test("需求编辑面板在缺少 Clipboard 写入 API 时仍能复制链接并�
   expect(await copied.boundingBox()).toEqual(bounds);
   await expect(editor.getByText("已复制", { exact: true })).toHaveCount(0);
   await expect(copy.locator("svg.lucide-copy")).toBeVisible({ timeout: 2000 });
+
+  const open = editor.getByRole("link", { name: "在新标签页打开PRD 链接", exact: true });
+  await expect(open).toHaveAttribute("rel", "noopener noreferrer");
+  await page.context().route("https://example.com/request?id=42", (route) => route.fulfill({ body: "PRD preview" }));
+  const nextTab = page.context().waitForEvent("page");
+  await open.click();
+  const prd = await nextTab;
+  await expect(prd).toHaveURL(link);
+  await expect(prd.getByText("PRD preview")).toBeVisible();
+  await prd.close();
+  await expect(editor.getByRole("textbox", { name: "PRD 链接", exact: true })).toHaveValue(link);
+  await editor.getByRole("textbox", { name: "PRD 链接", exact: true }).fill("不完整地址");
+  await expect(open).toHaveCount(0);
+  await expect(editor.getByRole("button", { name: "在新标签页打开PRD 链接", exact: true })).toBeDisabled();
 });
 
 test("甘特图按日期显示排期，未分配遵循日期范围，隐藏无排期的历史需求", async ({ page }) => {
@@ -561,8 +575,13 @@ test("游客可看需求详情和优先级，无法修改优先级", async ({ pa
     await name.click({ button: "right" });
     await expect(page.getByRole("menuitem")).toHaveText(["查看详情", "复制需求名", "复制PRD地址"]);
     await page.getByRole("menuitem", { name: "查看详情", exact: true }).click();
-    await expect(page.getByRole("dialog").locator("input, textarea, select")).toHaveCount(0);
-    await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();
+    const details = page.getByRole("dialog", { name: "需求详情", exact: true });
+    await expect(details.locator("input, textarea, select")).toHaveCount(0);
+    const prd = details.getByRole("link", { name: "https://example.com/prd", exact: true });
+    await expect(prd).toHaveAttribute("href", "https://example.com/prd");
+    await expect(prd).toHaveAttribute("target", "_blank");
+    await expect(prd).toHaveAccessibleDescription("在新标签页打开PRD 链接");
+    await details.getByRole("button", { name: "关闭", exact: true }).click();
     await name.dblclick();
     await expect(page.getByRole("heading", { name: "需求详情", exact: true })).toBeVisible();
     await page.getByRole("dialog").getByRole("button", { name: "关闭", exact: true }).click();

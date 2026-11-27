@@ -19,6 +19,9 @@
 .nameText { min-width: 0; font-weight: 500; }
 .name > [data-dict-field="status"] { flex: none; }
 .notes { white-space: pre-wrap; }
+.linkField { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.link { display: flex; align-items: baseline; gap: 6px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.link > svg { width: 12px; height: 12px; flex: none; align-self: flex-start; margin-top: 5px; }
 .schedule ol { display: grid; gap: 9px; }
 .schedule li { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding-left: 12px; border-left: 2px solid var(--rsm-border); }
 .schedule .hold { color: var(--rsm-muted); font-size: 12px; border-left-style: dashed; }

@@ -1,7 +1,9 @@
+import { ExternalLink } from "lucide-react";
 import type { State } from "../../../api/types";
 import { usePreferences } from "../../../app/preferences";
 import { addDays } from "../../../lib/dates";
 import { formatDays } from "../../../lib/format";
+import { validLink } from "../../../lib/validation";
 import { Drawer } from "../../../ui/Drawer";
 import { Button } from "../../../ui/Button";
 import { CopyLinkButton } from "../../../ui/CopyLinkButton";
@@ -99,10 +101,15 @@ export function RequestDetailsDrawer({ state, id, onClose }: { state: State; id:
 function ReadonlyLink({ label, value }: { label: string; value?: string | null }) {
   const text = (value || "").trim();
   if (!text) return <span style={{ color: "var(--rsm-muted)" }}>-</span>;
-  const valid = /^https?:\/\/[^\s]+$/i.test(text);
+  const openLabel = `在新标签页打开${label}`;
   return (
-    <span style={{ display: "flex", alignItems: "flex-start", gap: 8, minWidth: 0 }}>
-      {valid ? <a href={text} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{text}</a> : <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>{text}</span>}
+    <span className={styles.linkField}>
+      {validLink(text) ? (
+        <a className={styles.link} href={text} target="_blank" rel="noopener noreferrer" aria-description={openLabel} data-tooltip={openLabel}>
+          <span>{text}</span>
+          <ExternalLink aria-hidden="true" />
+        </a>
+      ) : <span className={styles.link}>{text}</span>}
       <CopyLinkButton label={label} value={text} />
     </span>
   );
