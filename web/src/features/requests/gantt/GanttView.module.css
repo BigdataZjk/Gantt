@@ -270,6 +270,7 @@
 .barHandle[data-edge="start"] { left: 0; }
 .barHandle[data-edge="end"] { right: 0; }
 .calendar tr:hover .barHandle, .rowSelected .barHandle { opacity: 1; }
+.segmentEndGuide ~ .barHandle[data-edge="end"]::before { content: none; }
 .markOnly {
   display: grid;
   place-items: center;

@@ -296,6 +296,10 @@ test("悬停分段排期时，右边界虚线随滚动和缩放对齐日期轴",
     await expect(guides).toHaveCount(1);
     await expect(guide).toHaveCSS("border-right-style", "dashed");
     await expect(guide).toHaveCSS("pointer-events", "none");
+    await expect(row.locator('[class*="deliveryGuide"]')).toHaveCount(0);
+    const endHandle = endBar.locator('[data-resize][data-edge="end"]');
+    await expect(endHandle).toHaveCSS("cursor", "ew-resize");
+    expect(await endHandle.evaluate((el) => getComputedStyle(el, "::before").content)).toBe("none");
     expect(await startBar.evaluate((el) => getComputedStyle(el, "::after").borderRightStyle)).toBe("dashed");
     const line = (await guide.boundingBox())!;
     const edge = (await endBar.boundingBox())!;

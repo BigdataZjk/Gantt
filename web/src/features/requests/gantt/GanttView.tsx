@@ -1345,7 +1345,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const hoveredFill = !archived && filled && hoveredPhase === phase;
         const showDayDivider = hoveredFill && date < fill.end && index + 1 < visibleDates.length;
         const showSegmentEndGuide = hoveredFill && date === fill.end;
-        const showDelivery = !archived && (rowSelected || hoveredPhase === phase) && date === delivery && phase >= 0;
+        const showDelivery = !archived && rowSelected && hoveredPhase < 0 && date === delivery && phase >= 0;
         const bar = phase >= 0;
         const working = isWorkday(date, calendar);
         const available = info.dayType !== "leave" && (working || info.overtime);
