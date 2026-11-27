@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import type { State } from "../src/api/types";
 import { request } from "../src/test/fixtures";
 
-test("P0 交付日期确认覆盖需求编辑、甘特拖拽、撤回和顺排随动", async ({ page }, testInfo) => {
+test("P0 排期确认覆盖休假、需求编辑、甘特拖拽、撤回和顺排随动", async ({ page }, testInfo) => {
   const readState = async () => await (await page.request.get("/api/state")).json() as State;
   const password = process.env.RSM_E2E_PASSWORD || "rsm-e2e-pass-123";
   const guest = await readState();
@@ -31,7 +31,7 @@ test("P0 交付日期确认覆盖需求编辑、甘特拖拽、撤回和顺排�
   }
   const [anchor, next, firstP0, secondP0] = cases.map((item) => state.requests.find((row) => row.name === item.name)!);
   const nameButton = (name: string) => page.getByRole("button", { name, exact: true });
-  const confirmation = page.getByRole("dialog", { name: "确认 P0 交付日期变更", exact: true });
+  const confirmation = page.getByRole("dialog", { name: /^确认 P0 .+变更$/ });
   const cancel = confirmation.getByRole("button", { name: "取消", exact: true });
   const confirm = confirmation.getByRole("button", { name: "确认并执行", exact: true });
   const assertDates = async (id: number, before: string, after: string) => {
@@ -44,6 +44,27 @@ test("P0 交付日期确认覆盖需求编辑、甘特拖拽、撤回和顺排�
     localStorage.setItem(`rsm.ui.v2:${id}`, JSON.stringify({ ganttRange: { start: "2026-11-16", end: "2026-12-10" } }));
   }, state.me!.id);
   await page.goto("/");
+  const leaveCell = page.locator(`tr[data-row="${firstP0!.id}"] td[data-date="2026-11-19"]`);
+  const leaveBar = leaveCell.locator("[data-bar]");
+  const beforeLeave = await readState();
+  for (const decision of [cancel, confirm]) {
+    await leaveBar.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "休假", exact: true }).click();
+    await expect(confirmation).toHaveAccessibleName("确认 P0 有效开发人天变更");
+    await expect(confirmation.locator("dd")).toHaveText(["3 人天", "2 人天"]);
+    await expect(cancel).toBeFocused();
+    expect((await readState()).requests).toEqual(beforeLeave.requests);
+    await decision.click();
+    await expect(confirmation).toBeHidden();
+  }
+  await expect(leaveCell.locator('[data-marker="leave"]')).toBeVisible();
+  await expect(leaveBar).toHaveAttribute("data-tooltip", /2人天/);
+  expect(await savedDelivery(firstP0!.id)).toBe(firstP0!.delivery);
+  await page.keyboard.press("Control+z");
+  await expect(confirmation.locator("dd")).toHaveText(["2 人天", "3 人天"]);
+  await confirm.click();
+  await expect(leaveCell.locator('[data-marker="leave"]')).toHaveCount(0);
+
   await nameButton(firstP0!.name).dblclick();
   const editor = page.getByRole("dialog", { name: "编辑需求", exact: true });
   await editor.getByRole("tab", { name: "开发信息", exact: true }).click();
@@ -52,6 +73,8 @@ test("P0 交付日期确认覆盖需求编辑、甘特拖拽、撤回和顺排�
   await days.fill("4");
   await save.click();
   await assertDates(firstP0!.id, "2026-11-20", "2026-11-23");
+  await expect(confirmation).toHaveAccessibleName("确认 P0 交付日期及有效开发人天变更");
+  await expect(confirmation.locator("dd")).toHaveText(["2026-11-20", "2026-11-23", "3 人天", "4 人天"]);
   await expect(cancel).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath("p0-delivery-editor.png"), animations: "disabled" });
   await page.keyboard.press("Escape");

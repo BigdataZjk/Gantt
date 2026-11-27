@@ -1024,6 +1024,10 @@ export interface components {
             before: string;
             /** @description 新交付日期，未排期时为空字符串。 */
             after: string;
+            /** @description 变更前的有效开发人天，只有有效开发人天变化时返回。 */
+            beforeDays?: number;
+            /** @description 变更后的有效开发人天，只有有效开发人天变化时返回。 */
+            afterDays?: number;
         };
         LoginInput: {
             username: string;
@@ -1088,7 +1092,7 @@ export interface components {
         };
     };
     responses: {
-        /** @description 本次操作涉及 P0 需求交付日期变更，待确认后保存。 */
+        /** @description 本次操作涉及 P0 需求的交付日期或有效开发人天变更，待确认后保存。 */
         P0DeliveryConfirmationRequired: {
             headers: {
                 [name: string]: unknown;
@@ -1099,7 +1103,7 @@ export interface components {
         };
     };
     parameters: {
-        /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+        /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
         P0DeliveryConfirmationHeader: string;
     };
     requestBodies: never;
@@ -1550,7 +1554,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path?: never;
@@ -1610,7 +1614,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path?: never;
@@ -1889,7 +1893,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path: {
@@ -1948,7 +1952,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path: {
@@ -2009,7 +2013,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path?: never;
@@ -2066,7 +2070,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path: {
@@ -2623,7 +2627,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path: {
@@ -2681,7 +2685,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                /** @description 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
+                /** @description 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。 */
                 "X-RSM-Confirm-P0-Delivery"?: components["parameters"]["P0DeliveryConfirmationHeader"];
             };
             path: {

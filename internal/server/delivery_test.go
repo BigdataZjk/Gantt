@@ -32,8 +32,12 @@ func (f *fixture) requireDeliveryConfirmation(method, path string, input any, wa
 		f.t.Fatalf("unexpected confirmation: %+v", response)
 	}
 	for index, got := range response.Confirmation.Changes {
-		if got.RequestId != want[index].RequestID || got.Name != want[index].Name || got.Before != want[index].Before || got.After != want[index].After {
-			f.t.Fatalf("unexpected delivery change: %+v, want %+v", got, want[index])
+		change := store.P0DeliveryChange{
+			RequestID: got.RequestId, Name: got.Name, Before: got.Before, After: got.After,
+			BeforeDays: got.BeforeDays, AfterDays: got.AfterDays,
+		}
+		if !reflect.DeepEqual(change, want[index]) {
+			f.t.Fatalf("unexpected schedule change: %+v, want %+v", got, want[index])
 		}
 	}
 	return http.Header{"X-RSM-Confirm-P0-Delivery": {response.Confirmation.Token}}
@@ -68,7 +72,7 @@ func TestP0DeliveryConfirmationBindsOperationAndRevision(t *testing.T) {
 	row = before.Requests[0]
 	row.Days, row.Delivery = 5, ""
 	input := map[string]any{"baseRevision": before.Revision, "request": row}
-	changes := []store.P0DeliveryChange{{RequestID: row.ID, Name: row.Name, Before: "2026-11-18", After: "2026-11-20"}}
+	changes := []store.P0DeliveryChange{{RequestID: row.ID, Name: row.Name, Before: "2026-11-18", After: "2026-11-20", BeforeDays: new(3), AfterDays: new(5)}}
 	header := f.requireDeliveryConfirmation("PUT", path, input, changes)
 	f.assertDeliveryPreviewDidNotSave(before)
 
@@ -96,8 +100,35 @@ func TestP0DeliveryConfirmationBindsOperationAndRevision(t *testing.T) {
 	row = confirmed.Requests[0]
 	row.Start, row.Delivery, row.Segments = "", "", nil
 	f.requireDeliveryConfirmation("PUT", path, map[string]any{"baseRevision": confirmed.Revision, "request": row},
-		[]store.P0DeliveryChange{{RequestID: row.ID, Name: row.Name, Before: "2026-11-20"}})
+		[]store.P0DeliveryChange{{RequestID: row.ID, Name: row.Name, Before: "2026-11-20", BeforeDays: new(5), AfterDays: new(0)}})
 	f.assertDeliveryPreviewDidNotSave(confirmed)
+}
+
+func TestP0LeaveConfirmsEffectiveDaysWithSameDates(t *testing.T) {
+	f := newFixture(t)
+	before := f.scheduledRequest("一日核心排期", "P0", "2026-11-16")
+	row := before.Requests[0]
+	path := fmt.Sprintf("/api/requests/%d", row.ID)
+	row.Days, row.Delivery = 1, row.Start
+	input := map[string]any{"baseRevision": before.Revision, "request": row}
+	header := f.requireDeliveryConfirmation("PUT", path, input, []store.P0DeliveryChange{{
+		RequestID: row.ID, Name: row.Name, Before: "2026-11-18", After: row.Start, BeforeDays: new(3), AfterDays: new(1),
+	}})
+	_, before = f.call("PUT", path, input, 200, true, header)
+	row = before.Requests[0]
+	row.Vacation = []string{"2026-11-17"}
+	_, before = f.call("PUT", path, map[string]any{"baseRevision": before.Revision, "request": row}, 200, true)
+	row = before.Requests[0]
+	row.Vacation = []string{"2026-11-16", "2026-11-17"}
+	input = map[string]any{"baseRevision": before.Revision, "request": row}
+	header = f.requireDeliveryConfirmation("PUT", path, input, []store.P0DeliveryChange{{
+		RequestID: row.ID, Name: row.Name, Before: row.Delivery, After: row.Delivery, BeforeDays: new(1), AfterDays: new(0),
+	}})
+	f.assertDeliveryPreviewDidNotSave(before)
+	_, saved := f.call("PUT", path, input, 200, true, header)
+	if got := saved.Requests[0]; got.Start != row.Start || got.Delivery != row.Delivery || !reflect.DeepEqual(got.Vacation, row.Vacation) {
+		t.Fatalf("confirmed leave did not preserve the original dates: %+v", got)
+	}
 }
 
 func TestP0DeliveryConfirmationCoversBatchRestoreAndUndo(t *testing.T) {
@@ -111,8 +142,8 @@ func TestP0DeliveryConfirmationCoversBatchRestoreAndUndo(t *testing.T) {
 	first.Priority, second.Priority = "P1", "P0"
 	input := map[string]any{"baseRevision": before.Revision, "requests": []requests.Request{second, first}, "operation": "sequence"}
 	changes := []store.P0DeliveryChange{
-		{RequestID: first.ID, Name: first.Name, Before: "2026-11-18", After: "2026-11-20"},
-		{RequestID: second.ID, Name: second.Name, Before: "2026-11-19", After: "2026-11-20"},
+		{RequestID: first.ID, Name: first.Name, Before: "2026-11-18", After: "2026-11-20", BeforeDays: new(3), AfterDays: new(5)},
+		{RequestID: second.ID, Name: second.Name, Before: "2026-11-19", After: "2026-11-20", BeforeDays: new(3), AfterDays: new(4)},
 	}
 	header := f.requireDeliveryConfirmation("POST", "/api/requests/batch", input, changes)
 	f.assertDeliveryPreviewDidNotSave(before)
@@ -126,6 +157,7 @@ func TestP0DeliveryConfirmationCoversBatchRestoreAndUndo(t *testing.T) {
 	reversed := append([]store.P0DeliveryChange(nil), changes...)
 	for index := range reversed {
 		reversed[index].Before, reversed[index].After = reversed[index].After, reversed[index].Before
+		reversed[index].BeforeDays, reversed[index].AfterDays = reversed[index].AfterDays, reversed[index].BeforeDays
 	}
 	header = f.requireDeliveryConfirmation("POST", restorePath, restoreInput, reversed)
 	f.assertDeliveryPreviewDidNotSave(after)

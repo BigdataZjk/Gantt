@@ -581,10 +581,16 @@ type P0DeliveryChange struct {
 	// After 新交付日期，未排期时为空字符串。
 	After string `json:"after"`
 
+	// AfterDays 变更后的有效开发人天，只有有效开发人天变化时返回。
+	AfterDays *int `json:"afterDays,omitempty"`
+
 	// Before 原交付日期，未排期时为空字符串。
-	Before    string `json:"before"`
-	Name      string `json:"name"`
-	RequestId int64  `json:"requestId"`
+	Before string `json:"before"`
+
+	// BeforeDays 变更前的有效开发人天，只有有效开发人天变化时返回。
+	BeforeDays *int   `json:"beforeDays,omitempty"`
+	Name       string `json:"name"`
+	RequestId  int64  `json:"requestId"`
 }
 
 // P0DeliveryConfirmation defines model for P0DeliveryConfirmation.
@@ -833,7 +839,7 @@ type PostApiCalendarImportJSONBody struct {
 
 // PostApiCalendarImportParams defines parameters for PostApiCalendarImport.
 type PostApiCalendarImportParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
@@ -845,7 +851,7 @@ type PostApiCalendarRefreshJSONBody struct {
 
 // PostApiCalendarRefreshParams defines parameters for PostApiCalendarRefresh.
 type PostApiCalendarRefreshParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
@@ -857,13 +863,13 @@ type GetEventsParams struct {
 
 // PostApiHistoryIdUndoParams defines parameters for PostApiHistoryIdUndo.
 type PostApiHistoryIdUndoParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // PostApiRequestsBatchParams defines parameters for PostApiRequestsBatch.
 type PostApiRequestsBatchParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
@@ -875,25 +881,25 @@ type ReverseRequestOperationJSONBody struct {
 
 // ReverseRequestOperationParams defines parameters for ReverseRequestOperation.
 type ReverseRequestOperationParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // DeleteApiRequestsIdParams defines parameters for DeleteApiRequestsId.
 type DeleteApiRequestsIdParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // PutApiRequestsIdParams defines parameters for PutApiRequestsId.
 type PutApiRequestsIdParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 
 // PostApiVersionsIdRestoreParams defines parameters for PostApiVersionsIdRestore.
 type PostApiVersionsIdRestoreParams struct {
-	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
+	// XRSMConfirmP0Delivery 用户核对受影响的 P0 交付日期和有效开发人天后，携带确认凭据重发同一请求。凭据绑定提交人、请求和数据修订。
 	XRSMConfirmP0Delivery *P0DeliveryConfirmationHeader `json:"X-RSM-Confirm-P0-Delivery,omitempty"`
 }
 

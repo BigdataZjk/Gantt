@@ -3,16 +3,19 @@ package store
 import (
 	"context"
 	"database/sql"
+	"slices"
 
 	"rsm/internal/requests"
 	"rsm/internal/schedule"
 )
 
 type P0DeliveryChange struct {
-	RequestID int64  `json:"requestId"`
-	Name      string `json:"name"`
-	Before    string `json:"before"`
-	After     string `json:"after"`
+	RequestID  int64  `json:"requestId"`
+	Name       string `json:"name"`
+	Before     string `json:"before"`
+	After      string `json:"after"`
+	BeforeDays *int   `json:"beforeDays,omitempty"`
+	AfterDays  *int   `json:"afterDays,omitempty"`
 }
 
 type P0DeliveryConfirmation struct {
@@ -20,7 +23,7 @@ type P0DeliveryConfirmation struct {
 	Changes []P0DeliveryChange `json:"changes"`
 }
 
-func (P0DeliveryConfirmation) Error() string { return "请确认 P0 需求的交付日期变更" }
+func (P0DeliveryConfirmation) Error() string { return "请确认 P0 需求的排期变更" }
 
 type p0DeliveryConfirmationKey struct{}
 type verifyP0DeliveryConfirmation func(revision int64, changes []P0DeliveryChange) error
@@ -29,39 +32,72 @@ func WithP0DeliveryConfirmation(ctx context.Context, verify func(int64, []P0Deli
 	return context.WithValue(ctx, p0DeliveryConfirmationKey{}, verifyP0DeliveryConfirmation(verify))
 }
 
-type requestDelivery struct {
+type requestSchedule struct {
 	priority string
-	date     string
+	plan     schedule.Plan
 }
 
-func readDeliveryDates(ctx context.Context, tx *sql.Tx, rows []requests.Request) (map[int64]requestDelivery, error) {
-	dates := make(map[int64]requestDelivery, len(rows))
-	resolve := deliveryDateResolver(ctx, tx)
+type requestScheduleSnapshot struct {
+	rows     map[int64]requestSchedule
+	calendar schedule.Calendar
+}
+
+func readRequestSchedules(ctx context.Context, tx *sql.Tx, rows []requests.Request) (requestScheduleSnapshot, error) {
+	previous := requestScheduleSnapshot{rows: make(map[int64]requestSchedule, len(rows))}
+	var hasSchedules bool
 	for _, row := range rows {
-		date, err := resolve(row)
-		if err != nil {
-			return nil, err
-		}
-		dates[row.ID] = requestDelivery{priority: row.Priority, date: date}
+		plan := requestPlan(row)
+		plan.Segments = slices.Clone(plan.Segments)
+		plan.Vacation = slices.Clone(plan.Vacation)
+		plan.Overtime = slices.Clone(plan.Overtime)
+		previous.rows[row.ID] = requestSchedule{priority: row.Priority, plan: plan}
+		hasSchedules = hasSchedules || hasScheduleDates(plan)
 	}
-	return dates, nil
+	if hasSchedules {
+		calendar, err := ReadCalendar(ctx, tx)
+		if err != nil {
+			return requestScheduleSnapshot{}, err
+		}
+		previous.calendar = calendar
+	}
+	return previous, nil
 }
 
-func checkP0DeliveryChanges(ctx context.Context, tx *sql.Tx, revision int64, before map[int64]requestDelivery, rows []requests.Request) error {
+func checkP0ScheduleChanges(ctx context.Context, tx *sql.Tx, revision int64, before requestScheduleSnapshot, rows []requests.Request) error {
 	var changes []P0DeliveryChange
-	resolve := deliveryDateResolver(ctx, tx)
+	var calendar schedule.Calendar
+	var loaded, sameCalendar bool
 	for _, row := range rows {
-		old, exists := before[row.ID]
+		old, exists := before.rows[row.ID]
 		if !exists || (old.priority != "P0" && row.Priority != "P0") {
 			continue
 		}
-		date, err := resolve(row)
-		if err != nil {
-			return err
+		plan := requestPlan(row)
+		if !hasScheduleDates(old.plan) && !hasScheduleDates(plan) {
+			continue
 		}
-		if old.date != date {
-			changes = append(changes, P0DeliveryChange{RequestID: row.ID, Name: row.Name, Before: old.date, After: date})
+		if !loaded {
+			var err error
+			calendar, err = ReadCalendar(ctx, tx)
+			if err != nil {
+				return err
+			}
+			loaded = true
+			sameCalendar = slices.Equal(calendar.RestDays, before.calendar.RestDays) && slices.Equal(calendar.WorkDays, before.calendar.WorkDays)
 		}
+		if sameCalendar && sameRequestPlan(old.plan, plan) {
+			continue
+		}
+		oldDate, oldDays := resolveScheduleImpact(old.plan, before.calendar)
+		newDate, newDays := resolveScheduleImpact(plan, calendar)
+		if oldDate == newDate && oldDays == newDays {
+			continue
+		}
+		change := P0DeliveryChange{RequestID: row.ID, Name: row.Name, Before: oldDate, After: newDate}
+		if oldDays != newDays {
+			change.BeforeDays, change.AfterDays = &oldDays, &newDays
+		}
+		changes = append(changes, change)
 	}
 	if len(changes) == 0 {
 		return nil
@@ -72,22 +108,26 @@ func checkP0DeliveryChanges(ctx context.Context, tx *sql.Tx, revision int64, bef
 	return P0DeliveryConfirmation{Changes: changes}
 }
 
-func deliveryDateResolver(ctx context.Context, tx *sql.Tx) func(requests.Request) (string, error) {
-	var calendar schedule.Calendar
-	loaded := false
-	return func(row requests.Request) (string, error) {
-		// 旧记录可能需要由开始日期和工作日历推算交付日期。
-		if !loaded && len(row.Segments) == 0 && row.Start != "" && !schedule.ValidDate(row.Delivery) {
-			var err error
-			calendar, err = ReadCalendar(ctx, tx)
-			if err != nil {
-				return "", err
-			}
-			loaded = true
-		}
-		return schedule.DeliveryOf(schedule.Plan{
-			Segments: row.Segments, Start: row.Start, Delivery: row.Delivery,
-			Days: row.Days, Vacation: row.Vacation, Overtime: row.Overtime,
-		}, calendar), nil
+func requestPlan(row requests.Request) schedule.Plan {
+	return schedule.Plan{
+		Segments: row.Segments, Start: row.Start, Delivery: row.Delivery,
+		Days: row.Days, Vacation: row.Vacation, Overtime: row.Overtime,
 	}
+}
+
+func hasScheduleDates(plan schedule.Plan) bool {
+	return plan.Start != "" || plan.Delivery != "" || len(plan.Segments) > 0
+}
+
+func sameRequestPlan(a, b schedule.Plan) bool {
+	return a.Start == b.Start && a.Delivery == b.Delivery && a.Days == b.Days &&
+		slices.Equal(a.Segments, b.Segments) && slices.Equal(a.Vacation, b.Vacation) && slices.Equal(a.Overtime, b.Overtime)
+}
+
+func resolveScheduleImpact(plan schedule.Plan, calendar schedule.Calendar) (string, int) {
+	plan.Delivery = schedule.DeliveryOf(plan, calendar)
+	if len(plan.Segments) == 0 {
+		plan.Segments = schedule.EffectiveSegments(plan)
+	}
+	return plan.Delivery, schedule.EffectiveDays(plan, calendar)
 }

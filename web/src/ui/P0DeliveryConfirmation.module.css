@@ -21,16 +21,16 @@
 .heading { display: flex; align-items: baseline; gap: 8px; }
 .heading strong { min-width: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 
-.dates {
+.values {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
 
-.dates > svg { width: 15px; height: 15px; color: var(--rsm-muted); }
-.date { margin: 0; padding: 6px 8px; border-radius: var(--rsm-radius-sm); background: var(--rsm-soft); }
-.date dt { color: var(--rsm-muted); font-size: 11px; }
-.date dd { margin: 1px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-.nextDate { background: var(--rsm-accent-soft); }
-.nextDate dd { color: var(--rsm-accent); font-weight: 600; }
+.values > svg { width: 15px; height: 15px; color: var(--rsm-muted); }
+.value { margin: 0; padding: 6px 8px; border-radius: var(--rsm-radius-sm); background: var(--rsm-soft); }
+.value dt { color: var(--rsm-muted); font-size: 11px; }
+.value dd { margin: 1px 0 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.nextValue { background: var(--rsm-accent-soft); }
+.nextValue dd { color: var(--rsm-accent); font-weight: 600; }

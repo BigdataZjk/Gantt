@@ -41,13 +41,17 @@ export function P0DeliveryConfirmationProvider({ children }: { children: ReactNo
 
 function P0DeliveryDialog({ confirmation, onDecision }: { confirmation: P0DeliveryConfirmation; onDecision: (approved: boolean) => void }) {
   const cancel = useRef<HTMLButtonElement>(null);
+  const fields = [
+    confirmation.changes.some((change) => change.before !== change.after) ? "交付日期" : "",
+    confirmation.changes.some((change) => change.beforeDays !== undefined) ? "有效开发人天" : "",
+  ].filter(Boolean).join("及");
   return (
     <Dialog
       open
       onOpenChange={(open) => { if (!open) onDecision(false); }}
       onOpenAutoFocus={(event) => { event.preventDefault(); cancel.current?.focus(); }}
-      title="确认 P0 交付日期变更"
-      caption={`本次操作将影响 ${confirmation.changes.length} 条 P0 需求的交付日期。`}
+      title={`确认 P0 ${fields}变更`}
+      caption={`本次操作涉及 ${confirmation.changes.length} 条 P0 需求。`}
       width={500}
       overlayClassName={styles.overlay}
       className={styles.dialog}
@@ -65,20 +69,35 @@ function P0DeliveryDialog({ confirmation, onDecision }: { confirmation: P0Delive
               <PriorityTag value="P0" />
               <strong>{change.name}</strong>
             </div>
-            <div className={styles.dates}>
-              <dl className={styles.date}>
-                <dt>原交付日期</dt>
-                <dd>{change.before ? <time dateTime={change.before}>{change.before}</time> : "未排期"}</dd>
-              </dl>
-              <ArrowRight aria-hidden="true" />
-              <dl className={`${styles.date} ${styles.nextDate}`}>
-                <dt>新交付日期</dt>
-                <dd>{change.after ? <time dateTime={change.after}>{change.after}</time> : "未排期"}</dd>
-              </dl>
-            </div>
+            {change.before !== change.after ? (
+              <ChangeValues
+                label="交付日期"
+                before={change.before ? <time dateTime={change.before}>{change.before}</time> : "未排期"}
+                after={change.after ? <time dateTime={change.after}>{change.after}</time> : "未排期"}
+              />
+            ) : null}
+            {change.beforeDays !== undefined && change.afterDays !== undefined ? (
+              <ChangeValues label="有效开发人天" before={`${change.beforeDays} 人天`} after={`${change.afterDays} 人天`} />
+            ) : null}
           </li>
         ))}
       </ul>
     </Dialog>
+  );
+}
+
+function ChangeValues({ label, before, after }: { label: string; before: ReactNode; after: ReactNode }) {
+  return (
+    <div className={styles.values}>
+      <dl className={styles.value}>
+        <dt>原{label}</dt>
+        <dd>{before}</dd>
+      </dl>
+      <ArrowRight aria-hidden="true" />
+      <dl className={`${styles.value} ${styles.nextValue}`}>
+        <dt>新{label}</dt>
+        <dd>{after}</dd>
+      </dl>
+    </div>
   );
 }
