@@ -71,6 +71,29 @@ it("按条目标题和说明过滤并展开命中的版本", async () => {
   expect(screen.queryByRole("region", { name: "V1" })).not.toBeInTheDocument();
 });
 
+it.each(["0.1.8", "V0.1.8"])("搜索 %s 时展开所属分组下的完整版本日志", async (version) => {
+  const user = userEvent.setup();
+  render(<UpdatesPanel serverVersion="0.1.8" />);
+  await user.type(screen.getByRole("searchbox", { name: "搜索更新日志" }), version);
+
+  const v0 = within(screen.getByRole("region", { name: "V0" }));
+  expect(v0.getByText("v0.1.8").closest("details")).toHaveAttribute("open");
+  expect(v0.getByText("一键下载备份")).toBeVisible();
+  expect(v0.getByText("多字段排序")).toBeVisible();
+  expect(v0.getByText("滚动修复")).toBeVisible();
+  expect(v0.queryByText("v0.1.2")).not.toBeInTheDocument();
+});
+
+it("同时输入版本号和关键词时仅筛选该版本中的条目", async () => {
+  const user = userEvent.setup();
+  render(<UpdatesPanel serverVersion="1.0.1" />);
+  await user.type(screen.getByRole("searchbox", { name: "搜索更新日志" }), "0.1.8 备份");
+
+  expect(screen.getByText("一键下载备份")).toBeVisible();
+  expect(screen.queryByText("多字段排序")).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: "V1" })).not.toBeInTheDocument();
+});
+
 it("无结果时显示状态，清空后恢复搜索前的展开状态", async () => {
   const user = userEvent.setup();
   render(<UpdatesPanel serverVersion="1.0.1" />);

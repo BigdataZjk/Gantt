@@ -12,6 +12,7 @@ const categories = [
 const dateFormatter = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric", timeZone: "Asia/Shanghai" });
 const versionOrder = new Intl.Collator("en", { numeric: true });
 const releaseEntries = Object.entries(releaseNotes).sort(([a], [b]) => versionOrder.compare(b, a));
+const versionKeywordPattern = /^v?\d+\.\d+\.\d+$/;
 
 function normalizeSearch(text: string) {
   return text.normalize("NFKC").toLowerCase();
@@ -24,6 +25,9 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
   const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const keywords = normalizeSearch(query).trim().split(/\s+/).filter(Boolean);
+  const versionKeywords = keywords.filter((keyword) => versionKeywordPattern.test(keyword));
+  const changeKeywords = keywords.filter((keyword) => !versionKeywordPattern.test(keyword));
+  const filterChanges = changeKeywords.length > 0;
   const searching = keywords.length > 0;
   const expansion = searching ? searchExpansion : historyExpansion;
   const setExpansion = searching ? setSearchExpansion : setHistoryExpansion;
@@ -38,15 +42,16 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
   const visibleEntries = releaseEntries.filter(([version]) => !currentVersion || versionOrder.compare(version, currentVersion) <= 0);
   const latestVersion = visibleEntries[0]?.[0];
   const entries = visibleEntries.flatMap(([version, note]) => {
+    if (versionKeywords.some((keyword) => keyword !== version && keyword !== `v${version}`)) return [];
     const sections = categories.flatMap((category) => {
       const items = note[category.key];
-      const changes = searching ? items?.filter(({ title, description }) => {
+      const changes = filterChanges ? items?.filter(({ title, description }) => {
         const text = normalizeSearch(`${title} ${description}`);
-        return keywords.every((keyword) => text.includes(keyword));
+        return changeKeywords.every((keyword) => text.includes(keyword));
       }) : items;
       return changes?.length ? [{ ...category, changes }] : [];
     });
-    return searching && !sections.length ? [] : [{ version, note, sections }];
+    return filterChanges && !sections.length ? [] : [{ version, note, sections }];
   });
   const groups = new Map<string, typeof entries>();
   for (const entry of entries) {
