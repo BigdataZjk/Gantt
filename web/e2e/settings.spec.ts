@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import type { State } from "../src/api/types";
+import type { State, UpgradeJob, UpgradeState } from "../src/api/types";
 import { request as makeRequest } from "../src/test/fixtures";
 
 const password = process.env.RSM_E2E_PASSWORD || "rsm-e2e-pass-123";
@@ -60,6 +60,84 @@ test("系统维护合并三个区块，超管可下载备份，游客可查看�
   await updates.getByRole("searchbox", { name: "搜索更新日志" }).fill("0.1.7");
   await expect(updates.getByRole("heading", { name: "V0", exact: true })).toBeVisible();
   await expect(updates.getByText("v0.1.7", { exact: true })).toBeVisible();
+});
+
+test("网页升级重连时保留当前页和进度，完成后只刷新一次", async ({ page }) => {
+  await login(page);
+  const staged: UpgradeJob = { version: "0.1.8", sha256: "a".repeat(64), status: "ready", step: 0 };
+  const started: UpgradeJob = { ...staged, status: "starting", startedAt: "2026-11-27T10:00:00Z" };
+  const stages = ["校验并解压源码包", "构建前端页面", "停止旧服务", "检查服务健康状态", "保存部署结果"];
+  let update: UpgradeState = { currentVersion: staged.version, maxSourceBytes: 16 * 1024 ** 2, available: true };
+  let disconnected = false;
+  let navigationCount = 0;
+  let polls = 0;
+  page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) navigationCount += 1; });
+  await page.route("**/api/state", (route) => disconnected ? route.abort("connectionrefused") : route.continue());
+  await page.route("**/api/upgrade", (route) => {
+    polls += 1;
+    return disconnected ? route.abort("connectionrefused") : route.fulfill({ json: update });
+  });
+  await page.route("**/api/upgrade/source", (route) => {
+    update = { ...update, job: staged };
+    return route.fulfill({ json: update });
+  });
+  await page.route("**/api/upgrade/apply", (route) => {
+    expect(route.request().postDataJSON()).toEqual({ sha256: staged.sha256 });
+    update = { ...update, job: started };
+    return route.fulfill({ status: 202, json: update });
+  });
+
+  const tab = page.getByRole("tab", { name: "系统维护", exact: true });
+  await tab.click();
+  const panel = page.getByRole("region", { name: "上传源码并更新", exact: true });
+  await expect(panel.getByRole("button", { name: "选择源码 ZIP" })).toBeEnabled();
+  await panel.getByLabel("源码 ZIP 文件").setInputFiles({ name: "rsm-source-0.1.8.zip", mimeType: "application/zip", buffer: Buffer.from("fixture") });
+  await page.getByRole("dialog", { name: "确认同版本覆盖更新" }).getByRole("button", { name: "开始更新" }).click();
+  const progress = panel.getByRole("progressbar", { name: "升级进度" });
+  await expect(progress).toHaveAttribute("aria-valuenow", "0");
+  const running: UpgradeJob = { ...started, status: "running", step: 7, progress: { total: stages.length, stages: stages.slice(0, 3) } };
+  update = { ...update, job: running };
+  await expect(progress).toHaveAttribute("aria-valuenow", "2");
+  await panel.getByText("升级步骤", { exact: true }).click();
+  const steps = panel.getByRole("list", { name: "升级步骤" });
+  const progressElement = await progress.elementHandle();
+  const scroll = page.locator('[data-scroll-container="system-maintenance"]');
+  const scrollPosition = await scroll.evaluate((element) => {
+    element.scrollTop = 25;
+    return element.scrollTop;
+  });
+  const scrolledBounds = await progress.boundingBox();
+  expect(scrollPosition).toBeGreaterThan(0);
+
+  disconnected = true;
+  const stateFailed = page.waitForEvent("requestfailed", (request) => new URL(request.url()).pathname === "/api/state");
+  await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
+  await stateFailed;
+  await expect(panel.getByText("正在重新连接服务… · 上次记录 停止旧服务", { exact: true })).toBeVisible();
+  await expect(progress).toHaveAttribute("aria-valuenow", "2");
+  expect(await progressElement!.evaluate((element) => element.isConnected)).toBe(true);
+  expect(await progress.boundingBox()).toEqual(scrolledBounds);
+  expect(await scroll.evaluate((element) => element.scrollTop)).toBe(scrollPosition);
+  await expect(steps).toBeVisible();
+  expect(navigationCount).toBe(0);
+
+  const finalizing: UpgradeJob = { ...running, step: 8, progress: { total: stages.length, stages } };
+  update = { ...update, job: finalizing };
+  disconnected = false;
+  await expect(panel.getByText("正在保存部署结果", { exact: true })).toBeVisible();
+  await expect(progress).toHaveAttribute("aria-valuenow", String(stages.length - 1));
+  await expect(steps).toBeVisible();
+  expect(navigationCount).toBe(0);
+
+  const reloaded = page.waitForEvent("framenavigated", (frame) => frame === page.mainFrame());
+  update = { ...update, job: { ...finalizing, status: "succeeded" } };
+  await expect(progress).toHaveAttribute("aria-valuenow", String(stages.length));
+  await reloaded;
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await expect(panel.getByText("已完成更新 · v0.1.8", { exact: true })).toBeVisible();
+  const pollsAfterReload = polls;
+  await expect.poll(() => polls, { timeout: 8000 }).toBeGreaterThan(pollsAfterReload);
+  expect(navigationCount).toBe(1);
 });
 
 test("字段管理新增删除及名称合并与刷新、归档数据一致", async ({ page }) => {

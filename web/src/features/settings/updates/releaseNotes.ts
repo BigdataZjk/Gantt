@@ -26,7 +26,7 @@ export const releaseNotes: Record<string, ReleaseNote> = {
       { title: "需求链接", description: "编辑和预览面板可在新标签页打开 PRD、望岳工单和 BRD 链接。" },
     ],
     fixed: [
-      { title: "网页升级进度", description: "按实际阶段显示前端构建、服务端编译、备份、重启和健康检查。服务重连后可查看完整步骤。" },
+      { title: "网页升级进度", description: "按实际阶段显示前端构建、服务端编译、备份、重启和健康检查。重连时保留上次进度，升级成功后自动刷新当前页一次。" },
       { title: "甘特图右键拖动预览", description: "目标与原排期重叠时，也能看清目标的填充和起止边界。" },
       { title: "悬停提示", description: "提示气泡根据可用宽度展示文本，空间充足时可单行显示。" },
     ],

@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, CheckCircle2, ChevronDown, CircleAlert, FileUp, LoaderCircle, RefreshCw } from "lucide-react";
+import { Check, CheckCircle2, ChevronDown, CircleAlert, FileUp, LoaderCircle } from "lucide-react";
 import { api, ApiError } from "../../../api/client";
 import type { UpgradeJob, UpgradeState } from "../../../api/types";
 import { Button } from "../../../ui/Button";
@@ -23,30 +23,37 @@ function isActive(job?: UpgradeJob) {
   return job?.status === "starting" || job?.status === "running";
 }
 
-function UpgradeProgress({ job, disconnected }: { job: UpgradeJob; disconnected: boolean }) {
+function UpgradeProgress({ job, connectionStatus }: { job: UpgradeJob; connectionStatus: string }) {
   if (job.status === "ready") return null;
   const { stages, total } = job.progress ?? { stages: STEPS.slice(0, job.step), total: STEPS.length };
   const active = isActive(job);
   const failed = job.status === "failed";
-  const completed = job.status === "succeeded" ? stages.length : Math.max(0, stages.length - 1);
+  const succeeded = job.status === "succeeded";
+  const completed = succeeded ? total : Math.max(0, stages.length - 1);
   const current = stages.at(-1);
   const countLabel = `已完成 ${completed}/${total} 步`;
-  const stageLabel = current ? `${disconnected ? "上次记录 · " : "正在"}${current}` : "正在启动升级任务…";
+  let stageLabel = current ? `正在${current}` : "正在启动升级任务…";
+  if (connectionStatus) stageLabel = current ? `${connectionStatus} · 上次记录 ${current}` : connectionStatus;
+  if (failed) stageLabel = current ? `「${current}」阶段未完成，可查看服务器部署日志` : "升级任务启动失败，可查看服务器部署日志";
+  if (succeeded) stageLabel = "新版本已通过健康检查";
 
   return (
     <>
-      {active ? (
-        <>
-          <progress className={styles.upgradeProgress} value={completed} max={total} aria-label="升级进度" aria-valuetext={countLabel} />
-          <div className={styles.upgradeStageLine} role="status">
-            <span>{stageLabel}</span>
-            <span className={styles.caption}>{countLabel}</span>
-          </div>
-        </>
-      ) : null}
-      {failed ? (
-        <p className={styles.caption}>{current ? `「${current}」阶段未完成。` : "升级任务启动失败。"}可查看服务器部署日志。</p>
-      ) : null}
+      <div
+        className={styles.upgradeProgress}
+        role="progressbar"
+        aria-label="升级进度"
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={completed}
+        aria-valuetext={countLabel}
+      >
+        <span aria-hidden="true" style={{ transform: `scaleX(${completed / total})` }} />
+      </div>
+      <div className={styles.upgradeStageLine} role="status">
+        <span title={stageLabel}>{stageLabel}</span>
+        <span className={styles.caption}>{countLabel}</span>
+      </div>
       {job.progress ? (
         <details className={styles.upgradeDetails}>
           <summary><ChevronDown aria-hidden="true" />升级步骤</summary>
@@ -70,6 +77,7 @@ function UpgradeProgress({ job, disconnected }: { job: UpgradeJob; disconnected:
 
 export function UpgradePanel() {
   const fileInput = useRef<HTMLInputElement>(null);
+  const watchedJob = useRef<string | undefined>(undefined);
   const client = useQueryClient();
   const [action, setAction] = useState<"upload" | "start" | null>(null);
   const [confirmation, setConfirmation] = useState<UpgradeState | null>(null);
@@ -85,10 +93,28 @@ export function UpgradePanel() {
   const data = status.data;
   const job = data?.job;
   const active = isActive(job);
+  const startedAt = job?.startedAt;
+  const canReload = status.isSuccess && data?.available && job?.status === "succeeded" && data.currentVersion === job.version;
+  const connectionStatus = status.isError
+    ? status.error instanceof ApiError && [401, 403].includes(status.error.status)
+      ? status.error.message
+      : "正在重新连接服务…"
+    : "";
   const canUpload = data?.available && !action && !active && !status.isError;
   const target = confirmation?.job;
   const canConfirm = canUpload && job?.status === "ready" &&
     target?.sha256 === job.sha256 && confirmation?.currentVersion === data?.currentVersion;
+
+  useEffect(() => {
+    if (active) watchedJob.current = startedAt;
+    if (!canReload || !startedAt || watchedJob.current !== startedAt) return;
+
+    const timer = window.setTimeout(() => {
+      watchedJob.current = undefined;
+      window.location.reload();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [active, canReload, startedAt]);
 
   const submit = async (kind: "upload" | "start", perform: () => Promise<UpgradeState>) => {
     setAction(kind);
@@ -96,6 +122,7 @@ export function UpgradePanel() {
     await client.cancelQueries({ queryKey: UPGRADE_KEY });
     try {
       const next = await perform();
+      if (kind === "start") watchedJob.current = next.job?.startedAt;
       client.setQueryData(UPGRADE_KEY, next);
       if (kind === "upload") setConfirmation(next);
     } catch (reason) {
@@ -149,15 +176,9 @@ export function UpgradePanel() {
           </Button>
         </div>
 
-        {data && !data.available ? <p className={styles.caption}>网页升级需要通过 rsm.sh 启动已安装的实例。</p> : null}
+        {data && !data.available && !active ? <p className={styles.caption}>网页升级需要通过 rsm.sh 启动已安装的实例。</p> : null}
         {error ? <p className={styles.uploadError} role="alert">{error}</p> : null}
-        {status.isError ? (
-          <p className={styles.caption} role="status">
-            {status.error instanceof ApiError && [401, 403].includes(status.error.status)
-              ? status.error.message
-              : active ? "正在重新连接服务，恢复后将补齐升级步骤。" : "正在重新连接服务…"}
-          </p>
-        ) : null}
+        {connectionStatus && !active ? <p className={styles.caption} role="status">{connectionStatus}</p> : null}
         {job ? (
           <div className={styles.upgradeStatus} data-status={job.status}>
             <div className={styles.upgradeStatusLine}>
@@ -172,11 +193,8 @@ export function UpgradePanel() {
                   {action === "start" ? "正在启动…" : "核对并安装"}
                 </Button>
               ) : null}
-              {job.status === "succeeded" ? (
-                <Button size="sm" onClick={() => location.reload()}><RefreshCw aria-hidden="true" />刷新页面</Button>
-              ) : null}
             </div>
-            <UpgradeProgress key={job.startedAt} job={job} disconnected={status.isError} />
+            <UpgradeProgress key={startedAt} job={job} connectionStatus={active ? connectionStatus : ""} />
           </div>
         ) : null}
       </section>
