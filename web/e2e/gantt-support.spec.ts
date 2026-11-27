@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { ApiRequest, State } from "../src/api/types";
 import { request, users } from "../src/test/fixtures";
 
-const target = request({ id: 2, name: "跨组指标核对", developer: "colleague", priority: "P0" });
+const target = request({ id: 2, name: "跨组指标核对及实时数据看板接入和历史明细口径校验需求", developer: "colleague", priority: "P0" });
 
 interface GanttFixtures {
   source?: Partial<ApiRequest>;
@@ -152,7 +152,13 @@ test("可从筛选之外选择未归档需求，补位能拉伸、移动、取�
   expect(supportBox.y).toBe(scheduledBox.y);
   await expectLegendAppearance(page, start);
   await start.hover();
-  await expect(page.getByRole("tooltip")).toHaveText(`补位 · ${target.name}`);
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toHaveText(`补位 · ${target.name}`);
+  expect(await tooltip.evaluate((element) => {
+    const text = document.createRange();
+    text.selectNodeContents(element);
+    return text.getClientRects().length;
+  })).toBe(1);
 
   const handle = (await start.locator('[data-edge="end"]').boundingBox())!;
   const tuesday = (await cell("2026-11-24").boundingBox())!;

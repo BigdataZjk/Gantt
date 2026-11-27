@@ -220,7 +220,8 @@ for (const theme of ["light", "dark"] as const) {
   });
 }
 
-test("长提示在视窗右下角向上避让，并保持靠近目标", async ({ page }) => {
+test("长提示在窄屏按可用宽度折行，在右下角向上避让", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
   await openSession(page, "member");
   const message = "需求开始与结束时间、开发人与当前状态的说明。".repeat(10);
   await page.evaluate((text) => {
@@ -245,6 +246,7 @@ test("长提示在视窗右下角向上避让，并保持靠近目标", async ({
   expect(bubble.x + bubble.width).toBeLessThanOrEqual(viewport.width - 8);
   expect(bubble.y + bubble.height).toBeLessThanOrEqual(anchor.y + anchor.height / 2);
   expect(anchor.y - bubble.y - bubble.height).toBeLessThanOrEqual(20);
-  await page.mouse.move(500, 300);
+  expect(await tooltip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  await page.mouse.move(viewport.width / 2, viewport.height / 2);
   await expect(tooltip).toHaveCount(0);
 });
