@@ -352,6 +352,7 @@ EOF
   case "$expected" in
     installed) [ "$status" = 0 ] && [ -f "$fixture/installed" ] ;;
     blocked) [ "$status" != 0 ] && [ ! -f "$fixture/installed" ] ;;
+    untouched) [ "$status" != 0 ] && [ ! -f "$fixture/calls" ] ;;
   esac
 )
 apt_case new installed || fail 'safe installation of missing Debian packages failed'
@@ -366,6 +367,8 @@ apt_case refresh-upgrade blocked || fail 'package index refresh bypassed the exi
 pass 'refreshed Debian package plan still blocks dependency upgrades'
 apt_case unavailable blocked || fail 'Debian packages installed without a valid simulation'
 pass 'unresolved Debian package plans never proceed to installation'
+RSM_NO_SYSTEM_PACKAGES=1 apt_case web untouched || fail 'web upgrade invoked the system package manager'
+pass 'web upgrade leaves the system package manager untouched'
 
 . "$RSM_TEST_ROOT/scripts/lib/instance.sh"
 RSM_ROOT="$RSM_TEST_TMP/source root with space"

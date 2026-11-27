@@ -14,6 +14,7 @@ export const releaseNotes: Record<string, ReleaseNote> = {
     title: "备份下载与排期保护",
     added: [
       { title: "一键下载备份", description: "超级管理员可在设置的「数据备份」中生成并下载经过校验的 ZIP 备份。" },
+      { title: "网页上传升级", description: "超级管理员可在「系统升级」上传已签名的源码 ZIP，确认版本后更新，页面显示进度和结果。" },
     ],
     improved: [
       { title: "归档排期保护", description: "归档需求的线段淡化显示，开发人、排期和开发人天只读，行序可在同组拖动调整。" },

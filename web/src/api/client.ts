@@ -1,4 +1,4 @@
-import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogDetail, LogManagement, LogPolicy, P0DeliveryConfirmation, Preferences, ScheduleOperation, State, UserPatch } from "./types";
+import type { ApiRequest, Calendar, Domain, GanttOrderInput, LogCleanupPreview, LogCleanupResponse, LogDetail, LogManagement, LogPolicy, P0DeliveryConfirmation, Preferences, ScheduleOperation, State, UpgradeState, UserPatch } from "./types";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -110,6 +110,12 @@ export const api = {
     if (!blob.size) throw new Error("备份文件为空，请重试");
     return { blob, filename, createdAt, revision };
   },
+  upgradeStatus: (signal?: AbortSignal): Promise<UpgradeState> =>
+    send<UpgradeState>("/api/upgrade", "GET", undefined, { signal }),
+  uploadUpgradeSource: (file: File): Promise<UpgradeState> =>
+    send<UpgradeState>("/api/upgrade/source", "POST", undefined, { headers: { "Content-Type": "application/zip" }, body: file }),
+  applyUpgrade: (sha256: string): Promise<UpgradeState> =>
+    send<UpgradeState>("/api/upgrade/apply", "POST", { sha256 }),
   uploadAvatar: async (file: File): Promise<State> => {
     const response = await fetch("/api/avatar", {
       method: "POST",

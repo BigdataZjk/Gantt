@@ -17,6 +17,7 @@ import (
 
 	"rsm/internal/server"
 	"rsm/internal/store"
+	"rsm/internal/upgrade"
 	webassets "rsm/web"
 )
 
@@ -53,6 +54,7 @@ func run() error {
 	addr := flags.String("addr", os.Getenv("RSM_ADDR"), "监听地址，默认0.0.0.0:1111")
 	output := flags.String("output", "", "备份输出路径")
 	input := flags.String("input", "", "备份输入路径")
+	startedAt := flags.String("started-at", "", "升级任务开始时间")
 	if e := flags.Parse(args); e != nil {
 		return e
 	}
@@ -65,6 +67,8 @@ func run() error {
 	}
 	*home = absolute
 	switch command {
+	case "run-web-upgrade":
+		return (upgrade.Manager{Home: *home}).Run(*startedAt)
 	case "verify-backup":
 		if *input == "" {
 			return errors.New("需要 --input 备份文件")

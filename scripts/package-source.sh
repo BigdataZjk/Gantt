@@ -30,6 +30,14 @@ TARGET="$OUT_DIR/rsm-source-$VERSION.zip"
 TEMP_ARCHIVE=$(mktemp "$OUT_DIR/.rsm-source-$VERSION.XXXXXX")
 trap 'rm -f "$TEMP_ARCHIVE"' EXIT
 git -C "$RSM_ROOT" archive --format=zip --prefix=rsm/ --output="$TEMP_ARCHIVE" HEAD || die "源码打包失败"
+SIGNING_KEY="${RSM_RELEASE_SIGNING_KEY:-${XDG_CONFIG_HOME:-$HOME/.config}/rsm/release-signing-key.pem}"
+if [ -n "${RSM_RELEASE_SIGNING_KEY:-}" ] || [ -f "$SIGNING_KEY" ]; then
+  SIGN_GO="$RSM_ROOT/.tools/go/bin/go"
+  if [ ! -x "$SIGN_GO" ]; then SIGN_GO=$(command -v go) || die "签名需要 Go"; fi
+  ( cd "$RSM_ROOT" && "$SIGN_GO" run ./cmd/rsm-sign-source "$TEMP_ARCHIVE" "$SIGNING_KEY" ) || die "源码包签名失败"
+else
+  info "未配置发布签名密钥，源码包可用于命令行部署"
+fi
 mv -f "$TEMP_ARCHIVE" "$TARGET" || die "无法保存源码包"
 ok "RSM v$VERSION 源码包已保存: $TARGET"
 printf 'SHA256: %s\n' "$(sha256_file "$TARGET")"

@@ -362,6 +362,10 @@ apt_install_missing() {
 }
 
 pkg_install() {
+  if [ "${RSM_NO_SYSTEM_PACKAGES:-0}" = 1 ]; then
+    warn "网页升级需要服务器已安装系统依赖: $*"
+    return 1
+  fi
   _pi_pkgs="$*"
   _pi_pm=$(pkg_manager)
   [ -n "$_pi_pm" ] || return 1
@@ -496,6 +500,9 @@ ensure_c_compiler() {
     export_cgo_env
     debug "C 编译器: $CC ${SDKROOT:+(SDKROOT=$SDKROOT)}"
     return 0
+  fi
+  if [ "${RSM_NO_SYSTEM_PACKAGES:-0}" = 1 ]; then
+    die "网页升级需要服务器已安装可用的 C 编译器"
   fi
   case "$(host_os)" in
     darwin)

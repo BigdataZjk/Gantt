@@ -392,6 +392,74 @@ paths:
           description: 已有备份正在生成或下载
         '500':
           description: 备份生成或校验失败
+  /api/upgrade:
+    get:
+      operationId: getUpgradeStatus
+      summary: 超级管理员查看实例升级状态
+      responses:
+        '200':
+          description: 当前版本及最近一次升级任务
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeState'
+        '401':
+          description: 未登录
+        '403':
+          description: 仅超级管理员可查看
+  /api/upgrade/source:
+    post:
+      operationId: stageUpgradeSource
+      summary: 超级管理员上传并校验源码 ZIP
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: 签名和版本通过校验，等待确认
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeState'
+        '400':
+          description: 实例不支持网页升级、源码包或签名无效、版本低于当前版本
+        '401':
+          description: 未登录
+        '403':
+          description: 仅超级管理员可上传
+        '409':
+          description: 已有升级操作进行中
+        '413':
+          description: 源码 ZIP 超过上传大小限制
+  /api/upgrade/apply:
+    post:
+      operationId: applyUpgradeSource
+      summary: 超级管理员确认安装已校验的源码 ZIP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartUpgradeInput'
+      responses:
+        '202':
+          description: 独立升级任务已启动
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpgradeState'
+        '400':
+          description: 请求无效或实例不支持网页升级
+        '401':
+          description: 未登录
+        '403':
+          description: 仅超级管理员可确认
+        '409':
+          description: 文件已变更或已有升级操作进行中
   /api/requests:
     post:
       operationId: postApiRequests
@@ -1121,6 +1189,46 @@ components:
           schema:
             $ref: '#/components/schemas/P0DeliveryConfirmationError'
   schemas:
+    UpgradeState:
+      type: object
+      required: [currentVersion, available, maxSourceBytes]
+      properties:
+        currentVersion:
+          type: string
+        available:
+          type: boolean
+        maxSourceBytes:
+          type: integer
+        job:
+          $ref: '#/components/schemas/UpgradeJob'
+      additionalProperties: false
+    UpgradeJob:
+      type: object
+      required: [version, sha256, status, step]
+      properties:
+        version:
+          type: string
+        sha256:
+          type: string
+        status:
+          type: string
+          enum: [ready, starting, running, succeeded, failed]
+        step:
+          type: integer
+          minimum: 0
+          maximum: 8
+        startedAt:
+          type: string
+          format: date-time
+      additionalProperties: false
+    StartUpgradeInput:
+      type: object
+      required: [sha256]
+      properties:
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+      additionalProperties: false
     Segment:
       type: object
       required:

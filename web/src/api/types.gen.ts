@@ -251,6 +251,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 超级管理员查看实例升级状态 */
+        get: operations["getUpgradeStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/upgrade/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 超级管理员上传并校验源码 ZIP */
+        post: operations["stageUpgradeSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/upgrade/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 超级管理员确认安装已校验的源码 ZIP */
+        post: operations["applyUpgradeSource"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests": {
         parameters: {
             query?: never;
@@ -651,6 +702,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpgradeState: {
+            currentVersion: string;
+            available: boolean;
+            maxSourceBytes: number;
+            job?: components["schemas"]["UpgradeJob"];
+        };
+        UpgradeJob: {
+            version: string;
+            sha256: string;
+            /** @enum {string} */
+            status: "ready" | "starting" | "running" | "succeeded" | "failed";
+            step: number;
+            /** Format: date-time */
+            startedAt?: string;
+        };
+        StartUpgradeInput: {
+            sha256: string;
+        };
         Segment: {
             start: string;
             end: string;
@@ -1829,6 +1898,151 @@ export interface operations {
             };
             /** @description 备份生成或校验失败 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getUpgradeStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前版本及最近一次升级任务 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpgradeState"];
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 仅超级管理员可查看 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    stageUpgradeSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/zip": string;
+            };
+        };
+        responses: {
+            /** @description 签名和版本通过校验，等待确认 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpgradeState"];
+                };
+            };
+            /** @description 实例不支持网页升级、源码包或签名无效、版本低于当前版本 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 仅超级管理员可上传 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 已有升级操作进行中 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 源码 ZIP 超过上传大小限制 */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    applyUpgradeSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartUpgradeInput"];
+            };
+        };
+        responses: {
+            /** @description 独立升级任务已启动 */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpgradeState"];
+                };
+            };
+            /** @description 请求无效或实例不支持网页升级 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 仅超级管理员可确认 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 文件已变更或已有升级操作进行中 */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

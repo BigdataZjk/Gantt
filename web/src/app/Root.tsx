@@ -53,7 +53,7 @@ export function Root() {
     );
   }
 
-  if (stateQuery.isError || !stateQuery.data) {
+  if (!stateQuery.data) {
     return (
       <div className={styles.fatal}>
         <div className={styles.fatalCard}>
