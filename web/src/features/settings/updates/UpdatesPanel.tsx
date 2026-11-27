@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
 import { ChevronDown, Search, X } from "lucide-react";
 import { releaseNotes } from "./releaseNotes";
 import styles from "./UpdatesPanel.module.css";
@@ -18,12 +18,12 @@ function normalizeSearch(text: string) {
   return text.normalize("NFKC").toLowerCase();
 }
 
-export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
+export function UpdatesPanel({ serverVersion, scrollRef }: { serverVersion?: string; scrollRef?: RefObject<HTMLDivElement | null> }) {
   const [query, setQuery] = useState("");
   const [historyExpansion, setHistoryExpansion] = useState<Record<string, boolean>>({});
   const [searchExpansion, setSearchExpansion] = useState<Record<string, boolean>>({});
   const searchRef = useRef<HTMLInputElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
   const keywords = normalizeSearch(query).trim().split(/\s+/).filter(Boolean);
   const versionKeywords = keywords.filter((keyword) => versionKeywordPattern.test(keyword));
   const changeKeywords = keywords.filter((keyword) => !versionKeywordPattern.test(keyword));
@@ -35,7 +35,9 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
   function updateSearch(value: string) {
     setQuery(value);
     setSearchExpansion({});
-    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    const scroll = scrollRef?.current;
+    const history = sectionRef.current;
+    if (scroll && history && scroll.scrollTop > history.offsetTop) scroll.scrollTop = history.offsetTop;
   }
 
   const currentVersion = serverVersion?.match(/^v?(\d+\.\d+\.\d+)(?=$|[-+])/)?.[1];
@@ -62,7 +64,7 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
   }
 
   return (
-    <section className={styles.panel} aria-labelledby="rsm-updates-heading">
+    <section ref={sectionRef} className={styles.panel} aria-labelledby="rsm-updates-heading">
       <header className={styles.toolbar}>
         <div className={styles.toolbarContent}>
           <h2 id="rsm-updates-heading" className={styles.title}>更新日志</h2>
@@ -93,63 +95,61 @@ export function UpdatesPanel({ serverVersion }: { serverVersion?: string }) {
           </div>
         </div>
       </header>
-      <div ref={scrollRef} className={styles.scroll} data-scroll-container="update-history">
-        <div className={styles.content}>
-          {Array.from(groups, ([major, versions]) => (
-            <section key={major} className={styles.group} aria-labelledby={`rsm-updates-major-${major}`}>
-              <h3 id={`rsm-updates-major-${major}`} className={styles.groupHeading}>
-                <span className={styles.majorVersion}>V{major}</span>
-              </h3>
-              <ol className={styles.timeline} aria-label="版本时间轴" role="list">
-                {versions.map(({ version, note, sections }) => {
-                  const current = version === currentVersion;
-                  const open = expansion[version] ?? (searching || version === latestVersion);
-                  return (
-                    <li key={version} className={styles.node} data-current={current || undefined}>
-                      <time className={styles.date} dateTime={note.date}>
-                        <span>{dateFormatter.format(new Date(note.date))}</span>
-                        <span className={styles.year}>{note.date.slice(0, 4)}</span>
-                      </time>
-                      <details className={styles.card} open={open}>
-                        <summary className={styles.header} onClick={(event) => {
-                          event.preventDefault();
-                          setExpansion((previous) => ({ ...previous, [version]: !open }));
-                        }}>
-                          <h4 className={styles.heading}>
-                            <span className={styles.versionMeta}>
-                              <span className={styles.version} aria-current={current ? "true" : undefined}>v{version}</span>
-                              {current ? <span className={styles.current}>当前版本</span> : null}
-                            </span>
-                            <span className={styles.noteTitle}>{note.title}</span>
-                            <ChevronDown className={styles.chevron} aria-hidden="true" />
-                          </h4>
-                        </summary>
-                        <div className={styles.changes}>
-                          {sections.map(({ key, label, changes }) => (
-                            <div key={key} className={styles.category}>
-                              <h5 className={styles.categoryLabel} data-kind={key}>{label}</h5>
-                              <ul className={styles.entries} role="list">
-                                {changes.map(({ title, description }) => (
-                                  <li key={title} className={styles.change}>
-                                    <strong>{title}</strong>
-                                    <p>{description}</p>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-          ))}
-          {!entries.length ? (
-            <p className={styles.empty} role="status">{searching ? "没有匹配的更新记录" : "暂无此版本的更新日志"}</p>
-          ) : null}
-        </div>
+      <div className={styles.content}>
+        {Array.from(groups, ([major, versions]) => (
+          <section key={major} className={styles.group} aria-labelledby={`rsm-updates-major-${major}`}>
+            <h3 id={`rsm-updates-major-${major}`} className={styles.groupHeading}>
+              <span className={styles.majorVersion}>V{major}</span>
+            </h3>
+            <ol className={styles.timeline} aria-label="版本时间轴" role="list">
+              {versions.map(({ version, note, sections }) => {
+                const current = version === currentVersion;
+                const open = expansion[version] ?? (searching || version === latestVersion);
+                return (
+                  <li key={version} className={styles.node} data-current={current || undefined}>
+                    <time className={styles.date} dateTime={note.date}>
+                      <span>{dateFormatter.format(new Date(note.date))}</span>
+                      <span className={styles.year}>{note.date.slice(0, 4)}</span>
+                    </time>
+                    <details className={styles.card} open={open}>
+                      <summary className={styles.header} onClick={(event) => {
+                        event.preventDefault();
+                        setExpansion((previous) => ({ ...previous, [version]: !open }));
+                      }}>
+                        <h4 className={styles.heading}>
+                          <span className={styles.versionMeta}>
+                            <span className={styles.version} aria-current={current ? "true" : undefined}>v{version}</span>
+                            {current ? <span className={styles.current}>当前版本</span> : null}
+                          </span>
+                          <span className={styles.noteTitle}>{note.title}</span>
+                          <ChevronDown className={styles.chevron} aria-hidden="true" />
+                        </h4>
+                      </summary>
+                      <div className={styles.changes}>
+                        {sections.map(({ key, label, changes }) => (
+                          <div key={key} className={styles.category}>
+                            <h5 className={styles.categoryLabel} data-kind={key}>{label}</h5>
+                            <ul className={styles.entries} role="list">
+                              {changes.map(({ title, description }) => (
+                                <li key={title} className={styles.change}>
+                                  <strong>{title}</strong>
+                                  <p>{description}</p>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        ))}
+        {!entries.length ? (
+          <p className={styles.empty} role="status">{searching ? "没有匹配的更新记录" : "暂无此版本的更新日志"}</p>
+        ) : null}
       </div>
     </section>
   );

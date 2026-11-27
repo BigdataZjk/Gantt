@@ -1,21 +1,11 @@
-.panel {
-  --timeline-indent: 119px;
-  --content-padding: 28px;
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-height: 0;
-}
+.panel { --timeline-indent: 119px; }
 
-.toolbar { flex: none; overflow: hidden; }
-.toolbar, .scroll { scrollbar-gutter: stable; }
-.scroll { flex: 1; min-height: 0; overflow: auto; }
-
-.toolbarContent,
-.content {
-  max-width: 1040px;
-  margin-inline: auto;
-  padding-inline: var(--content-padding);
+.toolbar {
+  position: sticky;
+  z-index: 2;
+  inset-block-start: 0;
+  padding-inline-start: var(--timeline-indent);
+  margin-bottom: 12px;
 }
 
 .toolbarContent {
@@ -23,8 +13,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-block: 16px;
-  padding-inline-start: calc(var(--content-padding) + var(--timeline-indent));
+  padding: 10px 14px;
+  border: 1px solid var(--rsm-border);
+  border-radius: var(--rsm-radius-md);
+  background: var(--rsm-panel);
 }
 
 .content { padding-bottom: 32px; }
@@ -250,8 +242,8 @@
 .empty { padding-block: 20px; color: var(--rsm-muted); text-align: center; }
 
 @media (max-width: 620px) {
-  .panel { --timeline-indent: 21px; --content-padding: 10px; }
-  .toolbarContent { padding-block: 8px 12px; }
+  .panel { --timeline-indent: 21px; }
+  .toolbarContent { gap: 8px; padding: 8px 10px; }
   .content { padding-bottom: 22px; }
   .title { font-size: 19px; }
   .node { --rail: 4px; --marker-top: 43px; grid-template-columns: minmax(0, 1fr); gap: 5px; padding-inline-start: var(--timeline-indent); }

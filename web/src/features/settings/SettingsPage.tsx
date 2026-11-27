@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { CalendarDays, DatabaseBackup, History, ListFilter, ListTree, Megaphone, PackageCheck, ScrollText, ShieldUser, UserRound } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { CalendarDays, History, ListFilter, Megaphone, ScrollText, ShieldUser, UserRound, Wrench } from "lucide-react";
 import type { State, User } from "../../api/types";
 import { useUiState } from "../../app/uiState";
 import { PageTabs } from "../../ui/Tabs";
@@ -27,9 +27,10 @@ interface Props {
 export function SettingsPage({ state, permissions, onLogin, onLogout, onOpenCredential }: Props) {
   const { ui, patch } = useUiState();
   const serverVersion = state.serverVersion?.trim();
+  const maintenanceScroll = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const superOnly = ui.settingsTab === "fields" || ui.settingsTab === "announcement" || ui.settingsTab === "backup" || ui.settingsTab === "upgrade";
+    const superOnly = ui.settingsTab === "fields" || ui.settingsTab === "announcement";
     if ((ui.settingsTab === "calendar" && !permissions.isAdmin) || (superOnly && !permissions.isSuper)) patch({ settingsTab: "roles" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ui.settingsTab, permissions.isSuper, permissions.isAdmin]);
@@ -42,11 +43,7 @@ export function SettingsPage({ state, permissions, onLogin, onLogout, onOpenCred
     { key: "personal" as const, label: "个性化", icon: UserRound },
     { key: "logs" as const, label: "操作记录", icon: ScrollText },
     { key: "versions" as const, label: "版本记录", icon: History },
-    ...(permissions.isSuper ? [
-      { key: "backup" as const, label: "数据备份", icon: DatabaseBackup },
-      { key: "upgrade" as const, label: "系统升级", icon: PackageCheck },
-    ] : []),
-    { key: "updates" as const, label: "更新日志", icon: ListTree },
+    { key: "maintenance" as const, label: "系统维护", icon: Wrench },
   ];
 
   return (
@@ -65,9 +62,19 @@ export function SettingsPage({ state, permissions, onLogin, onLogout, onOpenCred
         {ui.settingsTab === "personal" ? <PersonalPanel state={state} permissions={permissions} onLogin={onLogin} onLogout={onLogout} onOpenCredential={onOpenCredential} /> : null}
         {ui.settingsTab === "logs" ? <LogsPanel state={state} permissions={permissions} /> : null}
         {ui.settingsTab === "versions" ? <VersionsPanel state={state} permissions={permissions} /> : null}
-        {ui.settingsTab === "backup" && permissions.isSuper ? <BackupPanel /> : null}
-        {ui.settingsTab === "upgrade" && permissions.isSuper ? <UpgradePanel /> : null}
-        {ui.settingsTab === "updates" ? <UpdatesPanel serverVersion={serverVersion} /> : null}
+        {ui.settingsTab === "maintenance" ? (
+          <div ref={maintenanceScroll} className={styles.maintenanceScroll} data-scroll-container="system-maintenance">
+            <div className={styles.maintenanceContent}>
+              {permissions.isSuper ? (
+                <div className={styles.maintenanceActions}>
+                  <BackupPanel />
+                  <UpgradePanel />
+                </div>
+              ) : null}
+              <UpdatesPanel serverVersion={serverVersion} scrollRef={maintenanceScroll} />
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -80,10 +80,10 @@ export function UpgradePanel() {
   };
 
   return (
-    <div className={styles.personalScroll}>
-      <section className={`${styles.personalSettings} ${styles.upgradePanel}`} aria-labelledby="upgrade-heading">
-        <div className={styles.upgradeHeader}>
-          <div>
+    <>
+      <section className={`${styles.personalSettings} ${styles.maintenanceCard}`} aria-labelledby="upgrade-heading">
+        <div className={styles.maintenanceCardHeader}>
+          <div className={styles.maintenanceCardHeading}>
             <h2 id="upgrade-heading" className={styles.sectionTitle}>上传源码并更新</h2>
             <p className={styles.caption}>{data ? `当前版本 v${data.currentVersion}` : "正在读取当前版本…"}</p>
           </div>
@@ -160,6 +160,6 @@ export function UpgradePanel() {
           {!canConfirm ? <p role="alert">升级状态已变化，请关闭后重新核对。</p> : null}
         </div>
       </Dialog>
-    </div>
+    </>
   );
 }

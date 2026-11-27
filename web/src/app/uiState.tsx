@@ -7,7 +7,7 @@ import { normalizeTableSort, type TableSort } from "../features/requests/table/s
 
 export type RequirementTab = "gantt" | "pool" | "archive";
 export type MainView = "requirements" | "settings";
-export type SettingsTab = "roles" | "fields" | "personal" | "logs" | "versions" | "calendar" | "announcement" | "updates" | "backup" | "upgrade";
+export type SettingsTab = "roles" | "fields" | "personal" | "logs" | "versions" | "calendar" | "announcement" | "maintenance";
 
 export interface UiFilters {
   domain: string[];
@@ -44,7 +44,7 @@ export interface UiState {
 }
 
 const REQUIREMENT_TABS: RequirementTab[] = ["gantt", "pool", "archive"];
-const SETTINGS_TABS: SettingsTab[] = ["roles", "fields", "personal", "logs", "versions", "calendar", "announcement", "updates", "backup", "upgrade"];
+const SETTINGS_TABS: SettingsTab[] = ["roles", "fields", "personal", "logs", "versions", "calendar", "announcement", "maintenance"];
 
 export const EMPTY_FILTERS: UiFilters = { domain: [], requestType: [], status: [], developer: [], priority: [], start: "", end: "", query: "" };
 
@@ -54,7 +54,7 @@ function asStringArray(value: unknown, allowed?: readonly string[]): string[] {
 }
 
 function normalize(value: unknown): UiState {
-  const raw = (value && typeof value === "object" ? value : {}) as Partial<UiState>;
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<Omit<UiState, "settingsTab"> & { settingsTab: string }>;
   const order = Array.isArray(raw.columnOrder) ? raw.columnOrder.filter((key): key is string => typeof key === "string" && COLUMN_KEYS.includes(key)) : [];
   const needsRankColumn = !order.includes("requesterRank");
   if (needsRankColumn) order.unshift("requesterRank");
@@ -66,11 +66,15 @@ function normalize(value: unknown): UiState {
   const rawFilters = (raw.filters && typeof raw.filters === "object" ? raw.filters : {}) as Partial<UiFilters>;
   const pageSize = Number(raw.logPagination?.pageSize);
   const page = Number(raw.logPagination?.page);
+  const storedSettingsTab = raw.settingsTab;
+  const settingsTab = storedSettingsTab === "backup" || storedSettingsTab === "upgrade" || storedSettingsTab === "updates"
+    ? "maintenance"
+    : SETTINGS_TABS.find((tab) => tab === storedSettingsTab) ?? "roles";
   return {
     mainView: raw.mainView === "settings" ? "settings" : "requirements",
     sidebarPinned: raw.sidebarPinned === true,
     requirementTab: REQUIREMENT_TABS.includes(raw.requirementTab as RequirementTab) ? (raw.requirementTab as RequirementTab) : "gantt",
-    settingsTab: SETTINGS_TABS.includes(raw.settingsTab as SettingsTab) ? (raw.settingsTab as SettingsTab) : "roles",
+    settingsTab,
     dismissedAnnouncement: typeof raw.dismissedAnnouncement === "string" ? raw.dismissedAnnouncement : "",
     filters: {
       domain: asStringArray(rawFilters.domain),

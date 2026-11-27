@@ -28,11 +28,16 @@ async function createRequest(page: Page, name: string, project = "") {
   return (await response.json() as State).requests.find((item) => item.name === name)!;
 }
 
-test("超级管理员一键下载已校验的备份 ZIP，游客看不到入口", async ({ page }) => {
+test("系统维护合并三个区块，超管可下载备份，游客可查看日志", async ({ page }) => {
   await login(page);
   const before = await state(page);
-  await page.getByRole("tab", { name: "数据备份", exact: true }).click();
+  const tab = page.getByRole("tab", { name: "系统维护", exact: true });
+  await tab.click();
   const panel = page.getByRole("region", { name: "实例备份", exact: true });
+  const upgrade = page.getByRole("region", { name: "上传源码并更新", exact: true });
+  const updates = page.getByRole("region", { name: "更新日志", exact: true });
+  await expect(upgrade.getByRole("button", { name: "选择源码 ZIP", exact: true })).toBeVisible();
+  await expect(updates).toBeVisible();
   const downloadEvent = page.waitForEvent("download");
   await panel.getByRole("button", { name: "生成并下载备份", exact: true }).click();
   const download = await downloadEvent;
@@ -49,8 +54,12 @@ test("超级管理员一键下载已校验的备份 ZIP，游客看不到入口"
   await page.request.post("/api/logout");
   await page.reload();
   await page.getByRole("button", { name: "设置", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "角色权限", exact: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "数据备份", exact: true })).toHaveCount(0);
+  await tab.click();
+  await expect(panel).toHaveCount(0);
+  await expect(upgrade).toHaveCount(0);
+  await updates.getByRole("searchbox", { name: "搜索更新日志" }).fill("0.1.7");
+  await expect(updates.getByRole("heading", { name: "V0", exact: true })).toBeVisible();
+  await expect(updates.getByText("v0.1.7", { exact: true })).toBeVisible();
 });
 
 test("字段管理新增删除及名称合并与刷新、归档数据一致", async ({ page }) => {

@@ -41,26 +41,24 @@ export function BackupPanel() {
   };
 
   return (
-    <div className={styles.personalScroll}>
-      <section className={`${styles.personalSettings} ${styles.backupPanel}`} aria-labelledby="backup-heading">
-        <div className={styles.backupHeader}>
-          <div className={styles.backupHeading}>
-            <h2 id="backup-heading" className={styles.sectionTitle}>实例备份</h2>
-            <p className={styles.caption}>ZIP 包含需求（含归档）、排期、账号和恢复密钥，请妥善保管。</p>
-          </div>
-          <Button variant="primary" disabled={pending} onClick={() => void download()}>
-            <Download aria-hidden="true" />{pending ? "正在生成并校验…" : "生成并下载备份"}
-          </Button>
+    <section className={`${styles.personalSettings} ${styles.maintenanceCard}`} aria-labelledby="backup-heading">
+      <div className={styles.maintenanceCardHeader}>
+        <div className={styles.maintenanceCardHeading}>
+          <h2 id="backup-heading" className={styles.sectionTitle}>实例备份</h2>
+          <p className={styles.caption}>ZIP 包含需求（含归档）、排期、账号和恢复密钥，请妥善保管。</p>
         </div>
-        {error ? <p className={styles.uploadError} role="alert">{error}</p> : null}
-        {result ? (
-          <div className={styles.backupResult} role="status">
-            <div className={styles.backupStatus}><CheckCircle2 aria-hidden="true" />校验通过，已开始下载</div>
-            <p className={styles.backupFile}>{result.filename}</p>
-            <p className={styles.caption}>北京时间 <time dateTime={result.createdAt}>{timeLabel(result.createdAt)}</time> · 数据修订号 {result.revision}</p>
-          </div>
-        ) : null}
-      </section>
-    </div>
+        <Button variant="primary" disabled={pending} onClick={() => void download()}>
+          <Download aria-hidden="true" />{pending ? "正在生成并校验…" : "生成并下载备份"}
+        </Button>
+      </div>
+      {error ? <p className={styles.uploadError} role="alert">{error}</p> : null}
+      {result ? (
+        <div className={styles.backupResult} role="status">
+          <div className={styles.backupStatus}><CheckCircle2 aria-hidden="true" />校验通过，已开始下载</div>
+          <p className={styles.backupFile}>{result.filename}</p>
+          <p className={styles.caption}>北京时间 <time dateTime={result.createdAt}>{timeLabel(result.createdAt)}</time> · 数据修订号 {result.revision}</p>
+        </div>
+      ) : null}
+    </section>
   );
 }

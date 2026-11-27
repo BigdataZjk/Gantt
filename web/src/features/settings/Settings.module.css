@@ -117,17 +117,25 @@
 .versionNumber { font-weight: 500; font-variant-numeric: tabular-nums; }
 .personalScroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
 .personalSettings { max-width: 960px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--rsm-panel) 82%, var(--rsm-border)); border-radius: 14px; background: var(--rsm-surface); box-shadow: var(--rsm-shadow-soft); }
-.announcementForm, .backupPanel, .upgradePanel { display: grid; gap: 14px; max-width: 720px; padding: 18px 20px; }
+.announcementForm, .maintenanceCard { display: grid; gap: 14px; padding: 18px 20px; }
+.announcementForm { max-width: 720px; }
 .announcementForm > button { justify-self: start; }
-.backupHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; }
-.backupHeading { display: grid; gap: 5px; }
-.backupHeading p { line-height: 1.6; }
+.maintenanceScroll { position: relative; flex: 1; min-height: 0; overflow: auto; scrollbar-gutter: stable; }
+.maintenanceContent { max-width: 1040px; margin-inline: auto; padding-inline: 28px; }
+.maintenanceActions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.maintenanceCardHeader { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; min-height: 56px; }
+.maintenanceCardHeading { display: grid; flex: 1 1 150px; gap: 5px; min-width: 0; }
+.maintenanceCardHeading p { line-height: 1.6; }
 .backupResult { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--rsm-border); border-radius: 8px; background: color-mix(in srgb, var(--rsm-soft) 60%, transparent); }
 .backupStatus { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
 .backupStatus svg { flex: none; width: 15px; height: 15px; color: var(--rsm-online); }
 .backupFile { font: 12px var(--rsm-mono); overflow-wrap: anywhere; }
-.upgradeHeader { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
-.upgradeHeader > div { display: grid; gap: 5px; }
 .upgradeStatus { display: grid; gap: 7px; padding: 12px 14px; border: 1px solid var(--rsm-border); border-radius: 8px; background: color-mix(in srgb, var(--rsm-soft) 60%, transparent); }
 .upgradeStatusLine { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
 .upgradeStatusLine h3 { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
@@ -154,6 +162,7 @@
 }
 @media (max-width: 620px) {
   .grid2 { grid-template-columns: 1fr; }
+  .maintenanceContent { padding-inline: 10px; }
   .personalRow { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 16px; }
   .personalRow .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pageControls { gap: 8px; }
