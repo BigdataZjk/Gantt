@@ -356,6 +356,42 @@ paths:
           description: 仅超级管理员可更新
         '409':
           description: 版本冲突
+  /api/backups/download:
+    post:
+      operationId: downloadBackup
+      summary: 超级管理员生成并下载实例备份
+      description: 在线生成经过完整性校验的 ZIP，内含数据库、密钥、配置（如有）及校验清单。
+      responses:
+        '200':
+          description: 备份已校验，可下载
+          headers:
+            Content-Disposition:
+              description: 附件文件名，包含程序版本和北京时间
+              schema:
+                type: string
+            X-RSM-Backup-Created-At:
+              description: 备份生成时间
+              schema:
+                type: string
+                format: date-time
+            X-RSM-Backup-Revision:
+              description: 备份中的数据修订号
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: 未登录
+        '403':
+          description: 仅超级管理员可下载
+        '409':
+          description: 已有备份正在生成或下载
+        '500':
+          description: 备份生成或校验失败
   /api/requests:
     post:
       operationId: postApiRequests

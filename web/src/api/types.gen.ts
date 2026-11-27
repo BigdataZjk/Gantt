@@ -231,6 +231,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backups/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 超级管理员生成并下载实例备份
+         * @description 在线生成经过完整性校验的 ZIP，内含数据库、密钥、配置（如有）及校验清单。
+         */
+        post: operations["downloadBackup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requests": {
         parameters: {
             query?: never;
@@ -1751,6 +1771,60 @@ export interface operations {
             };
             /** @description 版本冲突 */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    downloadBackup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 备份已校验，可下载 */
+            200: {
+                headers: {
+                    /** @description 附件文件名，包含程序版本和北京时间 */
+                    "Content-Disposition"?: string;
+                    /** @description 备份生成时间 */
+                    "X-RSM-Backup-Created-At"?: string;
+                    /** @description 备份中的数据修订号 */
+                    "X-RSM-Backup-Revision"?: number;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            /** @description 未登录 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 仅超级管理员可下载 */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 已有备份正在生成或下载 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description 备份生成或校验失败 */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

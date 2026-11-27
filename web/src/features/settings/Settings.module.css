@@ -117,8 +117,15 @@
 .versionNumber { font-weight: 500; font-variant-numeric: tabular-nums; }
 .personalScroll { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
 .personalSettings { max-width: 960px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--rsm-panel) 82%, var(--rsm-border)); border-radius: 14px; background: var(--rsm-surface); box-shadow: var(--rsm-shadow-soft); }
-.announcementForm { display: grid; gap: 14px; max-width: 720px; padding: 18px 20px; }
+.announcementForm, .backupPanel { display: grid; gap: 14px; max-width: 720px; padding: 18px 20px; }
 .announcementForm > button { justify-self: start; }
+.backupHeader { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; }
+.backupHeading { display: grid; gap: 5px; }
+.backupHeading p { line-height: 1.6; }
+.backupResult { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--rsm-border); border-radius: 8px; background: color-mix(in srgb, var(--rsm-soft) 60%, transparent); }
+.backupStatus { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }
+.backupStatus svg { flex: none; width: 15px; height: 15px; color: var(--rsm-online); }
+.backupFile { font: 12px var(--rsm-mono); overflow-wrap: anywhere; }
 .personalRow { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); align-items: center; gap: 32px; min-height: 96px; padding: 14px 20px; }
 .personalRow + .personalRow { border-top: 1px solid color-mix(in srgb, var(--rsm-border) 65%, transparent); }
 .personalLabel { display: grid; gap: 5px; min-width: 0; }

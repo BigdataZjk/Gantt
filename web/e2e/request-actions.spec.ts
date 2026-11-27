@@ -399,6 +399,48 @@ test("甘特图的默认顺序按筛选范围内第一段开发时间升序排�
   expect(orderWrites).toEqual([]);
 });
 
+test("归档需求的主线段、HOLD 与补位淡化显示，时间轴只读", async ({ page }) => {
+  const archived = request({
+    id: 9, name: "归档历史排期", archived: true, delivery: "2026-11-24",
+    segments: [
+      { start: "2026-11-16", end: "2026-11-18", holdBefore: false },
+      { start: "2026-11-23", end: "2026-11-24", holdBefore: true },
+    ],
+    supportSegments: [{ start: "2026-11-20", end: "2026-11-20", requestId: 1 }],
+  });
+  const { mutations, orderWrites } = await preview(page, { rows: [requests[0]!, archived] });
+  const active = page.locator('tr[data-row="1"] [data-date="2026-11-16"] [data-bar]');
+  const row = page.locator('tr[data-row="9"][data-archived]');
+  const cell = row.locator('[data-date="2026-11-16"]');
+  const bar = cell.locator("[data-bar]");
+  const support = row.locator("[data-support-bar]");
+  await expect(active).toHaveCSS("opacity", "1");
+  for (const segment of [bar, support, row.locator("[data-hold-connector]").first()]) {
+    await expect(segment).toBeVisible();
+    await expect(segment).toHaveCSS("opacity", "0.52");
+  }
+  await expect(row.locator('[data-resize], [data-bar][tabindex], [data-support-bar][tabindex]')).toHaveCount(0);
+  await expect(bar).toHaveAttribute("data-tooltip", /已归档，排期只读/);
+  await active.hover();
+  await expect(active).toHaveClass(/dayDivider/);
+  await bar.hover();
+  await expect(active).not.toHaveClass(/dayDivider/);
+  await expect(bar).not.toHaveClass(/dayDivider/);
+  await expect(cell).toHaveCSS("background-image", "none");
+  for (const segment of [bar, support]) {
+    await segment.click({ button: "right" });
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    const bounds = (await segment.boundingBox())!;
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down({ button: "right" });
+    await page.mouse.move(bounds.x + bounds.width * 2, bounds.y + bounds.height / 2, { steps: 6 });
+    await page.mouse.up({ button: "right" });
+  }
+  await expect(bar).toBeVisible();
+  expect(mutations).toEqual([]);
+  expect(orderWrites).toEqual([]);
+});
+
 test("甘特图归档需求可拖动调整同组顺序，刷新后仍保留", async ({ page }) => {
   const { state, mutations, orderWrites } = await preview(page);
   const before = structuredClone(state.requests);

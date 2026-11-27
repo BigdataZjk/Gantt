@@ -21,6 +21,12 @@ export class P0DeliveryConfirmationError extends ApiError {
   }
 }
 
+export interface BackupInfo {
+  filename: string;
+  createdAt: string;
+  revision: string;
+}
+
 const requestOperationIds = new WeakMap<object, string>();
 const requestReflowCounts = new WeakMap<object, number>();
 
@@ -90,6 +96,20 @@ export const api = {
   updateUser: (id: string, patch: UserPatch): Promise<State> => send<State>(`/api/users/${encodeURIComponent(id)}`, "PATCH", patch),
   savePreferences: (preferences: Preferences): Promise<State> => send<State>("/api/preferences", "PUT", preferences),
   saveAnnouncement: (baseRevision: number, text: string): Promise<State> => send<State>("/api/announcement", "PUT", { baseRevision, text }),
+  downloadBackup: async (signal: AbortSignal): Promise<BackupInfo & { blob: Blob }> => {
+    const response = await fetch("/api/backups/download", { method: "POST", credentials: "same-origin", signal });
+    if (!response.ok) await parse(response);
+    const filename = response.headers.get("Content-Disposition")?.match(/(?:^|;\s*)filename="?([^";]+)"?/i)?.[1];
+    const createdAt = response.headers.get("X-RSM-Backup-Created-At");
+    const revision = response.headers.get("X-RSM-Backup-Revision");
+    if (response.headers.get("Content-Type") !== "application/zip" || !filename?.endsWith(".zip") ||
+        !createdAt || !Number.isFinite(Date.parse(createdAt)) || revision === null || !/^\d+$/.test(revision)) {
+      throw new Error("未收到有效的备份文件，请重试");
+    }
+    const blob = await response.blob();
+    if (!blob.size) throw new Error("备份文件为空，请重试");
+    return { blob, filename, createdAt, revision };
+  },
   uploadAvatar: async (file: File): Promise<State> => {
     const response = await fetch("/api/avatar", {
       method: "POST",

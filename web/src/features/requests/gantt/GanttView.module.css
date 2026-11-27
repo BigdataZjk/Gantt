@@ -170,7 +170,8 @@
 .calendar tr[data-support-lane] {
   --gantt-support-offset: calc(var(--gantt-row-height) + var(--gantt-lane-gap));
 }
-.calendar tr[data-row]:hover > :is(th, td):not(.liveRipple),
+.calendar tr[data-row]:not([data-archived]):hover > :is(th, td):not(.liveRipple),
+.calendar tr[data-archived] > .nameCell:hover,
 .calendar tr[data-row].rowSelected > :is(th, td):not(.liveRipple) {
   background-image: linear-gradient(
     color-mix(in srgb, var(--rsm-accent) 8%, transparent),
@@ -360,6 +361,7 @@
 .parallelSymbol svg { display: block; width: 8px; height: 20px; fill: currentColor; stroke: var(--rsm-panel); stroke-width: 1.6; paint-order: stroke fill; flex: none; }
 .arrowUp { color: var(--rsm-arrow-up); animation: rsm-parallel-rise 1.2s ease-in-out infinite alternate; }
 .arrowDown { color: var(--rsm-arrow-down); animation: rsm-parallel-fall 1.2s ease-in-out infinite alternate; }
+.calendar tr[data-archived] :is(.barPiece, .holdFill, .markOnly, .parallelExchange) { opacity: 0.52; }
 .deliveryGuide { position: absolute; right: 0; top: 0; bottom: 0; width: 0; border-left: 1px dashed color-mix(in srgb, var(--task-fill, var(--rsm-accent)) 60%, var(--rsm-muted)); opacity: 0.7; z-index: 1; pointer-events: none; }
 .legend { composes: footer from "../RequestsPage.module.css"; }
 .legend > [data-legend-icon] > svg {

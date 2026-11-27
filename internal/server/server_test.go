@@ -156,8 +156,12 @@ func TestCRUDArchiveConflictAndUndo(t *testing.T) {
 	}
 	_, archived := f.call("POST", fmt.Sprint("/api/requests/", row.ID, "/archive"), map[string]any{"baseRevision": planned.Revision, "archived": true}, 200, true)
 	row = archived.Requests[0]
-	row.Name = "should be rejected"
+	row.Developer, row.Start, row.Delivery, row.Days = "", "2026-11-19", "2026-11-24", 4
 	f.call("PUT", fmt.Sprint("/api/requests/", row.ID), map[string]any{"baseRevision": archived.Revision, "request": row}, 400, true)
+	f.call("POST", "/api/requests/batch", map[string]any{"baseRevision": archived.Revision, "requests": []requests.Request{row}}, 400, true)
+	if latest := f.state(); latest.Revision != archived.Revision || !requests.SameSchedule(latest.Requests[0], archived.Requests[0]) {
+		t.Fatal("an archived schedule was changed")
+	}
 	f.call("DELETE", fmt.Sprint("/api/requests/", row.ID), map[string]any{"baseRevision": archived.Revision}, 400, true)
 	_, undone := f.call("POST", fmt.Sprint("/api/history/", archived.Logs[0].ID, "/undo"), map[string]any{"baseRevision": archived.Revision}, 200, true)
 	if undone.Requests[0].Archived || !undone.Logs[1].Undone {

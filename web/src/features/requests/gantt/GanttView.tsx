@@ -1116,7 +1116,7 @@ export const GanttView = memo(function GanttView({ state, permissions, rows: fil
                     groupBadges={badgeMap.get(item.group.developer) ?? EMPTY_BADGES}
                     preview={preview?.rowId === row.id ? preview : null}
                     hoveredPhase={hovered?.rowId === row.id ? hovered.phaseIndex : -1}
-                    rowSelected={selectedIds.has(row.id)}
+                    rowSelected={!row.archived && selectedIds.has(row.id)}
                     isAdmin={isAdmin && !row.archived}
                     canEdit={permissions.canEdit && !row.archived}
                     today={today}
@@ -1250,6 +1250,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
   today, suppressClickRef, selectRow, onOpen, onNameMenu, onDayMenu, setHovered,
 }: GanttRowProps) {
   const { plan, resolve, delivery, live } = state;
+  const archived = row.archived;
+  const archiveHint = archived ? " · 已归档，排期只读" : "";
+  const scheduleLabel = `${row.name}　${state.activeDays}人天${archiveHint}`;
   const estimated = (Number(row.days) || 0) === 0;
   const holds = useMemo(() => holdLayout(row, visibleDates, calendar), [row, visibleDates, calendar]);
   const estimates = useMemo(() => estimateCenters(row, visibleDates, calendar), [row, visibleDates, calendar]);
@@ -1288,12 +1291,12 @@ const GanttRequestRow = memo(function GanttRequestRow({
     };
   }, [visibleDays, visibleDates, live, liveRange, markerMode, dayWidth, leftHidden, row.id]);
   const previewCell = (date: string, working: boolean): "valid" | "invalid" | null => {
-    if (!preview || (preview.support && !working)) return null;
+    if (archived || !preview || (preview.support && !working)) return null;
     const included = preview.dates ? preview.dates.includes(date) : preview.start && preview.end && date >= preview.start && date <= preview.end;
     return included ? preview.valid ? "valid" : "invalid" : null;
   };
   return (
-    <tr data-row={row.id} data-archived={row.archived || undefined} data-support-lane={state.supportOverlaps ? "" : undefined} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
+    <tr data-row={row.id} data-archived={archived || undefined} data-support-lane={state.supportOverlaps ? "" : undefined} aria-selected={rowSelected} className={rowSelected ? styles.rowSelected : ""} style={{ "--task-fill": color.fill, "--task-ink": color.ink } as CSSProperties}>
       <th className={styles.nameCell} scope="row" data-request-select onClick={(event) => {
         if (!(event.target as Element).closest("[data-name]") && performance.now() >= suppressClickRef.current) selectRow(row.id, event);
       }}>
@@ -1305,7 +1308,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
             type="button"
             className={styles.requestName}
             data-name
-            data-tooltip={`${row.name}　${state.activeDays}人天`}
+            data-tooltip={scheduleLabel}
             aria-description={`优先级 ${row.priority}，状态 ${row.status}${row.requesterRank ? `，需求方优先级 ${row.requesterRank}` : ""}${row.archived ? "，已归档" : ""}`}
             aria-pressed={rowSelected}
             aria-haspopup="menu"
@@ -1339,8 +1342,8 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const segment = plan.segments[phase];
         const fill = state.fillBounds[phase];
         const filled = !!fill && date >= fill.start && date <= fill.end;
-        const showDayDivider = filled && hoveredPhase === phase && date < fill.end && index + 1 < visibleDates.length;
-        const showDelivery = (rowSelected || hoveredPhase === phase) && date === delivery && phase >= 0;
+        const showDayDivider = !archived && filled && hoveredPhase === phase && date < fill.end && index + 1 < visibleDates.length;
+        const showDelivery = !archived && (rowSelected || hoveredPhase === phase) && date === delivery && phase >= 0;
         const bar = phase >= 0;
         const working = isWorkday(date, calendar);
         const available = info.dayType !== "leave" && (working || info.overtime);
@@ -1367,7 +1370,7 @@ const GanttRequestRow = memo(function GanttRequestRow({
         const sharesHoldCenter = hold?.centerOffset === 0;
         const standaloneMarkerMode = sharesHoldCenter && markerMode === "icon" ? "tick" : markerMode;
         return (
-          <td key={date} className={classes} data-date={date} data-tooltip={hold ? "手动标记的 HOLD 暂停间隔" : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}`}>
+          <td key={date} className={classes} data-date={date} data-tooltip={hold ? `手动标记的 HOLD 暂停间隔${archiveHint}` : undefined} aria-label={`${row.name}，${date}${info.active ? "，开发排期" : ""}${info.hold ? "，HOLD" : ""}${info.dayType === "leave" ? "，休假" : info.overtime ? "，加班" : ""}${archiveHint}`}>
             {hold ? (
               <span className={styles.holdFill} data-hold-connector aria-hidden="true">
                 {hold.centerOffset !== null ? (
@@ -1381,14 +1384,21 @@ const GanttRequestRow = memo(function GanttRequestRow({
               <div
                 data-bar
                 data-phase={phase}
-                role="button"
-                tabIndex={0}
-                data-tooltip={`${row.name}　${state.activeDays}人天`}
+                role={archived ? undefined : "button"}
+                tabIndex={archived ? undefined : 0}
+                data-tooltip={scheduleLabel}
                 className={[styles.barPiece, info.active ? "" : styles.inactive, !filled ? styles.unfilled : "", info.active && estimated ? styles.estimated : "", date === fill?.start ? styles.barStart : "", date === fill?.end ? styles.barEnd : "", showDayDivider ? styles.dayDivider : ""].filter(Boolean).join(" ")}
-                aria-label={`${row.name}，${date}${info.active ? "，开发排期" : "，非开发日"}`}
-                onPointerOver={() => setHovered((current) => current?.rowId === row.id && current.phaseIndex === phase ? current : { rowId: row.id, phaseIndex: phase })}
-                onPointerOut={(event) => { if (!(event.relatedTarget as Element | null)?.closest?.("[data-bar]")) setHovered(null); }}
-                onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectRow(row.id, event as unknown as ReactMouseEvent); } }}
+                aria-label={archived ? undefined : `${row.name}，${date}${info.active ? "，开发排期" : "，非开发日"}`}
+                onPointerOver={archived ? undefined : () => setHovered((current) => current?.rowId === row.id && current.phaseIndex === phase ? current : { rowId: row.id, phaseIndex: phase })}
+                onPointerOut={archived ? undefined : (event) => {
+                  const next = (event.relatedTarget as Element | null)?.closest?.("[data-bar]");
+                  if (!next || next.closest("[data-archived]")) setHovered(null);
+                }}
+                onKeyDown={archived ? undefined : (event) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  selectRow(row.id, event as unknown as ReactMouseEvent);
+                }}
               >
                 {info.active && info.overtime ? <CellMarker kind="overtime" mode={markerMode} /> : null}
                 {info.dayType === "leave" ? <CellMarker kind="leave" mode={markerMode} /> : null}
@@ -1411,9 +1421,9 @@ const GanttRequestRow = memo(function GanttRequestRow({
                 className={`${styles.barPiece} ${styles.supportPiece} ${supportStart ? styles.barStart : ""} ${supportEnd ? styles.barEnd : ""}`}
                 data-support-bar
                 data-support-index={supportIndex}
-                data-tooltip={supportLabel}
+                data-tooltip={`${supportLabel}${archiveHint}`}
                 role={isAdmin ? "button" : undefined}
-                tabIndex={supportStart ? 0 : undefined}
+                tabIndex={supportStart && !archived ? 0 : undefined}
                 aria-label={`${supportLabel}，${date}`}
                 aria-haspopup={isAdmin ? "menu" : undefined}
                 onKeyDown={isAdmin ? (event) => {

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import type { State } from "../src/api/types";
 import { request as makeRequest } from "../src/test/fixtures";
 
@@ -26,6 +27,31 @@ async function createRequest(page: Page, name: string, project = "") {
   expect(response.ok()).toBe(true);
   return (await response.json() as State).requests.find((item) => item.name === name)!;
 }
+
+test("超级管理员一键下载已校验的备份 ZIP，游客看不到入口", async ({ page }) => {
+  await login(page);
+  const before = await state(page);
+  await page.getByRole("tab", { name: "数据备份", exact: true }).click();
+  const panel = page.getByRole("region", { name: "实例备份", exact: true });
+  const downloadEvent = page.waitForEvent("download");
+  await panel.getByRole("button", { name: "生成并下载备份", exact: true }).click();
+  const download = await downloadEvent;
+  expect(download.suggestedFilename()).toMatch(/^rsm-backup-v[^/]+-\d{8}-\d{6}\.zip$/);
+  const bytes = await readFile((await download.path())!);
+  expect(bytes.subarray(0, 4)).toEqual(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+  const result = panel.getByRole("status");
+  await expect(result).toContainText("校验通过，已开始下载");
+  await expect(result).toContainText(`数据修订号 ${before.revision}`);
+  await expect(result.locator("time")).toHaveAttribute("datetime", /^\d{4}-/);
+  expect((await state(page)).revision).toBe(before.revision);
+  await download.delete();
+
+  await page.request.post("/api/logout");
+  await page.reload();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "角色权限", exact: true })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "数据备份", exact: true })).toHaveCount(0);
+});
 
 test("字段管理新增删除及名称合并与刷新、归档数据一致", async ({ page }) => {
   await login(page);

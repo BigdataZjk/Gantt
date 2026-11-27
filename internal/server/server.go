@@ -25,6 +25,7 @@ type Server struct {
 	dummyHash       string
 	confirmationKey []byte
 	mu              sync.Mutex
+	backupMu        sync.Mutex
 	subscribers     map[*eventSubscriber]struct{}
 	visitors        map[string]visitor
 	online          Presence
@@ -64,6 +65,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /api/users/{id}", s.updateUser)
 	s.mux.HandleFunc("PUT /api/preferences", s.preferences)
 	s.mux.HandleFunc("PUT /api/announcement", s.saveAnnouncement)
+	s.mux.HandleFunc("POST /api/backups/download", s.downloadBackup)
 	s.mux.HandleFunc("POST /api/calendar/refresh", s.refreshCalendar)
 	s.mux.HandleFunc("POST /api/calendar/import", s.importCalendar)
 	s.mux.HandleFunc("POST /api/avatar", s.uploadAvatar)

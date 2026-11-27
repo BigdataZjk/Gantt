@@ -70,7 +70,14 @@ func (s *Store) Backup(ctx context.Context, output, version string) (BackupManif
 	}
 	defer os.RemoveAll(temp)
 	path := filepath.Join(temp, "rsm.db")
-	if _, e = s.DB.ExecContext(ctx, "vacuum into ?", path); e != nil {
+	// Keep the live Store connection available while SQLite copies the snapshot.
+	source, e := sql.Open("sqlite3", readOnlyDSN(filepath.Join(s.Home, "data", "rsm.db")))
+	if e != nil {
+		return manifest, e
+	}
+	_, e = source.ExecContext(ctx, "vacuum into ?", path)
+	source.Close()
+	if e != nil {
 		return manifest, e
 	}
 	data, e := os.ReadFile(path)
